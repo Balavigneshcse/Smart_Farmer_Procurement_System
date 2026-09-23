@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Farmer login · Smart Farmer Procurement System</title>
+    <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+<header class="site-header">
+    <div class="container header-row">
+        <a class="brand" href="/">
+            <span class="brand-mark">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 21V11"/>
+                    <path d="M12 11C12 7 9 4 4 4c0 4 3 7 8 7z"/>
+                    <path d="M12 14c0-4 3-7 8-7 0 4-3 7-8 7z"/>
+                </svg>
+            </span>
+            <span class="brand-text">Smart Farmer Procurement System</span>
+        </a>
+        <div class="lang-switch" role="group" aria-label="Language">
+            <button type="button" data-lang="en" aria-pressed="true">English</button>
+            <button type="button" data-lang="ta" aria-pressed="false">தமிழ்</button>
+            <button type="button" data-lang="hi" aria-pressed="false">हिन्दी</button>
+        </div>
+    </div>
+</header>
+
+<main class="container auth-wrap">
+    <div class="card auth-card">
+        <div id="alert" class="alert hidden" role="alert"></div>
+
+        <!-- Step 1: mobile number -->
+        <form id="mobile-form" novalidate>
+            <h1 class="auth-title" data-i18n="login.title">Farmer login</h1>
+            <p class="muted" data-i18n="login.subtitle">Enter your mobile number. We will send you a one-time password (OTP) by SMS.</p>
+            <div class="field">
+                <label for="mobile" data-i18n="login.mobile">Mobile number</label>
+                <div class="input-group">
+                    <span class="input-prefix">+91</span>
+                    <input id="mobile" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10"
+                           data-i18n-placeholder="login.mobile.placeholder" aria-describedby="mobile-error">
+                </div>
+                <p class="field-error" id="mobile-error"></p>
+            </div>
+            <button class="btn btn-primary btn-lg btn-block" type="submit" id="send-btn" data-i18n="login.sendOtp">Send OTP</button>
+        </form>
+
+        <!-- Step 2: OTP -->
+        <form id="otp-form" class="hidden" novalidate>
+            <h1 class="auth-title" data-i18n="login.otpTitle">Enter OTP</h1>
+            <p class="muted" id="otp-sent-to"></p>
+            <div class="field">
+                <label for="otp" data-i18n="login.otp">OTP</label>
+                <input id="otp" class="otp-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
+                       data-i18n-placeholder="login.otp.placeholder" aria-describedby="otp-error">
+                <p class="field-error" id="otp-error"></p>
+            </div>
+            <button class="btn btn-primary btn-lg btn-block" type="submit" id="verify-btn" data-i18n="login.verify">Verify and continue</button>
+            <div class="auth-links">
+                <button type="button" class="link-button" id="resend-btn" disabled></button>
+                <button type="button" class="link-button" id="change-btn" data-i18n="login.changeNumber">Change number</button>
+            </div>
+        </form>
+    </div>
+    <p class="auth-footer small muted"><a href="/staff/login.html">Staff login</a></p>
+</main>
+
+<script src="/js/i18n.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script>
+    // Where to go after login. The booking page arrives in M3; until then both go to the dashboard.
+    const NEXT_PAGES = { dashboard: '/farmer/dashboard.html', book: '/farmer/dashboard.html' };
+    const params = new URLSearchParams(location.search);
+    const nextPage = NEXT_PAGES[params.get('next')] || NEXT_PAGES.dashboard;
+
+    const $ = id => document.getElementById(id);
+    let mobile = '';
+    let resendLeft = 0;
+    let resendTimer = null;
+
+    // Already logged in as a farmer? Skip the login page.
+    if (Auth.user()?.role === 'FARMER') {
+        location.replace(nextPage);
+    }
+
+    function showAlert(text, type = 'error') {
+        $('alert').textContent = text;
+        $('alert').className = `alert alert-${type}`;
+    }
+
+    function hideAlert() {
+        $('alert').className = 'alert hidden';
+    }
+
+    function setFieldError(inputId, messageKey) {
+        $(inputId).setAttribute('aria-invalid', 'true');
+        $(`${inputId}-error`).textContent = I18N.t(messageKey);
+        $(inputId).focus();
+    }
+
+    function clearFieldError(inputId) {
+        $(inputId).removeAttribute('aria-invalid');
+        $(`${inputId}-error`).textContent = '';
+    }
+
+    function setBusy(button, busyKey, busy) {
+        button.disabled = busy;
+        button.textContent = I18N.t(busy ? busyKey : button.dataset.i18n);
+    }
+
+    function renderOtpStepText() {
+        $('otp-sent-to').textContent = I18N.t('login.otpSentTo', { mobile });
+        $('resend-btn').disabled = resendLeft > 0;
+        $('resend-btn').textContent = resendLeft > 0
+            ? I18N.t('login.resendIn', { seconds: resendLeft })
+            : I18N.t('login.resend');
+    }
+
+    function startResendCountdown(seconds) {
+        resendLeft = Math.ceil(seconds);
+        clearInterval(resendTimer);
+        renderOtpStepText();
+        resendTimer = setInterval(() => {
+            resendLeft -= 1;
+            renderOtpStepText();
+            if (resendLeft <= 0) clearInterval(resendTimer);
+        }, 1000);
+    }
+
+    function showOtpStep() {
+        $('mobile-form').classList.add('hidden');
+        $('otp-form').classList.remove('hidden');
+        $('otp').value = '';
+        clearFieldError('otp');
+        renderOtpStepText();
+        $('otp').focus();
+    }
+
+    function showMobileStep() {
+        clearInterval(resendTimer);
+        resendLeft = 0;
+        hideAlert();
+        $('otp-form').classList.add('hidden');
+        $('mobile-form').classList.remove('hidden');
+        $('mobile').focus();
+    }
+
+    async function requestOtp() {
+        const result = await Api.post('/api/auth/otp/send', { mobile, language: I18N.lang });
+        startResendCountdown(result.resendAfterSeconds);
+    }
+
+    $('mobile-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        hideAlert();
+        const value = $('mobile').value.replace(/\D/g, '');
+        if (!/^[6-9]\d{9}$/.test(value)) {
+            setFieldError('mobile', 'validation.mobile');
+            return;
+        }
+        clearFieldError('mobile');
+        mobile = value;
+
+        const button = $('send-btn');
+        setBusy(button, 'login.sending', true);
+        try {
+            await requestOtp();
+            showOtpStep();
+        } catch (error) {
+            if (error.code === 'OTP_COOLDOWN') {
+                // An OTP was sent a moment ago (e.g. page refreshed) - let them type it.
+                showOtpStep();
+                startResendCountdown(error.params.seconds);
+            }
+            showAlert(Api.errorMessage(error));
+        } finally {
+            setBusy(button, 'login.sending', false);
+        }
+    });
+
+    $('otp-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        hideAlert();
+        const code = $('otp').value.replace(/\D/g, '');
+        if (!/^\d{6}$/.test(code)) {
+            setFieldError('otp', 'validation.otp');
+            return;
+        }
+        clearFieldError('otp');
+
+        const button = $('verify-btn');
+        setBusy(button, 'login.verifying', true);
+        try {
+            const result = await Api.post('/api/auth/otp/verify', { mobile, otp: code });
+            if (result.registered) {
+                Auth.save(result.token, result.user);
+                await I18N.setLang(result.user.language);   // show the farmer's own language from now on
+                location.replace(nextPage);
+                return;
+            }
+            Auth.setPendingRegistration({ token: result.registrationToken, mobile, next: nextPage });
+            location.href = '/farmer/register.html';
+        } catch (error) {
+            showAlert(Api.errorMessage(error));
+            if (error.code === 'OTP_EXPIRED' || error.code === 'OTP_TOO_MANY_ATTEMPTS') {
+                $('otp').value = '';
+            }
+            setBusy(button, 'login.verifying', false);
+        }
+    });
+
+    $('resend-btn').addEventListener('click', async () => {
+        hideAlert();
+        $('resend-btn').disabled = true;
+        try {
+            await requestOtp();
+            showAlert(I18N.t('login.otpResent'), 'success');
+        } catch (error) {
+            if (error.code === 'OTP_COOLDOWN') startResendCountdown(error.params.seconds);
+            else renderOtpStepText();
+            showAlert(Api.errorMessage(error));
+        }
+    });
+
+    $('change-btn').addEventListener('click', showMobileStep);
+
+    // Only digits in the number fields.
+    ['mobile', 'otp'].forEach(id => $(id).addEventListener('input', event => {
+        event.target.value = event.target.value.replace(/\D/g, '');
+    }));
+
+    document.addEventListener('langchange', () => {
+        hideAlert();
+        if (mobile) renderOtpStepText();
+    });
+
+    I18N.init().then(() => {
+        if (params.get('expired')) showAlert(I18N.t('login.expired'), 'info');
+    });
+</script>
+</body>
+</html>

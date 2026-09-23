@@ -36,6 +36,30 @@ Useful URLs:
 - <http://localhost:8080/api/ping>: health check
 - <http://localhost:8080/api/centres>: procurement centres (JSON)
 - <http://localhost:8080/api/crops>: crops and rates (JSON)
+- <http://localhost:8080/farmer/login.html>: farmer login (English / Tamil / Hindi)
+- <http://localhost:8080/staff/login.html>: operator and admin login (English)
+
+### Logging in
+
+**Farmers** log in with their mobile number and an OTP. While `SMS_PROVIDER` is `console` (the default), no real SMS is sent. The OTP is printed in the IntelliJ **Run** console:
+
+```
+======== SMS to +91 98XXXXXXXX ========
+123456 is your OTP to log in to Smart Farmer Procurement System. ...
+```
+
+A new mobile number goes to the registration form: name, address, district, last 4 digits of Aadhaar, and language. That language is then used for the farmer's pages and SMS.
+
+**Staff** demo accounts (created by `V3__staff_accounts.sql`):
+
+| Username | Password | Role |
+|---|---|---|
+| `admin` | `Admin@123` | Admin |
+| `operator.tnj` | `Operator@123` | Operator, Thanjavur |
+| `operator.tvr` | `Operator@123` | Operator, Tiruvarur |
+| `operator.ngt` | `Operator@123` | Operator, Nagapattinam |
+
+OTP rules: valid for 5 minutes, 3 wrong tries, a new OTP only after 60 seconds, at most 5 per hour per number.
 
 ### Configuration
 
@@ -46,23 +70,40 @@ Local defaults are in `src/main/resources/application.yml`. To override them, se
 | `DB_URL` | `jdbc:postgresql://localhost:5432/farmer_procurement` | Database URL |
 | `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | `postgres` / `postgres` (from `application.yml`) | Database login |
 | `PORT` | `8080` | HTTP port |
+| `JWT_SECRET` | a local development value | Signs login tokens. **Set a random 32+ character value in production** |
+| `SMS_PROVIDER` | `console` | `console` prints SMS in the log; `textbee` sends real SMS (M6) |
 
-Secret keys (Razorpay, textbee, JWT) are added in later milestones. They are always set as environment variables and never committed.
+Secret keys (JWT, Razorpay, textbee) are always set as environment variables and never committed.
 
 ## Project structure
 
 ```
 src/main/java/com/cropcoders/procurement/
 ├── ProcurementApplication.java   entry point (forces Asia/Kolkata time zone)
+├── config/                       AppProperties (the "app:" settings)
+├── security/                     SecurityConfig (who can call what), JWT service + filter
 ├── controller/                   REST endpoints
-├── service/                      business logic
+├── service/                      business logic (OTP, login, farmer profile, ...)
 ├── repository/                   Spring Data JPA repositories
 ├── entity/                       JPA entities (tables)
-└── dto/                          request/response objects
+├── enums/                        Role, ...
+├── dto/                          request/response objects
+├── sms/                          SmsSender interface + console sender (textbee in M6)
+└── exception/                    ApiException + GlobalExceptionHandler (JSON errors)
 src/main/resources/
 ├── application.yml               configuration
-├── db/migration/                 Flyway SQL migrations (V1 schema, V2 sample data)
+├── messages*.properties          SMS texts in English, Tamil, Hindi
+├── db/migration/                 Flyway: V1 schema, V2 centres + crops, V3 staff accounts
 └── static/                       HTML pages, css/, js/, i18n/ (en, ta, hi)
+src/test/java/                    unit tests (JwtServiceTest)
 ```
+
+### How login works (for the viva)
+
+1. **Farmer OTP.** The server makes a random 6-digit code, stores only its BCrypt hash, and sends it by SMS in the farmer's language.
+2. **Verify.** The code is checked against the hash. There are 3 attempts, and each wrong try is saved even though the request fails (`noRollbackFor`).
+3. **New farmer.** The server returns a 15-minute *registration token* (a JWT marked `purpose=register`). This token can only be used to submit the registration form.
+4. **Login token.** A JWT signed with `JWT_SECRET` that holds the user id, role and centre. The browser keeps it in `localStorage` and sends it as `Authorization: Bearer …`.
+5. **Access rules.** `JwtAuthFilter` reads the token on every request, and `SecurityConfig` allows `/api/farmers/**` only for FARMER, `/api/operator/**` only for OPERATOR, and `/api/admin/**` only for ADMIN.
 
 See [PLAN.md](PLAN.md) for the full design and milestone checklist.

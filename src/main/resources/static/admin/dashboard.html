@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin dashboard · Smart Farmer Procurement System</title>
+    <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+<header class="site-header">
+    <div class="container header-row">
+        <a class="brand" href="/admin/dashboard.html">
+            <span class="brand-mark">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 21V11"/>
+                    <path d="M12 11C12 7 9 4 4 4c0 4 3 7 8 7z"/>
+                    <path d="M12 14c0-4 3-7 8-7 0 4-3 7-8 7z"/>
+                </svg>
+            </span>
+            <span class="brand-text">Admin</span>
+        </a>
+        <div class="header-actions">
+            <span class="user-chip" id="user-name"></span>
+            <button type="button" class="btn btn-outline btn-sm" id="logout-btn">Log out</button>
+        </div>
+    </div>
+</header>
+
+<main class="container">
+    <div class="page-head">
+        <h1>Admin dashboard</h1>
+        <p class="muted">Smart Farmer Procurement System</p>
+    </div>
+
+    <div id="notice" class="alert hidden" role="alert"></div>
+
+    <section class="card">
+        <p>Signed in as <strong id="who"></strong>.</p>
+        <p class="muted" style="margin: 0">Today's numbers, centre settings and farmer payments will appear here.</p>
+    </section>
+</main>
+
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script>
+    const $ = id => document.getElementById(id);
+    const me = Auth.require('ADMIN');
+
+    function render(user) {
+        $('user-name').textContent = user.name;
+        $('who').textContent = `${user.name} (${user.username})`;
+    }
+
+    $('logout-btn').addEventListener('click', Auth.logout);
+
+    if (me) {
+        render(me);
+        Api.get('/api/auth/me').then(render).catch(error => {
+            $('notice').textContent = Api.errorMessage(error);
+            $('notice').className = 'alert alert-error';
+        });
+    }
+</script>
+</body>
+</html>

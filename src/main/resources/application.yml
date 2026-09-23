@@ -20,8 +20,29 @@ spring:
   flyway:
     enabled: true
 
+  # SMS texts: messages.properties (English), messages_ta.properties, messages_hi.properties
+  messages:
+    basename: messages
+    fallback-to-system-locale: false
+
 server:
   port: ${PORT:8080}
 
 app:
   name: Smart Farmer Procurement System
+
+  jwt:
+    # Set JWT_SECRET (32+ random characters) on Render. The default is for local development only.
+    secret: ${JWT_SECRET:local-dev-secret-change-me-on-render-0123456789}
+    farmer-expiry-hours: 168          # farmers stay logged in for 7 days (fewer OTP SMS)
+    staff-expiry-hours: 12
+    registration-expiry-minutes: 15
+
+  otp:
+    valid-minutes: 5
+    max-attempts: 3
+    resend-seconds: 60
+    max-per-hour: 5
+
+  sms:
+    provider: ${SMS_PROVIDER:console}  # console = print in log, textbee = real SMS (M6)

@@ -1,0 +1,110 @@
+package com.cropcoders.procurement.entity;
+
+import java.time.LocalDateTime;
+
+import com.cropcoders.procurement.enums.Role;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+
+/**
+ * Anyone who can log in. Farmers have a mobile number (OTP login);
+ * operators and admins have a username and password.
+ */
+@Entity
+@Table(name = "users")
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+
+    @Enumerated(EnumType.STRING)
+    private Role role;
+
+    private String mobile;
+    private String username;
+    private String passwordHash;
+
+    /** The centre an operator works at (null for farmers and admins). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "centre_id")
+    private Centre centre;
+
+    private boolean active = true;
+    private LocalDateTime createdAt;
+
+    protected User() {
+        // for JPA
+    }
+
+    public static User newFarmer(String name, String mobile) {
+        User user = new User();
+        user.name = name;
+        user.mobile = mobile;
+        user.role = Role.FARMER;
+        return user;
+    }
+
+    @PrePersist
+    void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public String getMobile() {
+        return mobile;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public Centre getCentre() {
+        return centre;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+}

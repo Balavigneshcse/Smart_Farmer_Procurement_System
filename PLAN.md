@@ -84,7 +84,7 @@ Admin browser ── checkout.js popup ──► Razorpay (test)  → success �
 
 - [x] **M0 — Your setup:** JDK 21 installed, PostgreSQL 18 running, IntelliJ 2026.2 installed.
 - [x] **M1 — Skeleton:** `pom.xml`, Flyway `V1__schema.sql` (all tables) + `V2__seed_data.sql` (centres, crops), `application.yml`, Centre/Crop entities, `/api/centres`, `/api/crops`, `/api/ping`, shared CSS, i18n (en/ta/hi), landing page. ✔ App starts in IntelliJ, tables appear in the DB, landing page shows centres and rates.
-- [ ] **M2 — Auth:** OTP send/verify (console sender), JWT, farmer registration (with language choice), staff username/password login, role-based access. Pages: farmer login/register (3 languages), staff login (English).
+- [x] **M2 — Auth:** OTP send/verify (console sender), JWT, farmer registration (with language choice), staff username/password login, role-based access. Pages: farmer login/register (3 languages), staff login (English).
 - [ ] **M3 — Slots + booking:** slot generator (startup + daily), slot grid with busy colours, booking with capacity check, token + QR, my bookings, cancel.
 - [ ] **M4 — Live queue:** check-in, call next (`FOR UPDATE SKIP LOCKED`), SSE hub, TV display page, farmer live position/ETA.
 - [ ] **M5 — Procurement + payment:** weighment form, amount calculation, payments page, Razorpay order + checkout + verify. *You: add Razorpay test keys.*
@@ -242,7 +242,8 @@ Smart Farmer Procurement System/
 └── src/main/
     ├── java/com/cropcoders/procurement/
     │   ├── ProcurementApplication.java
-    │   ├── config/       SecurityConfig, JwtAuthFilter, AppProperties
+    │   ├── config/       AppProperties
+    │   ├── security/     SecurityConfig, JwtAuthFilter, JwtService, AuthUser
     │   ├── entity/       User, FarmerProfile, Centre, Crop, Slot, Booking, BookingEvent, Procurement, Payment, Notification, OtpCode
     │   ├── enums/        Role, BookingStatus, PaymentStatus, NotificationEvent
     │   ├── repository/   one Spring Data repository per entity
@@ -253,10 +254,11 @@ Smart Farmer Procurement System/
     │   ├── realtime/     QueueSseHub
     │   ├── scheduler/    SlotGenerationJob, ReminderJob, NoShowJob
     │   ├── controller/   Auth, Farmer, Catalogue, Booking, Queue, Operator, Payment, Admin, Ping
-    │   └── exception/    ApiException, GlobalExceptionHandler
+    │   └── exception/    ApiException, ApiError, GlobalExceptionHandler
     └── resources/
         ├── application.yml
-        ├── db/migration/ V1__schema.sql, V2__seed_data.sql
+        ├── messages.properties, messages_ta.properties, messages_hi.properties   (SMS texts)
+        ├── db/migration/ V1__schema.sql, V2__seed_data.sql, V3__staff_accounts.sql
         └── static/       (pages above, css/, js/, i18n/)
 ```
 

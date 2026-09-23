@@ -66,9 +66,18 @@ const I18N = (() => {
         document.dispatchEvent(new CustomEvent('langchange', { detail: { lang } }));
     }
 
-    async function init() {
+    /**
+     * Loads the saved language and wires the language buttons.
+     * options.onUserChange(lang) runs when the user clicks a language button
+     * (farmer pages use it to save the choice to their profile).
+     */
+    async function init(options = {}) {
         document.querySelectorAll('.lang-switch [data-lang]').forEach(btn => {
-            btn.addEventListener('click', () => setLang(btn.dataset.lang));
+            btn.addEventListener('click', async () => {
+                if (btn.dataset.lang === lang) return;
+                await setLang(btn.dataset.lang);
+                options.onUserChange?.(lang);
+            });
         });
         await setLang(savedLang() || 'en');
     }
