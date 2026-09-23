@@ -1,0 +1,27 @@
+# Local defaults work out of the box with a local PostgreSQL (postgres / postgres).
+# On Render, the same keys are overridden with environment variables.
+spring:
+  application:
+    name: smart-farmer-procurement
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/farmer_procurement}
+    username: postgres
+    password: postgres
+    hikari:
+      maximum-pool-size: 5
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Flyway owns the schema; Hibernate only checks that entities match it.
+      ddl-auto: validate
+
+  flyway:
+    enabled: true
+
+server:
+  port: ${PORT:8080}
+
+app:
+  name: Smart Farmer Procurement System

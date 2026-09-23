@@ -1,0 +1,16 @@
+# Build output
+target/
+out/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# Secrets and local settings - never commit these
+.env
+*.env
+application-local.yml
+
+# Logs
+*.log

@@ -1,0 +1,37 @@
+{
+  "common.loading": "लोड हो रहा है…",
+  "common.loadError": "लोड नहीं हो सका। कृपया इंटरनेट जाँचें और फिर से प्रयास करें।",
+
+  "landing.tagline": "स्लॉट बुक करें। लाइन से बचें। भुगतान ट्रैक करें।",
+  "landing.hero.title": "अब खरीद केंद्र पर दिन भर इंतज़ार नहीं",
+  "landing.hero.text": "अपनी फसल बेचने के लिए समय स्लॉट बुक करें, अपनी बारी मोबाइल पर लाइव देखें, और पैसा मिलने तक हर कदम पर SMS पाएं।",
+  "landing.hero.book": "स्लॉट बुक करें",
+  "landing.hero.track": "मेरी बुकिंग देखें",
+
+  "landing.demo.label": "आपका टोकन",
+  "landing.demo.position": "कतार में स्थान",
+  "landing.demo.wait": "प्रतीक्षा",
+  "landing.demo.minutes": "{n} मिनट",
+  "landing.demo.status": "आपकी बारी पास है। कृपया केंद्र पर आएं।",
+
+  "landing.how.title": "यह कैसे काम करता है",
+  "landing.how.step1.title": "मोबाइल नंबर से पंजीकरण करें",
+  "landing.how.step1.text": "SMS से आए OTP से लॉग इन करें। पासवर्ड याद रखने की ज़रूरत नहीं।",
+  "landing.how.step2.title": "समय स्लॉट बुक करें",
+  "landing.how.step2.text": "केंद्र, तारीख, समय और फसल चुनें। आपको एक टोकन नंबर मिलेगा।",
+  "landing.how.step3.title": "अपने समय पर आएं",
+  "landing.how.step3.text": "अपनी कतार की स्थिति और प्रतीक्षा समय लाइव देखें। बारी पास आने पर हम SMS भेजेंगे।",
+  "landing.how.step4.title": "भुगतान पाएं",
+  "landing.how.step4.text": "आपकी फसल तौली और जाँची जाएगी, और पैसा खाते में आने तक आप भुगतान ट्रैक कर सकते हैं।",
+
+  "landing.centres.title": "खरीद केंद्र",
+  "landing.centres.hours": "खुला {open} – {close}",
+  "landing.centres.counters": "{n} काउंटर",
+  "landing.centres.perSlot": "हर {mins} मिनट के स्लॉट में {n} किसान",
+
+  "landing.rates.title": "खरीद दरें",
+  "landing.rates.crop": "फसल",
+  "landing.rates.rate": "दर प्रति क्विंटल",
+  "landing.rates.moisture": "अधिकतम नमी",
+  "landing.rates.note": "सीमा से अधिक नमी वाली फसल अस्वीकार हो सकती है। आने से पहले फसल अच्छी तरह सुखा लें।"
+}

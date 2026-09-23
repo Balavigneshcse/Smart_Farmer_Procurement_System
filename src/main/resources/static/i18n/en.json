@@ -1,0 +1,37 @@
+{
+  "common.loading": "Loading…",
+  "common.loadError": "Could not load. Please check your internet and try again.",
+
+  "landing.tagline": "Book your slot. Skip the queue. Track your payment.",
+  "landing.hero.title": "No more waiting all day at the procurement centre",
+  "landing.hero.text": "Book a time slot to sell your crop, watch your turn live on your phone, and get an SMS at every step until the money reaches you.",
+  "landing.hero.book": "Book a slot",
+  "landing.hero.track": "Track my booking",
+
+  "landing.demo.label": "Your token",
+  "landing.demo.position": "Position",
+  "landing.demo.wait": "Wait",
+  "landing.demo.minutes": "{n} min",
+  "landing.demo.status": "Your turn is near. Please come to the centre.",
+
+  "landing.how.title": "How it works",
+  "landing.how.step1.title": "Register with your mobile",
+  "landing.how.step1.text": "Log in with an OTP sent by SMS. No password to remember.",
+  "landing.how.step2.title": "Book a time slot",
+  "landing.how.step2.text": "Choose your centre, date, time and crop. You get a token number.",
+  "landing.how.step3.title": "Come at your time",
+  "landing.how.step3.text": "See your queue position and waiting time live. We send an SMS when your turn is near.",
+  "landing.how.step4.title": "Get paid",
+  "landing.how.step4.text": "Your crop is weighed and checked, and you can track the payment until it is credited.",
+
+  "landing.centres.title": "Procurement centres",
+  "landing.centres.hours": "Open {open} – {close}",
+  "landing.centres.counters": "{n} counters",
+  "landing.centres.perSlot": "{n} farmers per {mins}-minute slot",
+
+  "landing.rates.title": "Procurement rates",
+  "landing.rates.crop": "Crop",
+  "landing.rates.rate": "Rate per quintal",
+  "landing.rates.moisture": "Max moisture",
+  "landing.rates.note": "Crop with moisture above the limit may be rejected. Dry your crop well before coming."
+}

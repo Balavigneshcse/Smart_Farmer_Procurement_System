@@ -1,0 +1,315 @@
+/* ==========================================================
+   Smart Farmer Procurement System - shared styles
+   Mobile-first. Used by farmer, operator, admin and display pages.
+   ========================================================== */
+
+:root {
+    --green-900: #12351f;
+    --green-700: #1e6b3a;
+    --green-600: #25804a;
+    --green-100: #dff0e3;
+    --green-50: #f0f7f1;
+    --amber-600: #b77905;
+    --amber-500: #e3a008;
+    --amber-100: #fdf1d2;
+    --red-600: #b3261e;
+    --red-100: #fbe4e1;
+    --blue-600: #1c5fa8;
+    --blue-100: #e3eefb;
+
+    --ink: #1b2a20;
+    --muted: #5b6b60;
+    --line: #dfe5dc;
+    --bg: #f7f6f1;
+    --card: #ffffff;
+
+    --radius: 14px;
+    --radius-sm: 8px;
+    --shadow: 0 1px 2px rgba(18, 53, 31, .06), 0 4px 16px rgba(18, 53, 31, .06);
+    --font: system-ui, "Segoe UI", "Nirmala UI", Roboto, "Noto Sans", "Noto Sans Tamil", "Noto Sans Devanagari", sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+    margin: 0;
+    font-family: var(--font);
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--ink);
+    background: var(--bg);
+    overflow-wrap: break-word;
+}
+
+h1, h2, h3 { line-height: 1.25; margin: 0 0 .5em; color: var(--green-900); }
+h1 { font-size: clamp(1.7rem, 5vw, 2.6rem); }
+h2 { font-size: clamp(1.3rem, 3.5vw, 1.7rem); }
+h3 { font-size: 1.1rem; }
+p { margin: 0 0 1em; }
+a { color: var(--green-700); }
+img, svg { max-width: 100%; }
+
+.container { width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+.section { padding: 40px 16px; }
+.muted { color: var(--muted); }
+.small { font-size: .9rem; }
+.hidden { display: none !important; }
+
+/* ---------- Header ---------- */
+.site-header {
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+.header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    min-height: 64px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: var(--green-900);
+    font-weight: 700;
+    font-size: 1.05rem;
+    line-height: 1.2;
+}
+.brand-mark {
+    width: 36px;
+    height: 36px;
+    flex: none;
+    border-radius: 10px;
+    background: var(--green-700);
+    color: #fff;
+    display: grid;
+    place-items: center;
+}
+
+/* ---------- Language switch ---------- */
+.lang-switch {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 3px;
+    background: var(--green-50);
+}
+.lang-switch button {
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: .9rem;
+    padding: 6px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    color: var(--muted);
+    min-height: 36px;
+}
+.lang-switch button[aria-pressed="true"] {
+    background: var(--green-700);
+    color: #fff;
+    font-weight: 600;
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    border: 2px solid transparent;
+    font: inherit;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+}
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+.btn-primary { background: var(--green-700); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--green-900); }
+.btn-outline { background: var(--card); color: var(--green-700); border-color: var(--green-700); }
+.btn-outline:hover:not(:disabled) { background: var(--green-50); }
+.btn-accent { background: var(--amber-500); color: var(--green-900); }
+.btn-accent:hover:not(:disabled) { background: var(--amber-600); color: #fff; }
+.btn-danger { background: var(--card); color: var(--red-600); border-color: var(--red-600); }
+.btn-lg { min-height: 56px; font-size: 1.1rem; padding: 12px 28px; }
+.btn-block { width: 100%; }
+
+/* ---------- Cards & grids ---------- */
+.card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+}
+.grid { display: grid; gap: 16px; }
+.grid-2 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.grid-3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+
+/* ---------- Hero (landing) ---------- */
+.hero {
+    background: linear-gradient(180deg, var(--green-50), var(--bg));
+    padding: 48px 0 40px;
+    border-bottom: 1px solid var(--line);
+}
+.eyebrow {
+    display: inline-block;
+    background: var(--amber-100);
+    color: var(--amber-600);
+    font-weight: 600;
+    font-size: .9rem;
+    padding: 4px 12px;
+    border-radius: 999px;
+    margin-bottom: 16px;
+}
+.lead { font-size: 1.15rem; color: var(--muted); max-width: 60ch; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.hero-grid { display: grid; gap: 32px; align-items: center; }
+@media (min-width: 860px) {
+    .hero-grid { grid-template-columns: 1.4fr 1fr; }
+}
+
+/* ---------- Token card (landing demo + farmer dashboard) ---------- */
+.token-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+    width: 100%;
+    max-width: 380px;
+    justify-self: center;
+}
+.token {
+    font-size: 2.6rem;
+    font-weight: 800;
+    letter-spacing: .04em;
+    color: var(--green-700);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+}
+.token-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+.stat { background: var(--green-50); border-radius: var(--radius-sm); padding: 12px; }
+.stat-label { font-size: .85rem; color: var(--muted); }
+.stat-value { font-size: 1.5rem; font-weight: 700; color: var(--green-900); }
+.token-card .alert { margin-bottom: 0; }
+
+/* ---------- Steps (how it works) ---------- */
+.steps {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    counter-reset: step;
+}
+.steps li { counter-increment: step; }
+.steps li::before {
+    content: counter(step);
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--green-700);
+    color: #fff;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+.steps h3 { margin-bottom: 4px; }
+.steps p { margin: 0; color: var(--muted); font-size: .95rem; }
+
+/* ---------- Centre card ---------- */
+.centre-card h3 { margin-bottom: 2px; }
+.centre-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+/* ---------- Badges ---------- */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: .85rem;
+    font-weight: 600;
+    background: var(--green-100);
+    color: var(--green-900);
+    max-width: 100%;
+}
+.badge-amber { background: var(--amber-100); color: var(--amber-600); }
+.badge-red { background: var(--red-100); color: var(--red-600); }
+.badge-blue { background: var(--blue-100); color: var(--blue-600); }
+.badge-grey { background: #eceee9; color: var(--muted); }
+
+/* ---------- Tables ---------- */
+.table-wrap { overflow-x: auto; padding: 0; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: .85rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); background: var(--green-50); }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---------- Forms ---------- */
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.field label { font-weight: 600; }
+.field .hint { font-size: .85rem; color: var(--muted); }
+input, select, textarea {
+    font: inherit;
+    width: 100%;
+    min-height: 48px;
+    padding: 10px 14px;
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    color: var(--ink);
+}
+input:focus, select:focus, textarea:focus, .btn:focus-visible, .lang-switch button:focus-visible {
+    outline: 3px solid var(--amber-500);
+    outline-offset: 1px;
+}
+
+/* ---------- Alerts ---------- */
+.alert { padding: 12px 16px; border-radius: var(--radius-sm); margin-bottom: 16px; }
+.alert-error { background: var(--red-100); color: var(--red-600); }
+.alert-success { background: var(--green-100); color: var(--green-900); }
+.alert-info { background: var(--blue-100); color: var(--blue-600); }
+
+/* ---------- Footer ---------- */
+.site-footer { border-top: 1px solid var(--line); background: var(--card); margin-top: 24px; }
+.footer-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 20px;
+    padding-bottom: 20px;
+    font-size: .9rem;
+    color: var(--muted);
+}
+.footer-row nav { display: flex; gap: 20px; flex-wrap: wrap; }
+
+@media (max-width: 480px) {
+    body { font-size: 16px; }
+    .section { padding: 32px 16px; }
+    th, td { padding: 10px; }
+    th { letter-spacing: 0; }
+    .actions .btn { width: 100%; }
+    .brand-text { font-size: .95rem; }
+}

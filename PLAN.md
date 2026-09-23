@@ -1,0 +1,289 @@
+# Smart Farmer Procurement System — Build Plan
+
+College mini project · Theme: Smart Automation · Built by you + Claude (no other team members)
+
+**Problem:** Farmers face long waits, no information about procurement schedules, and no visibility into procurement/payment status.
+**Solution:** Farmers book time slots, the centre runs a live token queue, SMS goes out at key moments, and every booking has a tracked timeline from arrival to payment.
+
+---
+
+## 1. Stack
+
+| Layer | Choice |
+|---|---|
+| Frontend | HTML, CSS, vanilla JS — served by Spring Boot from `src/main/resources/static` (no CORS, one deployable) |
+| Languages | Farmer pages: English / தமிழ் / हिन्दी (farmer picks at registration; landing + login have a switch). Operator desk and admin: **English only** |
+| Backend | Java 21, Spring Boot 4.1.1, Maven (IntelliJ's bundled Maven), Spring Security + JWT (jjwt 0.13.0) |
+| Database | PostgreSQL · Flyway migrations · local = PostgreSQL 18 installed on the PC (**no Docker**), database `farmer_procurement`, user `postgres` / `postgres` · production = Neon |
+| Realtime | Server-Sent Events (`SseEmitter` + browser `EventSource`) |
+| Payments | Razorpay **test mode** (Checkout + server-side signature verification) |
+| SMS | textbee.dev (your Android phone is the SMS gateway) · `console` sender for local dev |
+| Hosting | Render free web service (Docker) + Neon free Postgres |
+| IDE | IntelliJ IDEA 2026.2, project SDK = JDK 21 (`C:\Program Files\Java\jdk-21.0.12.1`) |
+| Source control | https://github.com/Balavigneshcse/Smart_Farmer_Procurement_System — commit + push after each milestone |
+
+**Decisions made**
+- Farmer registration asks: name, mobile (OTP-verified), address + district, Aadhaar last 4 digits, preferred language. The crop is asked **at booking**, not at registration.
+- A farmer's SMS are sent in their registered language.
+- Docker is used only by Render in the cloud (Render has no native Java runtime). Nothing Docker runs on the PC.
+
+## 2. Deployment architecture
+
+```
+Farmer phone ─┐
+Operator PC  ─┼── HTTPS ──►  Render (free, Docker)
+Admin PC     ─┤              Spring Boot app + static pages
+TV display   ─┘                 │ JDBC+SSL      │ HTTPS           │ HTTPS
+                                ▼               ▼                 ▼
+                          Neon Postgres    Razorpay API     textbee cloud ──push──► your Android phone ──SMS──► farmer
+
+Admin browser ── checkout.js popup ──► Razorpay (test)  → success → backend verifies signature
+```
+
+## 3. Free-tier limits and the design rules they force
+
+| Service | Free limit | Design rule |
+|---|---|---|
+| Render web service | 750 h/month, 512 MB RAM, sleeps after 15 min idle, ~1 min to wake | Open the site 2 min before any demo. JVM tuned for 512 MB. Optional: cron-job.org pings `/api/ping` (no DB hit) only 8 AM–8 PM |
+| Render Postgres | Deleted 30 days after creation | **Don't use it** — use Neon |
+| Neon Postgres | 0.5 GB storage, 100 CU-hours/month, sleeps after 5 min idle | Scheduled jobs run every 15 min, 7 AM–9 PM IST only, so the DB can sleep. Hikari pool max 5 |
+| textbee.dev | 1 device, 50 SMS/day, 300 SMS/month, 60 req/min | SMS only for 6 key events (below). Code enforces a daily cap (default 45) then falls back to in-app only. Use `console` sender while developing |
+| Razorpay | Test mode is free, no KYC | Test keys only. Test UPI ID `success@razorpay` |
+
+## 4. Who does what
+
+| Claude | You |
+|---|---|
+| Writes all code: Java, SQL, HTML/CSS/JS, Dockerfile, README | Create accounts: Razorpay, textbee, GitHub, Neon, Render |
+| Builds and runs locally, fixes errors, tests pages in the browser | Install the textbee app on an Android phone (Android 7+) and link it |
+| Git commits with clear messages | Put secret keys into IntelliJ run config / Render env vars (never in code) |
+| Writes deploy + demo steps | Run it in IntelliJ, test on your phone, click Deploy on Render, review each milestone |
+
+## 5. Scope
+
+**Must-have (the project is complete when these work)**
+1. Farmer registration + OTP login
+2. Centres, crops and rates (seeded; admin can edit)
+3. Automatic slot generation with capacity; booking gives a token + QR code
+4. Operator desk: check-in, **Call next** per counter, live queue list
+5. Live TV display + farmer live position/ETA (SSE)
+6. Weighment entry (weight, moisture, grade) → automatic amount → accept/reject
+7. Razorpay test payment → status PAID
+8. SMS on key events (budgeted) + in-app notification list
+9. Farmer tracking timeline (booked → arrived → at counter → weighed → paid)
+10. Automation jobs: reminders, no-show marking, "turn near" alert
+11. Admin dashboard: today's farmers, average wait, queue length, quantity procured, payments pending/paid
+
+**Nice-to-have (only after must-haves are deployed)**
+- QR scanning with webcam at check-in (`html5-qrcode`)
+- Tamil / English toggle
+- Charts on the dashboard (Chart.js)
+- "Least crowded slot" suggestion across centres
+
+## 6. Milestones (each ends with something you can run and test)
+
+- [x] **M0 — Your setup:** JDK 21 installed, PostgreSQL 18 running, IntelliJ 2026.2 installed.
+- [x] **M1 — Skeleton:** `pom.xml`, Flyway `V1__schema.sql` (all tables) + `V2__seed_data.sql` (centres, crops), `application.yml`, Centre/Crop entities, `/api/centres`, `/api/crops`, `/api/ping`, shared CSS, i18n (en/ta/hi), landing page. ✔ App starts in IntelliJ, tables appear in the DB, landing page shows centres and rates.
+- [ ] **M2 — Auth:** OTP send/verify (console sender), JWT, farmer registration (with language choice), staff username/password login, role-based access. Pages: farmer login/register (3 languages), staff login (English).
+- [ ] **M3 — Slots + booking:** slot generator (startup + daily), slot grid with busy colours, booking with capacity check, token + QR, my bookings, cancel.
+- [ ] **M4 — Live queue:** check-in, call next (`FOR UPDATE SKIP LOCKED`), SSE hub, TV display page, farmer live position/ETA.
+- [ ] **M5 — Procurement + payment:** weighment form, amount calculation, payments page, Razorpay order + checkout + verify. *You: add Razorpay test keys.*
+- [ ] **M6 — SMS + automation:** textbee sender, SMS templates, daily cap, reminder / no-show / turn-near jobs, in-app notifications. *You: add textbee API key; test real SMS on your phone.*
+- [ ] **M7 — Dashboard + polish:** admin dashboard, tracking timeline, mobile-friendly styling, demo seed data, README.
+- [ ] **M8 — Deploy:** Dockerfile, push to GitHub, Neon DB, Render web service + env vars, smoke test on the live URL, demo checklist.
+
+---
+
+## 7. Design details
+
+### Roles
+| Role | Login | Can do |
+|---|---|---|
+| FARMER | Mobile + OTP | Profile, book/cancel slots, see live status, timeline, payments, notifications |
+| OPERATOR | Username + password | For their centre: check-in, call next, weighment, mark no-show |
+| ADMIN | Username + password | Centres, crops/rates, slot settings, payments (Razorpay), dashboard |
+| Public | none | TV display for a centre (token numbers only — no names/phones) |
+
+### Booking lifecycle
+```
+BOOKED ──check-in──► CHECKED_IN ──call next──► CALLED ──weighment──► COMPLETED (accepted) / REJECTED
+  ├──► CANCELLED  (farmer cancels; slot capacity released)
+  └──► NO_SHOW    (auto: slot end + 30 min passed, never checked in)
+
+Payment (only for COMPLETED): PENDING ──► PAID / FAILED
+```
+Every change writes a `booking_events` row → this powers the farmer's timeline.
+
+### Slots and capacity
+- Each centre has `open_time`, `close_time`, `slot_minutes`, `counters` and `avg_service_min`.
+- Capacity per slot = `counters × slot_minutes / avg_service_min` (e.g. 4 × 30 / 10 = 12 farmers).
+- Slots for the next 7 days are generated at app startup and daily; the generator is idempotent (UNIQUE on centre+date+start).
+- Busy colour for the booking grid: < 50% green, 50–85% amber, > 85% red.
+
+### Booking safety
+```sql
+-- atomic capacity check: 0 rows updated => "slot full"
+UPDATE slots SET booked = booked + 1 WHERE id = :slotId AND booked < capacity;
+
+-- one active booking per farmer per day
+CREATE UNIQUE INDEX uq_active_booking ON bookings(farmer_id, booking_date)
+  WHERE status IN ('BOOKED','CHECKED_IN','CALLED');
+```
+Token = centre code + daily number, e.g. `TNJ-017`, from an upsert counter:
+`INSERT INTO token_counters ... ON CONFLICT (centre_id, day) DO UPDATE SET last_no = token_counters.last_no + 1 RETURNING last_no`.
+
+### Queue logic
+- At check-in set `queue_priority`: on time (before slot end + 15 min) → slot start time; late → actual check-in time (joins the back).
+- Queue = `CHECKED_IN` bookings of that centre today ordered by `queue_priority, checked_in_at`.
+- Call next:
+  ```sql
+  SELECT * FROM bookings
+  WHERE centre_id = ? AND booking_date = CURRENT_DATE AND status = 'CHECKED_IN'
+  ORDER BY queue_priority, checked_in_at
+  LIMIT 1 FOR UPDATE SKIP LOCKED;
+  ```
+- ETA = `ceil(position / counters) × avg_service_min`, where `avg_service_min` = average of (completed_at − called_at) for the last 10 farmers today at that centre, falling back to the centre default.
+- Every queue change broadcasts a snapshot on `/api/queue/{centreId}/stream` (SSE). Heartbeat comment every 20 s; dead emitters removed. The farmer page subscribes to the same public stream and finds its own token in the snapshot.
+
+### SMS budget (textbee free = 50/day, 300/month)
+| Event | Channel |
+|---|---|
+| OTP | SMS |
+| Booking confirmed (token, date, time, centre) | SMS |
+| Reminder (~1 hour before slot) | SMS |
+| Turn near (position ≤ 3) | SMS |
+| Procured / rejected (weight, grade, amount or reason) | SMS |
+| Payment credited (amount, reference) | SMS |
+| Checked in, called to counter, cancelled, no-show | In-app only |
+
+About 6 SMS per farmer journey → ~50 full journeys per month. All messages (sent or not) are stored in `notifications` and shown in-app. When today's SMS count reaches `SMS_DAILY_LIMIT`, we still save the notification, but it is shown in-app only.
+
+textbee call:
+```
+POST https://api.textbee.dev/api/v1/gateway/send-sms
+Header: x-api-key: <TEXTBEE_API_KEY>
+Body:   { "recipients": ["+91XXXXXXXXXX"], "message": "..." }
+```
+Phone tips: keep the phone on Wi-Fi/data, disable battery optimisation for the textbee app, SIM needs an SMS pack. SMS arrive from your own number.
+
+### Payment flow (Razorpay test mode)
+1. Weighment saved → `payments` row `PENDING`, amount computed on the server (in paise).
+2. Admin clicks **Pay** → `POST /api/payments/{id}/order` → backend creates a Razorpay order → returns `order_id` + public `key_id`.
+3. Browser opens Razorpay Checkout; pay with test UPI `success@razorpay`.
+4. Success handler posts `razorpay_order_id`, `razorpay_payment_id`, `razorpay_signature` to `/api/payments/verify` → `Utils.verifyPaymentSignature(...)` → `PAID` → SMS + timeline update.
+5. Viva note: in reality money goes government → farmer (DBT / RazorpayX Payouts). In the demo, the admin paying via test Checkout represents that disbursement.
+
+### Scheduled jobs (`zone = "Asia/Kolkata"`)
+| Job | When | What |
+|---|---|---|
+| Slot generator | On startup + `0 0 7 * * *` | Ensure slots exist for the next 7 days |
+| Reminder | `0 */15 7-21 * * *` | BOOKED, slot starts within 90 min, `reminder_sent = false` → SMS |
+| No-show | `0 */15 7-21 * * *` | BOOKED and slot end + 30 min passed → NO_SHOW (in-app) |
+| Turn near | Event-driven (after each call-next) | Farmers now at position ≤ 3 who weren't alerted → SMS |
+
+### Database tables (Flyway)
+| Table | Key columns |
+|---|---|
+| `users` | id, name, mobile (unique), username (unique, staff), password_hash (staff), role, centre_id (operators), created_at |
+| `farmer_profiles` | user_id (PK/FK), address, district, aadhaar_last4, language (en/ta/hi) |
+| `otp_codes` | id, mobile, code_hash, expires_at, attempts, used |
+| `centres` | id, code, name, district, address, open_time, close_time, slot_minutes, counters, avg_service_min, active |
+| `crops` | id, name, rate_per_qtl, max_moisture_pct, active |
+| `slots` | id, centre_id, slot_date, start_time, end_time, capacity, booked · UNIQUE(centre_id, slot_date, start_time) |
+| `token_counters` | centre_id, day, last_no · PK(centre_id, day) |
+| `bookings` | id, token, farmer_id, slot_id, centre_id, booking_date, crop_id, est_qty_qtl, status, queue_priority, checked_in_at, called_at, counter_no, completed_at, reminder_sent, turn_alert_sent, created_at |
+| `booking_events` | id, booking_id, status, note, created_by, created_at |
+| `procurements` | id, booking_id (unique), weight_qtl, moisture_pct, grade, rate_per_qtl, amount, accepted, remarks, recorded_by, recorded_at |
+| `payments` | id, procurement_id (unique), amount_paise, status, rzp_order_id, rzp_payment_id, paid_at |
+| `notifications` | id, user_id, mobile, channel, event, message, status, provider_ref, created_at, read_at |
+
+Migrations: `V1__schema.sql`, `V2__seed_data.sql` (crops, 3 centres, admin + operator accounts). Never edit an applied migration — add `V3__...`. JPA runs with `ddl-auto: validate`.
+
+### REST API
+```
+Public     GET  /api/ping
+           GET  /api/centres · /api/crops · /api/centres/{id}/slots?date=
+           GET  /api/queue/{centreId}          (snapshot)
+           GET  /api/queue/{centreId}/stream   (SSE)
+Auth       POST /api/auth/otp/send · /api/auth/otp/verify · /api/auth/login
+Farmer     GET/PUT /api/farmers/me
+           POST /api/bookings · GET /api/bookings/my · GET /api/bookings/{id} · POST /api/bookings/{id}/cancel
+           GET  /api/notifications/my
+Operator   GET  /api/operator/queue
+           POST /api/operator/checkin · /api/operator/call-next · /api/operator/bookings/{id}/no-show
+           POST /api/operator/procurements
+Admin      CRUD /api/admin/centres · /api/admin/crops
+           GET  /api/admin/payments?status= · POST /api/payments/{id}/order · POST /api/payments/verify
+           GET  /api/admin/dashboard
+```
+
+### Pages (`src/main/resources/static`)
+| Page | Purpose |
+|---|---|
+| `index.html` | Landing + choose role |
+| `farmer/login.html`, `farmer/register.html` | OTP login, profile + language choice (3 languages) |
+| `farmer/book.html` | Centre → date → slot grid (busy colours) → crop + quantity → token + QR |
+| `farmer/dashboard.html` | Bookings, live position/ETA, timeline, payments, notifications |
+| `staff/login.html` | Operator/admin login |
+| `operator/desk.html` | Check-in, live queue, **Call next**, weighment form |
+| `admin/dashboard.html`, `admin/centres.html`, `admin/payments.html` | Stats, settings, Razorpay payments |
+| `display.html?centre=1` | TV board: now serving per counter + next tokens |
+| `css/app.css`, `js/api.js`, `js/auth.js` | Shared styles, fetch wrapper (adds JWT, handles 401), auth helpers |
+| `js/i18n.js`, `i18n/en.json`, `ta.json`, `hi.json` | Translations for farmer-facing pages only |
+
+Operator, admin and staff-login pages are English only and don't load `i18n.js`.
+
+CDN scripts: Razorpay `checkout.js`, `qrcodejs`.
+
+### Project structure (layered — easy to explain in the viva)
+```
+Smart Farmer Procurement System/
+├── pom.xml · Dockerfile (M8, used only by Render) · .gitignore · README.md · PLAN.md
+└── src/main/
+    ├── java/com/cropcoders/procurement/
+    │   ├── ProcurementApplication.java
+    │   ├── config/       SecurityConfig, JwtAuthFilter, AppProperties
+    │   ├── entity/       User, FarmerProfile, Centre, Crop, Slot, Booking, BookingEvent, Procurement, Payment, Notification, OtpCode
+    │   ├── enums/        Role, BookingStatus, PaymentStatus, NotificationEvent
+    │   ├── repository/   one Spring Data repository per entity
+    │   ├── dto/          request/response records
+    │   ├── service/      AuthService, JwtService, OtpService, SlotService, BookingService, QueueService,
+    │   │                 ProcurementService, PaymentService, NotificationService, DashboardService
+    │   ├── sms/          SmsSender (interface), ConsoleSmsSender, TextBeeSmsSender, SmsTemplates
+    │   ├── realtime/     QueueSseHub
+    │   ├── scheduler/    SlotGenerationJob, ReminderJob, NoShowJob
+    │   ├── controller/   Auth, Farmer, Catalogue, Booking, Queue, Operator, Payment, Admin, Ping
+    │   └── exception/    ApiException, GlobalExceptionHandler
+    └── resources/
+        ├── application.yml
+        ├── db/migration/ V1__schema.sql, V2__seed_data.sql
+        └── static/       (pages above, css/, js/, i18n/)
+```
+
+### Configuration (environment variables)
+| Variable | Local (IntelliJ) | Production (Render) |
+|---|---|---|
+| `DB_URL` | default `jdbc:postgresql://localhost:5432/farmer_procurement` | `jdbc:postgresql://<neon-host>/<db>?sslmode=require` |
+| `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | `postgres` / `postgres` (hard-coded in `application.yml`) | from Neon (overrides the yml) |
+| `JWT_SECRET` | dev default | random 32+ characters |
+| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | test keys | test keys |
+| `SMS_PROVIDER` | `console` | `textbee` |
+| `TEXTBEE_API_KEY` | (only to test real SMS) | your key |
+| `SMS_DAILY_LIMIT` | `45` | `45` |
+| `PORT` | — | set by Render |
+
+Secrets live only in IntelliJ Run Configuration → Environment variables, and in Render → Environment. `.env` files are git-ignored.
+
+### Render deploy notes
+- Web Service → connect GitHub repo → Runtime **Docker** → Instance **Free** → env vars above → health check path `/api/ping`.
+- Dockerfile: multi-stage (`maven:3.9-eclipse-temurin-21` build → `eclipse-temurin:21-jre` run) with `-XX:MaxRAMPercentage=75 -XX:+UseSerialGC -Xss512k -XX:TieredStopAtLevel=1`.
+- `server.port=${PORT:8080}`; timezone forced to `Asia/Kolkata`.
+
+### Demo script (~5 min)
+1. Admin: centre settings and auto-generated slots with capacity.
+2. Farmer (phone): OTP login (real SMS) → book slot → token `TNJ-017` + QR + confirmation SMS.
+3. Operator: check in seeded farmers + you → TV and phone update live ("Position 3 · ETA 20 min") → "turn near" SMS.
+4. Operator: **Call next** → TV shows `TNJ-017 → Counter 2`.
+5. Operator: record 24.5 qtl, moisture 15%, Grade A → amount auto-calculated → SMS.
+6. Admin: Payments → Pay → Razorpay test checkout → farmer timeline shows **Paid** + SMS.
+7. Dashboard: average wait, queue length, farmers served, quantity procured.

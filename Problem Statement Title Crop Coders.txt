@@ -1,0 +1,13 @@
+Problem Statement Title	
+Farmers often face long waiting times, lack of information regarding procurement schedules, and uncertainty about procurement status.
+
+Description	
+Expected Solution: Develop a platform that:
+
+• Enables farmer registration and slot booking.
+• Provides real-time queue management.
+• Sends SMS/app notifications.
+• Tracks procurement and payment status.
+• Reduces congestion and waiting time at procurement centres.
+
+Theme	Smart Automation

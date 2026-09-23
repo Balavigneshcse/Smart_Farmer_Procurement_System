@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Smart Farmer Procurement System</title>
+    <meta name="description" content="Book a procurement slot, track your queue position live, and follow your payment until it is credited.">
+    <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+<header class="site-header">
+    <div class="container header-row">
+        <a class="brand" href="/">
+            <span class="brand-mark">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 21V11"/>
+                    <path d="M12 11C12 7 9 4 4 4c0 4 3 7 8 7z"/>
+                    <path d="M12 14c0-4 3-7 8-7 0 4-3 7-8 7z"/>
+                </svg>
+            </span>
+            <span class="brand-text">Smart Farmer Procurement System</span>
+        </a>
+        <div class="lang-switch" role="group" aria-label="Language">
+            <button type="button" data-lang="en" aria-pressed="true">English</button>
+            <button type="button" data-lang="ta" aria-pressed="false">தமிழ்</button>
+            <button type="button" data-lang="hi" aria-pressed="false">हिन्दी</button>
+        </div>
+    </div>
+</header>
+
+<main>
+    <section class="hero">
+        <div class="container hero-grid">
+            <div>
+                <span class="eyebrow" data-i18n="landing.tagline">Book your slot. Skip the queue. Track your payment.</span>
+                <h1 data-i18n="landing.hero.title">No more waiting all day at the procurement centre</h1>
+                <p class="lead" data-i18n="landing.hero.text">Book a time slot to sell your crop, watch your turn live on your phone, and get an SMS at every step until the money reaches you.</p>
+                <div class="actions">
+                    <a class="btn btn-primary btn-lg" href="/farmer/login.html?next=book" data-i18n="landing.hero.book">Book a slot</a>
+                    <a class="btn btn-outline btn-lg" href="/farmer/login.html?next=dashboard" data-i18n="landing.hero.track">Track my booking</a>
+                </div>
+            </div>
+
+            <!-- Example of what a farmer sees on their phone -->
+            <div class="token-card" aria-hidden="true">
+                <div class="muted small" data-i18n="landing.demo.label">Your token</div>
+                <div class="token">TNJ-017</div>
+                <div class="token-stats">
+                    <div class="stat">
+                        <div class="stat-label" data-i18n="landing.demo.position">Position</div>
+                        <div class="stat-value">3</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label" data-i18n="landing.demo.wait">Wait</div>
+                        <div class="stat-value" id="demo-wait">20 min</div>
+                    </div>
+                </div>
+                <div class="alert alert-success small" data-i18n="landing.demo.status">Your turn is near. Please come to the centre.</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="container section">
+        <h2 data-i18n="landing.how.title">How it works</h2>
+        <ol class="steps">
+            <li class="card">
+                <h3 data-i18n="landing.how.step1.title">Register with your mobile</h3>
+                <p data-i18n="landing.how.step1.text">Log in with an OTP sent by SMS. No password to remember.</p>
+            </li>
+            <li class="card">
+                <h3 data-i18n="landing.how.step2.title">Book a time slot</h3>
+                <p data-i18n="landing.how.step2.text">Choose your centre, date, time and crop. You get a token number.</p>
+            </li>
+            <li class="card">
+                <h3 data-i18n="landing.how.step3.title">Come at your time</h3>
+                <p data-i18n="landing.how.step3.text">See your queue position and waiting time live. We send an SMS when your turn is near.</p>
+            </li>
+            <li class="card">
+                <h3 data-i18n="landing.how.step4.title">Get paid</h3>
+                <p data-i18n="landing.how.step4.text">Your crop is weighed and checked, and you can track the payment until it is credited.</p>
+            </li>
+        </ol>
+    </section>
+
+    <section class="container section">
+        <h2 data-i18n="landing.centres.title">Procurement centres</h2>
+        <div id="centres" class="grid grid-3">
+            <p class="muted" data-i18n="common.loading">Loading…</p>
+        </div>
+    </section>
+
+    <section class="container section">
+        <h2 data-i18n="landing.rates.title">Procurement rates</h2>
+        <div class="card table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th data-i18n="landing.rates.crop">Crop</th>
+                    <th class="num" data-i18n="landing.rates.rate">Rate per quintal</th>
+                    <th class="num" data-i18n="landing.rates.moisture">Max moisture</th>
+                </tr>
+                </thead>
+                <tbody id="rates">
+                <tr><td colspan="3" class="muted" data-i18n="common.loading">Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="muted small" style="margin-top: 12px" data-i18n="landing.rates.note">Crop with moisture above the limit may be rejected. Dry your crop well before coming.</p>
+    </section>
+</main>
+
+<footer class="site-footer">
+    <div class="container footer-row">
+        <span>© 2026 Smart Farmer Procurement System</span>
+        <nav>
+            <a href="/staff/login.html">Staff login</a>
+            <a href="/display.html">Queue display screen</a>
+        </nav>
+    </div>
+</footer>
+
+<script src="/js/i18n.js"></script>
+<script src="/js/api.js"></script>
+<script>
+    let centres = null;
+    let crops = null;
+    let loadFailed = false;
+
+    function esc(value) {
+        const div = document.createElement('div');
+        div.textContent = value ?? '';
+        return div.innerHTML;
+    }
+
+    function cropName(crop) {
+        return { en: crop.nameEn, ta: crop.nameTa, hi: crop.nameHi }[I18N.lang] || crop.nameEn;
+    }
+
+    function renderCentres() {
+        const box = document.getElementById('centres');
+        if (loadFailed) {
+            box.innerHTML = `<p class="alert alert-error">${esc(I18N.t('common.loadError'))}</p>`;
+            return;
+        }
+        if (!centres) return;
+
+        box.innerHTML = centres.map(c => `
+            <article class="card centre-card">
+                <h3>${esc(c.name)}</h3>
+                <p class="muted small">${esc(c.address)}</p>
+                <p>${esc(I18N.t('landing.centres.hours', {
+                    open: I18N.formatTime(c.openTime),
+                    close: I18N.formatTime(c.closeTime),
+                }))}</p>
+                <div class="centre-meta">
+                    <span class="badge">${esc(I18N.t('landing.centres.counters', { n: c.counters }))}</span>
+                    <span class="badge badge-amber">${esc(I18N.t('landing.centres.perSlot', { n: c.slotCapacity, mins: c.slotMinutes }))}</span>
+                </div>
+            </article>`).join('');
+    }
+
+    function renderRates() {
+        const body = document.getElementById('rates');
+        if (loadFailed) {
+            body.innerHTML = `<tr><td colspan="3" class="muted">${esc(I18N.t('common.loadError'))}</td></tr>`;
+            return;
+        }
+        if (!crops) return;
+
+        const percent = new Intl.NumberFormat(I18N.locale(), { maximumFractionDigits: 1 });
+        body.innerHTML = crops.map(c => `
+            <tr>
+                <td>${esc(cropName(c))}</td>
+                <td class="num">${esc(I18N.formatMoney(c.ratePerQtl))}</td>
+                <td class="num">${esc(percent.format(c.maxMoisturePct))}%</td>
+            </tr>`).join('');
+    }
+
+    function render() {
+        document.getElementById('demo-wait').textContent = I18N.t('landing.demo.minutes', { n: 20 });
+        renderCentres();
+        renderRates();
+    }
+
+    async function loadData() {
+        try {
+            [centres, crops] = await Promise.all([Api.get('/api/centres'), Api.get('/api/crops')]);
+        } catch {
+            loadFailed = true;
+        }
+        render();
+    }
+
+    document.addEventListener('langchange', render);
+    I18N.init().then(loadData);
+</script>
+</body>
+</html>
