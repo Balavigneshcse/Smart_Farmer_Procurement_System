@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ import com.cropcoders.procurement.entity.Slot;
 import com.cropcoders.procurement.enums.BookingEventType;
 import com.cropcoders.procurement.enums.BookingStatus;
 import com.cropcoders.procurement.exception.ApiException;
+import com.cropcoders.procurement.realtime.QueueChangedEvent;
 import com.cropcoders.procurement.repository.BookingEventRepository;
 import com.cropcoders.procurement.repository.BookingRepository;
 import com.cropcoders.procurement.repository.CropRepository;
@@ -35,17 +37,19 @@ public class BookingService {
     private final CropRepository cropRepository;
     private final UserRepository userRepository;
     private final TokenService tokenService;
+    private final ApplicationEventPublisher events;
     private final int daysAhead;
 
     public BookingService(BookingRepository bookingRepository, BookingEventRepository eventRepository,
                           SlotRepository slotRepository, CropRepository cropRepository, UserRepository userRepository,
-                          TokenService tokenService, AppProperties properties) {
+                          TokenService tokenService, ApplicationEventPublisher events, AppProperties properties) {
         this.bookingRepository = bookingRepository;
         this.eventRepository = eventRepository;
         this.slotRepository = slotRepository;
         this.cropRepository = cropRepository;
         this.userRepository = userRepository;
         this.tokenService = tokenService;
+        this.events = events;
         this.daysAhead = properties.booking().daysAhead();
     }
 
@@ -81,6 +85,7 @@ public class BookingService {
                 new Booking(token, userRepository.getReferenceById(farmerId), slot, crop, request.estQtyQtl()));
         BookingEvent event = eventRepository.save(new BookingEvent(booking, BookingEventType.BOOKED,
                 "Slot " + slot.getStartTime() + "-" + slot.getEndTime(), farmerId));
+        notifyQueueIfToday(booking);
 
         return BookingResponse.from(booking, now, List.of(BookingEventResponse.from(event)));
     }
@@ -109,7 +114,15 @@ public class BookingService {
         booking.setStatus(BookingStatus.CANCELLED);
         slotRepository.releaseSeat(booking.getSlot().getId());
         eventRepository.save(new BookingEvent(booking, BookingEventType.CANCELLED, "Cancelled by farmer", farmerId));
+        notifyQueueIfToday(booking);
         return withTimeline(booking);
+    }
+
+    /** Today's bookings appear on the operator desk ("expected"), so refresh the live screens. */
+    private void notifyQueueIfToday(Booking booking) {
+        if (booking.getBookingDate().equals(LocalDate.now())) {
+            events.publishEvent(new QueueChangedEvent(booking.getCentre().getId()));
+        }
     }
 
     private Booking find(Long farmerId, Long bookingId) {

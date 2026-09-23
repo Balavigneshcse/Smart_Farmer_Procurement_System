@@ -86,7 +86,7 @@ Admin browser ── checkout.js popup ──► Razorpay (test)  → success �
 - [x] **M1 — Skeleton:** `pom.xml`, Flyway `V1__schema.sql` (all tables) + `V2__seed_data.sql` (centres, crops), `application.yml`, Centre/Crop entities, `/api/centres`, `/api/crops`, `/api/ping`, shared CSS, i18n (en/ta/hi), landing page. ✔ App starts in IntelliJ, tables appear in the DB, landing page shows centres and rates.
 - [x] **M2 — Auth:** OTP send/verify (console sender), JWT, farmer registration (with language choice), staff username/password login, role-based access. Pages: farmer login/register (3 languages), staff login (English).
 - [x] **M3 — Slots + booking:** slot generator (startup + daily), slot grid with busy colours, booking with capacity check, token + QR, my bookings, cancel.
-- [ ] **M4 — Live queue:** check-in, call next (`FOR UPDATE SKIP LOCKED`), SSE hub, TV display page, farmer live position/ETA.
+- [x] **M4 — Live queue:** check-in (token / QR text / camera), call next (`FOR UPDATE SKIP LOCKED`), call again, not present (back of the line), SSE hub, TV display page, farmer live position/ETA.
 - [ ] **M5 — Procurement + payment:** weighment form, amount calculation, payments page, Razorpay order + checkout + verify. *You: add Razorpay test keys.*
 - [ ] **M6 — SMS + automation:** textbee sender, SMS templates, daily cap, reminder / no-show / turn-near jobs, in-app notifications. *You: add textbee API key; test real SMS on your phone.*
 - [ ] **M7 — Dashboard + polish:** admin dashboard, tracking timeline, mobile-friendly styling, demo seed data, README.
@@ -142,7 +142,8 @@ Token = centre code + daily number, e.g. `TNJ-017`, from an upsert counter:
   ORDER BY queue_priority, checked_in_at
   LIMIT 1 FOR UPDATE SKIP LOCKED;
   ```
-- ETA = `ceil(position / counters) × avg_service_min`, where `avg_service_min` = average of (completed_at − called_at) for the last 10 farmers today at that centre, falling back to the centre default.
+- ETA = `ceil(max(0, position − free_counters) / counters) × avg_service_min`, where `avg_service_min` = average of (completed_at − called_at) for the last 10 farmers today at that centre (at least 3 needed), falling back to the centre default. See `EtaCalculator` + `EtaCalculatorTest`.
+- "Not present": a called farmer who doesn't come goes back to the end of the line (`SKIPPED` timeline event).
 - Every queue change broadcasts a snapshot on `/api/queue/{centreId}/stream` (SSE). Heartbeat comment every 20 s; dead emitters removed. The farmer page subscribes to the same public stream and finds its own token in the snapshot.
 
 ### SMS budget (textbee free = 50/day, 300/month)

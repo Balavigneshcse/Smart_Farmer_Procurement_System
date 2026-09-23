@@ -4,7 +4,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /** Everything under "app:" in application.yml. */
 @ConfigurationProperties(prefix = "app")
-public record AppProperties(String name, Jwt jwt, Otp otp, Sms sms, Booking booking) {
+public record AppProperties(String name, Jwt jwt, Otp otp, Sms sms, Booking booking, Queue queue) {
+
+    /** A farmer who checks in later than slot end + lateGraceMinutes joins the back of the queue. */
+    public record Queue(int lateGraceMinutes) {
+    }
 
     /** How many days ahead (including today) farmers can book. */
     public record Booking(int daysAhead) {

@@ -93,5 +93,9 @@ const Farmer = (() => {
         new QRCode(element, { text, width: 168, height: 168, correctLevel: QRCode.CorrectLevel.M });
     }
 
-    return { initPage, esc, cropName, isActive, statusBadge, slotTime, dayName, dayLabel, quantity, renderQr };
+    function todayIso() {
+        return isoDate(new Date());
+    }
+
+    return { initPage, esc, cropName, isActive, statusBadge, slotTime, dayName, dayLabel, quantity, renderQr, todayIso };
 })();

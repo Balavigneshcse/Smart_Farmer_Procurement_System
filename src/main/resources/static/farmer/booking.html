@@ -41,6 +41,15 @@
     <div id="alert" class="alert hidden" role="alert"></div>
 
     <div class="booking-layout hidden" id="content">
+        <!-- Live queue first, full width: on a phone the farmer sees "go to counter" without scrolling -->
+        <section class="card hidden live-card" id="live" aria-live="polite">
+            <div class="live-head">
+                <h2><span class="live-dot"></span><span data-i18n="live.title">Live queue</span></h2>
+                <span class="small muted" id="live-updated"></span>
+            </div>
+            <div id="live-body"></div>
+        </section>
+
         <div class="stack">
             <div class="token-card">
                 <div id="status"></div>
@@ -115,6 +124,101 @@
 
         $('cancel-btn').classList.toggle('hidden', !b.cancellable);
         $('content').classList.remove('hidden');
+        updateLive();
+    }
+
+    // ---------- Live queue (only on the day of the booking, while it is active) ----------
+
+    let source = null;
+    let snapshot = null;
+    let reloadTimer = null;
+    let announcedCounter = null;
+
+    function isLiveDay() {
+        return booking && booking.date === Farmer.todayIso() && Farmer.isActive(booking.status);
+    }
+
+    function updateLive() {
+        if (!isLiveDay()) {
+            source?.close();
+            source = null;
+            $('live').classList.add('hidden');
+            return;
+        }
+        $('live').classList.remove('hidden');
+        if (!source) {
+            source = new EventSource(`/api/queue/${booking.centre.id}/stream`);
+            source.addEventListener('queue', event => {
+                snapshot = JSON.parse(event.data);
+                renderLive();
+                syncStatus();
+            });
+            source.addEventListener('error', () => {
+                $('live-updated').textContent = t('live.reconnecting');
+            });
+        }
+        renderLive();
+    }
+
+    /** Where is this farmer's token in the public queue? */
+    function liveState() {
+        const serving = snapshot.serving.find(s => s.token === booking.token);
+        if (serving) return { status: 'CALLED', counterNo: serving.counterNo };
+        const waiting = snapshot.waiting.find(w => w.token === booking.token);
+        if (waiting) return { status: 'CHECKED_IN', position: waiting.position, eta: waiting.etaMinutes };
+        return { status: 'NOT_IN_QUEUE' };
+    }
+
+    function renderLive() {
+        if (!snapshot) {
+            $('live-body').innerHTML = `<p class="muted">${esc(t('common.loading'))}</p>`;
+            return;
+        }
+        const state = liveState();
+        if (state.status === 'CALLED') {
+            $('live-body').innerHTML = `<div class="live-called">${esc(t('live.goToCounter', { n: state.counterNo }))}</div>`;
+            if (announcedCounter !== state.counterNo) {
+                announcedCounter = state.counterNo;
+                navigator.vibrate?.([400, 150, 400]);
+            }
+        } else if (state.status === 'CHECKED_IN') {
+            announcedCounter = null;
+            const ahead = state.position - 1;
+            $('live-body').innerHTML = `
+                <div class="token-stats">
+                    <div class="stat">
+                        <div class="stat-label">${esc(t('live.position'))}</div>
+                        <div class="stat-value">${state.position}</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">${esc(t('live.eta'))}</div>
+                        <div class="stat-value">${esc(state.eta === 0 ? t('live.now') : t('live.minutes', { n: state.eta }))}</div>
+                    </div>
+                </div>
+                <p style="margin: 0">${esc(ahead === 0 ? t('live.next') : t('live.ahead', { n: ahead }))}</p>`;
+        } else {
+            $('live-body').innerHTML = `
+                <p>${esc(t('live.notArrived'))}</p>
+                <p class="muted" style="margin: 0">${esc(t('live.waitingNow', { n: snapshot.waiting.length }))}</p>`;
+        }
+        $('live-updated').textContent = t('live.updated', { time: I18N.formatTime(snapshot.updatedAt.substring(11, 16)) });
+    }
+
+    /** If the queue shows a different status than our copy of the booking, reload it (timeline, badge). */
+    function syncStatus() {
+        const shown = liveState().status;
+        const expected = booking.status === 'BOOKED' ? 'NOT_IN_QUEUE' : booking.status;
+        if (shown !== expected) {
+            clearTimeout(reloadTimer);
+            reloadTimer = setTimeout(async () => {
+                try {
+                    booking = await Api.get(`/api/bookings/${bookingId}`);
+                    render();
+                } catch {
+                    // keep showing what we have; the next update will try again
+                }
+            }, 300);
+        }
     }
 
     $('cancel-btn').addEventListener('click', async () => {

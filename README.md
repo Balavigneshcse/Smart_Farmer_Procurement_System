@@ -78,6 +78,36 @@ How it works (for the viva):
 - **Tokens.** `token_counters` is updated with `INSERT … ON CONFLICT DO UPDATE … RETURNING`, so two bookings can never get the same number.
 - **Status history.** Every change is saved in `booking_events` and shown to the farmer as a timeline.
 
+### Live queue
+
+| Screen | URL | Who |
+|---|---|---|
+| Operator desk | `/operator/desk.html` | Operator: check in by token or QR code (typed, USB scanner or camera), **Call next** per counter, **Call again**, **Not present** |
+| TV display | `/display.html?centre=1` | Centre TV: now serving per counter, next tokens with waiting time, labels in 3 languages, optional chime and spoken announcement |
+| Farmer phone | `/farmer/booking.html?id=…` | Farmer: live position and waiting time, then "Please go to Counter 2 now" (the phone vibrates) |
+
+How it works (for the viva):
+- **Check-in** sets `queue_priority`. A farmer who arrives on time or early is placed by their slot start time. A farmer who arrives after slot end + 15 minutes is placed by their arrival time, which puts them at the back of the line.
+- **Call next** picks the first farmer with `SELECT … ORDER BY queue_priority, checked_in_at LIMIT 1 FOR UPDATE SKIP LOCKED`, so two counters pressing the button at the same moment always get different farmers.
+- **ETA** is calculated by `EtaCalculator` and unit tested. The average service time is the real average of the last farmers served today, or the centre's setting until at least 3 have been served. The wait for position *p* is `ceil(max(0, p − free counters) / counters) × average service time`.
+- **Live updates** use Server-Sent Events. Each screen keeps one connection open (`/api/queue/{centreId}/stream`), and after every change is committed, `QueueSseHub` pushes the new queue to all screens of that centre. The browser reconnects by itself if the connection drops.
+- **Privacy.** The public queue contains token numbers only, never names or phone numbers.
+
+### Testing the queue outside centre hours
+
+Centres close at 16:00 or 17:00, so in the evening there are no slots left for today. To test at night, temporarily keep Thanjavur open late (run in pgAdmin), then restart the app so it creates the extra slots:
+
+```sql
+UPDATE centres SET close_time = '23:30' WHERE code = 'TNJ';
+```
+
+When you have finished testing, put it back and remove the extra empty slots:
+
+```sql
+UPDATE centres SET close_time = '17:00' WHERE code = 'TNJ';
+DELETE FROM slots WHERE centre_id = (SELECT id FROM centres WHERE code = 'TNJ') AND start_time >= '17:00' AND booked = 0;
+```
+
 ### Configuration
 
 Local defaults are in `src/main/resources/application.yml`. To override them, set environment variables in IntelliJ (Run → Edit Configurations → Environment variables):
@@ -106,6 +136,7 @@ src/main/java/com/cropcoders/procurement/
 ├── enums/                        Role, ...
 ├── dto/                          request/response objects
 ├── scheduler/                    timed jobs (slot generation)
+├── realtime/                     live queue updates (Server-Sent Events)
 ├── sms/                          SmsSender interface + console sender (textbee in M6)
 └── exception/                    ApiException + GlobalExceptionHandler (JSON errors)
 src/main/resources/
@@ -113,7 +144,7 @@ src/main/resources/
 ├── messages*.properties          SMS texts in English, Tamil, Hindi
 ├── db/migration/                 Flyway: V1 schema, V2 centres + crops, V3 staff accounts
 └── static/                       HTML pages, css/, js/, i18n/ (en, ta, hi)
-src/test/java/                    unit tests (JwtServiceTest)
+src/test/java/                    unit tests (JwtServiceTest, EtaCalculatorTest)
 ```
 
 ### How login works (for the viva)

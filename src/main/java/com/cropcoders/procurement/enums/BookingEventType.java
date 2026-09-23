@@ -6,6 +6,7 @@ public enum BookingEventType {
     CANCELLED,
     CHECKED_IN,
     CALLED,
+    SKIPPED,        // not at the counter when called - sent back to the queue
     COMPLETED,
     REJECTED,
     NO_SHOW,

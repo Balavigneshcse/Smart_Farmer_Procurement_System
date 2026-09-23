@@ -484,6 +484,69 @@ fieldset.field legend { font-weight: 600; padding: 0; margin-bottom: 6px; }
 .booking-item-go { font-size: 1.6rem; color: var(--muted); }
 .list-heading { font-size: 1rem; color: var(--muted); margin: 24px 0 12px; }
 
+/* ---------- Live indicator ---------- */
+.live-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--green-600);
+    vertical-align: middle;
+    animation: live-pulse 1.8s infinite;
+}
+.offline .live-dot { background: var(--red-600); animation: none; }
+@keyframes live-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(37, 128, 74, .5); }
+    70% { box-shadow: 0 0 0 10px rgba(37, 128, 74, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(37, 128, 74, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .live-dot { animation: none; }
+}
+.live-status { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: .9rem; color: var(--green-700); }
+.live-status.offline { color: var(--red-600); }
+
+/* Farmer's live queue card */
+.live-card { grid-column: 1 / -1; }
+.live-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.live-head h2 { display: flex; align-items: center; gap: 10px; }
+.live-called {
+    background: var(--amber-100);
+    color: var(--green-900);
+    border: 2px solid var(--amber-500);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    font-size: 1.4rem;
+    font-weight: 800;
+    text-align: center;
+}
+
+/* ---------- Operator desk ---------- */
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.stat-tile { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+.stat-tile .stat-value { font-size: 1.8rem; }
+.desk-grid { display: grid; gap: 20px; align-items: start; }
+@media (min-width: 980px) {
+    .desk-grid { grid-template-columns: minmax(360px, 5fr) 7fr; }
+}
+.checkin-row { display: flex; gap: 8px; }
+.checkin-row input { flex: 1; min-width: 0; font-size: 1.1rem; text-transform: uppercase; }
+.checkin-result { margin-top: 16px; }
+.checkin-result .alert { margin-bottom: 0; }
+.scan-area { margin-top: 12px; max-width: 360px; }
+
+.counter-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.counter-card { border: 2px solid var(--line); padding: 16px; }
+.counter-card.free { border-style: dashed; box-shadow: none; }
+.counter-card.busy { border-color: var(--amber-500); background: #fffaf0; }
+.counter-no { font-weight: 700; color: var(--muted); text-transform: uppercase; font-size: .85rem; letter-spacing: .04em; }
+.counter-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+.table-tools { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 16px 8px; flex-wrap: wrap; }
+.table-tools h2 { margin: 0; display: flex; align-items: center; gap: 8px; }
+.table-tools input { max-width: 240px; min-height: 40px; }
+.empty-row td { color: var(--muted); text-align: center; padding: 20px; }
+
 /* ---------- Footer ---------- */
 .site-footer { border-top: 1px solid var(--line); background: var(--card); margin-top: 24px; }
 .footer-row {

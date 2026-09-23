@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Queue display · Smart Farmer Procurement System</title>
+    <link rel="stylesheet" href="/css/app.css">
+    <style>
+        /* TV screen: dark, high contrast, readable from across the room */
+        body.tv { background: #0f1f16; color: #f4f7f2; min-height: 100vh; }
+        .tv a { color: #9fe0b5; }
+        .tv-wrap { padding: 2vh 3vw; display: flex; flex-direction: column; gap: 2vh; height: 100vh; overflow: hidden; }
+        .tv-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+        .tv-head-right { display: flex; align-items: center; gap: 2.4vw; flex-wrap: wrap; }
+        .tv-centre { font-size: clamp(1.4rem, 3vw, 2.6rem); font-weight: 800; color: #fff; }
+        .tv-sub { color: #a9bdb0; font-size: clamp(.9rem, 1.3vw, 1.2rem); }
+        .tv-clock { font-size: clamp(1.6rem, 3.4vw, 3rem); font-weight: 700; font-variant-numeric: tabular-nums; }
+        .tv-label { font-size: clamp(1rem, 1.6vw, 1.5rem); color: #f3c969; font-weight: 700; margin: 0 0 1.2vh; letter-spacing: .02em; }
+        .tv-counters { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5vw; }
+        .tv-counter { background: #173323; border: 3px solid #2c5a3d; border-radius: 18px; padding: 1.6vh 1.5vw; text-align: center; }
+        .tv-counter.busy { border-color: #f3c969; background: #22402c; }
+        .tv-counter.flash { animation: tv-flash 1s ease-in-out 4; }
+        @keyframes tv-flash { 50% { background: #f3c969; color: #0f1f16; } }
+        .tv-counter-name { font-size: clamp(1rem, 1.8vw, 1.6rem); color: #a9bdb0; font-weight: 700; }
+        .tv-token { font-size: clamp(2.4rem, 6vw, 5.5rem); font-weight: 900; letter-spacing: .03em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+        .tv-free { font-size: clamp(1.2rem, 2.4vw, 2.2rem); color: #6f8b79; font-weight: 700; padding: 1.4vh 0; }
+        .tv-next-section { flex: 1; min-height: 0; overflow: hidden; }
+        .tv-next { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1vw; }
+        .tv-next li { background: #173323; border-radius: 12px; padding: 1.2vh 1.2vw; display: flex; flex-direction: column; gap: 2px; }
+        .tv-next-token { font-size: clamp(1.4rem, 2.6vw, 2.4rem); font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.2; }
+        .tv-next-eta { color: #a9bdb0; font-size: clamp(.9rem, 1.4vw, 1.3rem); white-space: nowrap; }
+        .tv-stat { text-align: right; }
+        .tv-stat-label { color: #a9bdb0; font-size: clamp(.75rem, 1vw, 1rem); }
+        .tv-stat-value { font-size: clamp(1.4rem, 2.4vw, 2.4rem); font-weight: 800; line-height: 1.1; }
+        .tv-empty { color: #6f8b79; font-size: clamp(1rem, 1.6vw, 1.4rem); }
+        .tv-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; color: #a9bdb0; font-size: clamp(.9rem, 1.3vw, 1.2rem); border-top: 1px solid #2c5a3d; padding-top: 1.5vh; }
+        .tv-foot .btn { min-height: 38px; background: transparent; color: #f4f7f2; border-color: #4d7a5d; }
+        .tv .live-status { color: #9fe0b5; }
+        .tv .live-status.offline { color: #ff9b91; }
+        .tv-picker { max-width: 640px; margin: 10vh auto; padding: 0 16px; }
+        .tv-picker a { display: block; background: #173323; border-radius: 12px; padding: 16px 20px; margin-bottom: 12px; font-size: 1.2rem; font-weight: 700; text-decoration: none; }
+        @media (max-width: 800px) { .tv-wrap { height: auto; overflow: visible; } }
+    </style>
+</head>
+<body class="tv">
+
+<!-- Shown when no centre is chosen: /display.html -->
+<div id="picker" class="tv-picker hidden">
+    <h1 style="color: #fff">Queue display</h1>
+    <p class="tv-sub">Choose the centre for this screen:</p>
+    <div id="centre-links"></div>
+</div>
+
+<!-- The board: /display.html?centre=1 -->
+<div id="board" class="tv-wrap hidden">
+    <header class="tv-head">
+        <div>
+            <div class="tv-centre" id="centre-name"></div>
+            <div class="tv-sub">Smart Farmer Procurement System</div>
+        </div>
+        <div class="tv-head-right">
+            <div class="tv-stat">
+                <div class="tv-stat-label">Waiting · காத்திருப்பு · प्रतीक्षा</div>
+                <div class="tv-stat-value" id="waiting-count">0</div>
+            </div>
+            <div class="tv-stat">
+                <div class="tv-stat-label">Avg wait · சராசரி · औसत</div>
+                <div class="tv-stat-value" id="avg-wait">–</div>
+            </div>
+            <div class="tv-stat">
+                <div class="tv-stat-label">Served · சேவை · सेवा</div>
+                <div class="tv-stat-value" id="served">0</div>
+            </div>
+            <div class="tv-clock" id="clock"></div>
+        </div>
+    </header>
+
+    <section>
+        <h2 class="tv-label">Now serving · இப்போது · अभी</h2>
+        <div class="tv-counters" id="serving"></div>
+    </section>
+
+    <section class="tv-next-section">
+        <h2 class="tv-label">Next · அடுத்து · अगला</h2>
+        <ol class="tv-next" id="next"></ol>
+    </section>
+
+    <footer class="tv-foot">
+        <span>Show your token at the counter · டோக்கனை கவுண்டரில் காட்டுங்கள் · अपना टोकन काउंटर पर दिखाएँ</span>
+        <span style="display: flex; gap: 16px; align-items: center">
+            <span class="live-status offline" id="live-status"><span class="live-dot"></span><span id="live-text">Connecting…</span></span>
+            <button type="button" class="btn btn-outline btn-sm" id="sound-btn">Turn sound on</button>
+        </span>
+    </footer>
+</div>
+
+<script>
+    const $ = id => document.getElementById(id);
+    const centreId = Number(new URLSearchParams(location.search).get('centre'));
+    const lastCalledAt = {};       // counter number -> calledAt we last showed
+    let firstSnapshot = true;
+    let soundOn = false;
+    let audio = null;
+
+    function esc(value) {
+        const div = document.createElement('div');
+        div.textContent = value ?? '';
+        return div.innerHTML;
+    }
+
+    function tick() {
+        $('clock').textContent = new Date().toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+    }
+
+    function render(q) {
+        $('centre-name').textContent = q.centreName;
+        document.title = `${q.centreName} · Queue`;
+
+        const newlyCalled = [];
+        $('serving').innerHTML = q.serving.map(s => {
+            const changed = s.token && s.calledAt !== lastCalledAt[s.counterNo];
+            if (changed && !firstSnapshot) newlyCalled.push(s);
+            lastCalledAt[s.counterNo] = s.calledAt;
+            return s.token ? `
+                <div class="tv-counter busy ${changed && !firstSnapshot ? 'flash' : ''}">
+                    <div class="tv-counter-name">Counter ${s.counterNo} · கவுண்டர் · काउंटर</div>
+                    <div class="tv-token">${esc(s.token)}</div>
+                </div>` : `
+                <div class="tv-counter">
+                    <div class="tv-counter-name">Counter ${s.counterNo} · கவுண்டர் · काउंटर</div>
+                    <div class="tv-free">Free · காலி · खाली</div>
+                </div>`;
+        }).join('');
+
+        $('next').innerHTML = q.waiting.length
+            ? q.waiting.slice(0, 12).map(w => `
+                <li>
+                    <span class="tv-next-token">${esc(w.token)}</span>
+                    <span class="tv-next-eta">${w.etaMinutes === 0 ? 'Now' : `~${w.etaMinutes} min`}</span>
+                </li>`).join('')
+            : '<li class="tv-empty" style="background: none">Nobody waiting · யாரும் இல்லை · कोई नहीं</li>';
+
+        $('waiting-count').textContent = q.waiting.length;
+        $('avg-wait').textContent = q.avgWaitMinutes == null ? '–' : `${q.avgWaitMinutes} min`;
+        $('served').textContent = q.servedToday;
+
+        firstSnapshot = false;
+        newlyCalled.forEach(announce);
+    }
+
+    // ---------- Sound: a chime, then the token is read out ----------
+
+    function chime() {
+        if (!audio) return;
+        [660, 880].forEach((freq, i) => {
+            const osc = audio.createOscillator();
+            const gain = audio.createGain();
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.25, audio.currentTime + i * 0.35);
+            gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + i * 0.35 + 0.6);
+            osc.connect(gain).connect(audio.destination);
+            osc.start(audio.currentTime + i * 0.35);
+            osc.stop(audio.currentTime + i * 0.35 + 0.6);
+        });
+    }
+
+    function announce(serving) {
+        if (!soundOn) return;
+        chime();
+        if ('speechSynthesis' in window) {
+            // "TNJ-003" is read letter by letter: "T N J 0 0 3"
+            const spoken = serving.token.replace('-', '').split('').join(' ');
+            const speech = new SpeechSynthesisUtterance(`Token ${spoken}, please go to counter ${serving.counterNo}`);
+            speech.lang = 'en-IN';
+            speech.rate = 0.9;
+            setTimeout(() => speechSynthesis.speak(speech), 800);
+        }
+    }
+
+    $('sound-btn').addEventListener('click', () => {
+        // Browsers only allow sound after someone clicks on the page once.
+        soundOn = !soundOn;
+        if (soundOn && !audio) audio = new AudioContext();
+        $('sound-btn').textContent = soundOn ? 'Turn sound off' : 'Turn sound on';
+        if (soundOn) chime();
+    });
+
+    // ---------- Live connection ----------
+
+    function setLive(online) {
+        $('live-status').classList.toggle('offline', !online);
+        $('live-text').textContent = online ? 'Live' : 'Reconnecting…';
+    }
+
+    function connect() {
+        const source = new EventSource(`/api/queue/${centreId}/stream`);
+        source.addEventListener('open', () => setLive(true));
+        source.addEventListener('error', () => setLive(false));
+        source.addEventListener('queue', event => {
+            setLive(true);
+            render(JSON.parse(event.data));
+        });
+    }
+
+    async function showPicker() {
+        $('picker').classList.remove('hidden');
+        const centres = await fetch('/api/centres').then(r => r.json());
+        $('centre-links').innerHTML = centres.map(c =>
+            `<a href="/display.html?centre=${c.id}">${esc(c.name)} <span class="tv-sub">(${esc(c.district)})</span></a>`).join('');
+    }
+
+    if (centreId) {
+        $('board').classList.remove('hidden');
+        tick();
+        setInterval(tick, 1000);
+        connect();
+    } else {
+        showPicker();
+    }
+</script>
+</body>
+</html>

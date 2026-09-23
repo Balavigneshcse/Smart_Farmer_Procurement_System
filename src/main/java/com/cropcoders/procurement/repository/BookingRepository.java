@@ -35,4 +35,43 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             join fetch b.crop
             where b.id = :id and b.farmer.id = :farmerId""")
     Optional<Booking> findForFarmer(@Param("id") Long id, @Param("farmerId") Long farmerId);
+
+    // ---------- Queue (operator desk, TV display) ----------
+
+    /** Every booking of one centre on one day, with everything the queue screens show. */
+    @Query("""
+            select b from Booking b
+            join fetch b.slot
+            join fetch b.crop
+            join fetch b.farmer
+            where b.centre.id = :centreId and b.bookingDate = :date""")
+    List<Booking> findAllForCentreDay(@Param("centreId") Long centreId, @Param("date") LocalDate date);
+
+    @Query("""
+            select b from Booking b
+            join fetch b.slot join fetch b.centre join fetch b.crop join fetch b.farmer
+            where b.id = :id""")
+    Optional<Booking> findDetailedById(@Param("id") Long id);
+
+    @Query("""
+            select b from Booking b
+            join fetch b.slot join fetch b.centre join fetch b.crop join fetch b.farmer
+            where b.centre.id = :centreId and b.bookingDate = :date and b.token = :token""")
+    Optional<Booking> findDetailedByToken(@Param("centreId") Long centreId, @Param("date") LocalDate date,
+                                          @Param("token") String token);
+
+    boolean existsByCentreIdAndBookingDateAndStatusAndCounterNo(Long centreId, LocalDate date, BookingStatus status,
+                                                                Integer counterNo);
+
+    /**
+     * The next farmer to call: first in queue order, and locked for this transaction.
+     * SKIP LOCKED means two counters pressing "Call next" at the same moment get two different farmers.
+     */
+    @Query(nativeQuery = true, value = """
+            SELECT * FROM bookings
+            WHERE centre_id = :centreId AND booking_date = :date AND status = 'CHECKED_IN'
+            ORDER BY queue_priority, checked_in_at
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED""")
+    Optional<Booking> lockNextWaiting(@Param("centreId") Long centreId, @Param("date") LocalDate date);
 }

@@ -49,3 +49,6 @@ app:
 
   booking:
     days-ahead: 7                      # today + the next 6 days can be booked
+
+  queue:
+    late-grace-minutes: 15             # checked in later than slot end + 15 min = back of the queue

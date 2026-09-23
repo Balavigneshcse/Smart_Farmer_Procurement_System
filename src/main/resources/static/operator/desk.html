@@ -29,41 +29,326 @@
 </header>
 
 <main class="container">
-    <div class="page-head">
-        <span class="eyebrow" id="centre-name"></span>
-        <h1>Operator desk</h1>
+    <div class="page-head head-row">
+        <div>
+            <span class="eyebrow" id="centre-name">Loading…</span>
+            <h1>Operator desk</h1>
+        </div>
+        <div class="header-actions">
+            <span class="live-status offline" id="live-status"><span class="live-dot"></span><span id="live-text">Connecting…</span></span>
+            <a class="btn btn-outline btn-sm" id="tv-link" href="/display.html" target="_blank" rel="noopener">Open TV display</a>
+        </div>
     </div>
 
-    <div id="notice" class="alert hidden" role="alert"></div>
+    <div id="notice" class="alert hidden" role="status"></div>
 
-    <section class="card">
-        <p>Signed in as <strong id="who"></strong>.</p>
-        <p class="muted" style="margin: 0">Check-in, the live queue and weighment for this centre will appear here.</p>
-    </section>
+    <div class="stat-row">
+        <div class="stat-tile"><div class="stat-label">Expected today</div><div class="stat-value" id="s-expected">–</div></div>
+        <div class="stat-tile"><div class="stat-label">Waiting</div><div class="stat-value" id="s-waiting">–</div></div>
+        <div class="stat-tile"><div class="stat-label">At counters</div><div class="stat-value" id="s-counters">–</div></div>
+        <div class="stat-tile"><div class="stat-label">Served today</div><div class="stat-value" id="s-served">–</div></div>
+        <div class="stat-tile"><div class="stat-label">Average wait</div><div class="stat-value" id="s-wait">–</div></div>
+    </div>
+
+    <div class="desk-grid">
+        <div class="stack">
+            <section class="card" aria-labelledby="checkin-title">
+                <h2 id="checkin-title">Check in a farmer</h2>
+                <form id="checkin-form" class="checkin-row" novalidate>
+                    <input id="code" aria-label="Token or QR code" autocomplete="off" autocapitalize="characters" spellcheck="false"
+                           placeholder="Token (e.g. TNJ-005) or scan QR">
+                    <button class="btn btn-primary" type="submit" id="checkin-btn">Check in</button>
+                </form>
+                <p class="hint small muted" style="margin: 8px 0 0">A USB QR scanner can type straight into this box.</p>
+                <button type="button" class="btn btn-outline btn-sm hidden" id="scan-btn" style="margin-top: 12px">Scan QR with camera</button>
+                <div id="reader" class="scan-area hidden"></div>
+                <div id="checkin-result" class="checkin-result"></div>
+            </section>
+
+            <section aria-labelledby="counters-title">
+                <h2 id="counters-title">Counters</h2>
+                <div id="counters" class="counter-grid"></div>
+            </section>
+        </div>
+
+        <div class="stack">
+            <section class="card table-wrap" aria-labelledby="waiting-title">
+                <div class="table-tools">
+                    <h2 id="waiting-title">Waiting line <span class="badge" id="waiting-count">0</span></h2>
+                </div>
+                <table>
+                    <thead>
+                    <tr><th>#</th><th>Token</th><th>Farmer</th><th>Crop</th><th>Slot</th><th>Arrived</th><th class="num">ETA</th></tr>
+                    </thead>
+                    <tbody id="waiting"></tbody>
+                </table>
+            </section>
+
+            <section class="card table-wrap" aria-labelledby="expected-title">
+                <div class="table-tools">
+                    <h2 id="expected-title">Expected today <span class="badge badge-blue" id="expected-count">0</span></h2>
+                    <input id="expected-filter" type="search" placeholder="Search token or name" aria-label="Search expected farmers">
+                </div>
+                <table>
+                    <thead>
+                    <tr><th>Token</th><th>Farmer</th><th>Slot</th><th>Crop</th><th></th></tr>
+                    </thead>
+                    <tbody id="expected"></tbody>
+                </table>
+            </section>
+        </div>
+    </div>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
 <script>
     const $ = id => document.getElementById(id);
     const me = Auth.require('OPERATOR');
+    let queue = null;
+    let source = null;
+    let refreshTimer = null;
+    let noticeTimer = null;
+    let scanner = null;
 
-    function render(user) {
-        $('user-name').textContent = user.name;
-        $('who').textContent = `${user.name} (${user.username})`;
-        $('centre-name').textContent = user.centreName;
+    function esc(value) {
+        const div = document.createElement('div');
+        div.textContent = value ?? '';
+        return div.innerHTML;
     }
 
+    /** "08:30:00" -> "8:30 am" */
+    function slotTime(hhmmss) {
+        const [h, m] = hhmmss.split(':').map(Number);
+        return new Date(2000, 0, 1, h, m).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+    }
+
+    /** "2026-09-24T09:05:12" -> "9:05 am" */
+    function clock(iso) {
+        return iso ? new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }) : '–';
+    }
+
+    function qty(n) {
+        return `${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })} qtl`;
+    }
+
+    function showNotice(text, type = 'success') {
+        $('notice').textContent = text;
+        $('notice').className = `alert alert-${type}`;
+        clearTimeout(noticeTimer);
+        noticeTimer = setTimeout(() => { $('notice').className = 'alert hidden'; }, 6000);
+    }
+
+    // ---------- Rendering ----------
+
+    function render() {
+        if (!queue) return;
+        const { centre, stats } = queue;
+        $('centre-name').textContent = centre.name;
+        $('tv-link').href = `/display.html?centre=${centre.id}`;
+        $('s-expected').textContent = stats.expected;
+        $('s-waiting').textContent = stats.waiting;
+        $('s-counters').textContent = `${stats.atCounters}/${centre.counters}`;
+        $('s-served').textContent = stats.served;
+        $('s-wait').textContent = stats.avgWaitMinutes == null ? '–' : `${stats.avgWaitMinutes} min`;
+        renderCounters();
+        renderWaiting();
+        renderExpected();
+    }
+
+    function renderCounters() {
+        const anyoneWaiting = queue.waiting.length > 0;
+        $('counters').innerHTML = queue.counters.map(({ counterNo, booking: b }) => b ? `
+            <div class="card counter-card busy">
+                <div class="counter-no">Counter ${counterNo}</div>
+                <div class="token-sm">${esc(b.token)}</div>
+                <div><strong>${esc(b.farmerName)}</strong> · Aadhaar ••••${esc(b.aadhaarLast4 ?? '')}</div>
+                <div class="muted small">${esc(b.cropName)} · ${esc(qty(b.estQtyQtl))} · called ${esc(clock(b.calledAt))}</div>
+                <div class="counter-actions">
+                    <button type="button" class="btn btn-outline btn-sm" data-recall="${b.id}">Call again</button>
+                    <button type="button" class="btn btn-danger btn-sm" data-skip="${b.id}" data-token="${esc(b.token)}">Not present</button>
+                </div>
+            </div>` : `
+            <div class="card counter-card free">
+                <div class="counter-no">Counter ${counterNo}</div>
+                <p class="muted" style="margin: 4px 0 12px">Free</p>
+                <button type="button" class="btn btn-primary btn-block" data-call="${counterNo}" ${anyoneWaiting ? '' : 'disabled'}>
+                    Call next
+                </button>
+            </div>`).join('');
+    }
+
+    function renderWaiting() {
+        $('waiting-count').textContent = queue.waiting.length;
+        $('waiting').innerHTML = queue.waiting.length ? queue.waiting.map(b => `
+            <tr>
+                <td>${b.position}</td>
+                <td><strong>${esc(b.token)}</strong></td>
+                <td>${esc(b.farmerName)}${b.late ? ' <span class="badge badge-red">Late</span>' : ''}</td>
+                <td>${esc(b.cropName)} · ${esc(qty(b.estQtyQtl))}</td>
+                <td>${esc(slotTime(b.slotStart))}</td>
+                <td>${esc(clock(b.checkedInAt))}</td>
+                <td class="num">${b.etaMinutes === 0 ? 'Now' : `${b.etaMinutes} min`}</td>
+            </tr>`).join('')
+            : '<tr class="empty-row"><td colspan="7">Nobody is waiting.</td></tr>';
+    }
+
+    function renderExpected() {
+        const filter = $('expected-filter').value.trim().toLowerCase();
+        const rows = queue.expected.filter(b =>
+            !filter || b.token.toLowerCase().includes(filter) || b.farmerName.toLowerCase().includes(filter));
+        $('expected-count').textContent = queue.expected.length;
+        $('expected').innerHTML = rows.length ? rows.map(b => `
+            <tr>
+                <td><strong>${esc(b.token)}</strong></td>
+                <td>${esc(b.farmerName)}</td>
+                <td>${esc(slotTime(b.slotStart))} – ${esc(slotTime(b.slotEnd))}</td>
+                <td>${esc(b.cropName)} · ${esc(qty(b.estQtyQtl))}</td>
+                <td class="num"><button type="button" class="btn btn-outline btn-sm" data-checkin="${esc(b.token)}">Check in</button></td>
+            </tr>`).join('')
+            : `<tr class="empty-row"><td colspan="5">${filter ? 'No match.' : 'No more farmers expected today.'}</td></tr>`;
+    }
+
+    function showCheckInResult(result) {
+        const b = result.booking;
+        $('checkin-result').innerHTML = `
+            <div class="alert alert-success">
+                <strong>✓ ${esc(b.token)} checked in${b.late ? ' <span class="badge badge-red">Late</span>' : ''}</strong><br>
+                ${esc(b.farmerName)} · Aadhaar ••••${esc(b.aadhaarLast4 ?? '')} · +91 ${esc(b.mobile ?? '')}<br>
+                ${esc(b.cropName)} · ${esc(qty(b.estQtyQtl))} · slot ${esc(slotTime(b.slotStart))}<br>
+                Position <strong>${b.position}</strong> in the line · ETA ${b.etaMinutes === 0 ? 'now' : `${b.etaMinutes} min`}
+            </div>`;
+    }
+
+    // ---------- Actions ----------
+
+    async function refresh() {
+        try {
+            queue = await Api.get('/api/operator/queue');
+            render();
+        } catch (error) {
+            showNotice(Api.errorMessage(error), 'error');
+        }
+    }
+
+    async function act(path, body) {
+        try {
+            const result = await Api.post(path, body);
+            queue = result.queue;
+            render();
+            showNotice(result.message);
+            return result;
+        } catch (error) {
+            showNotice(Api.errorMessage(error), 'error');
+            return null;
+        }
+    }
+
+    async function checkIn(code) {
+        $('checkin-result').replaceChildren();
+        if (!code) {
+            showNotice('Enter a token or scan the QR code.', 'error');
+            return;
+        }
+        $('checkin-btn').disabled = true;
+        const result = await act('/api/operator/checkin', { code });
+        $('checkin-btn').disabled = false;
+        if (result) {
+            showCheckInResult(result);
+            $('code').value = '';
+        }
+        $('code').focus();
+    }
+
+    $('checkin-form').addEventListener('submit', event => {
+        event.preventDefault();
+        checkIn($('code').value.trim());
+    });
+
+    $('counters').addEventListener('click', async event => {
+        const button = event.target.closest('button');
+        if (!button) return;
+        button.disabled = true;
+        if (button.dataset.call) {
+            await act('/api/operator/call-next', { counterNo: Number(button.dataset.call) });
+        } else if (button.dataset.recall) {
+            await act(`/api/operator/bookings/${button.dataset.recall}/recall`);
+        } else if (button.dataset.skip) {
+            if (confirm(`${button.dataset.token} did not come to the counter? They will go to the back of the line.`)) {
+                await act(`/api/operator/bookings/${button.dataset.skip}/skip`);
+            }
+        }
+        button.disabled = false;
+    });
+
+    $('expected').addEventListener('click', event => {
+        const button = event.target.closest('[data-checkin]');
+        if (button) checkIn(button.dataset.checkin);
+    });
+
+    $('expected-filter').addEventListener('input', () => queue && renderExpected());
     $('logout-btn').addEventListener('click', Auth.logout);
 
-    if (me) {
-        render(me);
-        // Confirms the token with the server and refreshes the details.
-        Api.get('/api/auth/me').then(render).catch(error => {
-            $('notice').textContent = Api.errorMessage(error);
-            $('notice').className = 'alert alert-error';
+    // ---------- Live updates ----------
+
+    function setLive(online) {
+        $('live-status').classList.toggle('offline', !online);
+        $('live-text').textContent = online ? 'Live' : 'Reconnecting…';
+    }
+
+    /** Any change at this centre (another counter, a farmer booking for today, ...) refreshes the desk. */
+    function connectLive(centreId) {
+        source = new EventSource(`/api/queue/${centreId}/stream`);
+        source.addEventListener('open', () => setLive(true));
+        source.addEventListener('error', () => setLive(false));
+        source.addEventListener('queue', () => {
+            setLive(true);
+            clearTimeout(refreshTimer);
+            refreshTimer = setTimeout(refresh, 250);
         });
     }
+
+    // ---------- QR scanning with the camera (optional) ----------
+
+    async function stopScan() {
+        if (scanner) {
+            await scanner.stop().catch(() => {});
+            scanner = null;
+        }
+        $('reader').classList.add('hidden');
+        $('scan-btn').textContent = 'Scan QR with camera';
+    }
+
+    $('scan-btn').addEventListener('click', async () => {
+        if (scanner) {
+            await stopScan();
+            return;
+        }
+        $('reader').classList.remove('hidden');
+        $('scan-btn').textContent = 'Stop camera';
+        scanner = new Html5Qrcode('reader');
+        try {
+            await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: 220 }, async text => {
+                await stopScan();
+                $('code').value = text;
+                checkIn(text);
+            }, () => {});
+        } catch (error) {
+            showNotice(`Camera not available: ${error}`, 'error');
+            await stopScan();
+        }
+    });
+
+    async function init() {
+        $('user-name').textContent = me.name;
+        if (typeof Html5Qrcode !== 'undefined') $('scan-btn').classList.remove('hidden');
+        await refresh();
+        if (queue) connectLive(queue.centre.id);
+        $('code').focus();
+    }
+
+    if (me) init();
 </script>
 </body>
 </html>
