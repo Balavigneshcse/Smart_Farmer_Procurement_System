@@ -108,7 +108,7 @@ If the moisture is above the crop's limit (e.g. 17% for paddy), **Accept is bloc
 
 **Admin.** Go to **Admin → Payments**, find a pending payment and click **Pay**. Razorpay Checkout opens in **test mode**: use UPI ID `success@razorpay`, or a test card from Razorpay's documentation. After payment the row shows **Paid** with the Razorpay reference (`pay_…`), and the farmer's page shows it too.
 
-**Setup.** Put your Razorpay **test** keys in a `.env` file in the project folder. It is git-ignored and is read automatically at startup:
+**Setup.** Copy `example.env` to `.env` in the project folder and put your Razorpay **test** keys in it. `.env` is git-ignored and is read automatically at startup:
 
 ```
 RAZORPAY_KEY_ID=rzp_test_...

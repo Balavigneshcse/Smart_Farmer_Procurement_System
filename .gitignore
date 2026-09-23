@@ -12,5 +12,8 @@ out/
 *.env
 application-local.yml
 
+# ...except the empty template, which shows which settings exist
+!example.env
+
 # Logs
 *.log
