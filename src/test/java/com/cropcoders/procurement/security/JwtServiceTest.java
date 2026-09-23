@@ -61,6 +61,7 @@ class JwtServiceTest {
         return new AppProperties("test",
                 new AppProperties.Jwt(secret, 168, 12, 15),
                 new AppProperties.Otp(5, 3, 60, 5),
-                new AppProperties.Sms("console"));
+                new AppProperties.Sms("console"),
+                new AppProperties.Booking(7));
     }
 }

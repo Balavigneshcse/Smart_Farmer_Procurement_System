@@ -33,16 +33,24 @@
 </header>
 
 <main class="container">
-    <div class="page-head">
-        <h1 id="welcome"></h1>
-        <p class="muted" data-i18n="dashboard.subtitle">Book slots and track your crop and payment here.</p>
+    <div class="page-head head-row">
+        <div>
+            <h1 id="welcome"></h1>
+            <p class="muted" data-i18n="dashboard.subtitle">Book slots and track your crop and payment here.</p>
+        </div>
+        <a class="btn btn-primary btn-lg" href="/farmer/book.html" data-i18n="dashboard.bookSlot">Book a slot</a>
     </div>
 
     <div id="notice" class="alert hidden" role="status"></div>
 
-    <section class="card" aria-labelledby="profile-title">
+    <section class="dash-section" aria-labelledby="bookings-title">
+        <h2 id="bookings-title" data-i18n="dashboard.bookings.title">My bookings</h2>
+        <div id="bookings"><p class="muted" data-i18n="common.loading">Loading…</p></div>
+    </section>
+
+    <section class="card dash-section" aria-labelledby="profile-title">
         <h2 id="profile-title" data-i18n="dashboard.profile.title">My details</h2>
-        <dl class="details" id="profile">
+        <dl class="details">
             <dt data-i18n="dashboard.profile.mobile">Mobile</dt>
             <dd id="p-mobile">–</dd>
             <dt data-i18n="dashboard.profile.address">Address</dt>
@@ -60,11 +68,14 @@
 <script src="/js/i18n.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
+<script src="/js/farmer.js"></script>
 <script>
     const LANGUAGE_NAMES = { en: 'English', ta: 'தமிழ்', hi: 'हिन्दी' };
     const $ = id => document.getElementById(id);
-    const me = Auth.require('FARMER');
+    const { esc } = Farmer;
+    let me = null;
     let profile = null;
+    let bookings = null;
     let noticeTimer = null;
 
     function showNotice(text, type = 'success') {
@@ -74,9 +85,8 @@
         noticeTimer = setTimeout(() => { $('notice').className = 'alert hidden'; }, 5000);
     }
 
-    function render() {
-        const name = profile?.name ?? me.name;
-        $('welcome').textContent = I18N.t('dashboard.welcome', { name });
+    function renderProfile() {
+        $('welcome').textContent = I18N.t('dashboard.welcome', { name: profile?.name ?? me.name });
         if (!profile) return;
         $('p-mobile').textContent = `+91 ${profile.mobile}`;
         $('p-address').textContent = profile.address;
@@ -85,36 +95,70 @@
         $('p-language').textContent = LANGUAGE_NAMES[profile.language];
     }
 
-    /** Clicking a language button also saves it, so SMS come in the same language. */
-    async function saveLanguage(language) {
-        try {
-            profile = await Api.put('/api/farmers/me/language', { language });
-            Auth.updateUser({ language });
-            render();
-            showNotice(I18N.t('dashboard.langSaved'));
-        } catch (error) {
-            showNotice(Api.errorMessage(error), 'error');
-        }
+    function bookingItem(b) {
+        return `
+            <a class="card booking-item" href="/farmer/booking.html?id=${b.id}">
+                <div>
+                    <div class="token-sm">${esc(b.token)}</div>
+                    ${Farmer.statusBadge(b.status)}
+                </div>
+                <div>
+                    <strong>${esc(Farmer.dayLabel(b.date))} · ${esc(Farmer.slotTime(b.startTime, b.endTime))}</strong><br>
+                    <span class="muted small">${esc(b.centre.name)} · ${esc(Farmer.cropName(b.crop))} · ${esc(Farmer.quantity(b.estQtyQtl))}</span>
+                </div>
+                <span class="booking-item-go" aria-hidden="true">›</span>
+            </a>`;
     }
+
+    function renderBookings() {
+        if (!bookings) return;
+        if (!bookings.length) {
+            $('bookings').innerHTML = `
+                <div class="card">
+                    <p>${esc(I18N.t('dashboard.bookings.empty'))}</p>
+                    <a class="btn btn-primary" href="/farmer/book.html">${esc(I18N.t('dashboard.bookSlot'))}</a>
+                </div>`;
+            return;
+        }
+        // Current bookings first (soonest first), then earlier ones (newest first).
+        const current = bookings.filter(b => Farmer.isActive(b.status))
+            .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
+        const earlier = bookings.filter(b => !Farmer.isActive(b.status));
+
+        $('bookings').innerHTML = `
+            <div class="booking-list">${current.map(bookingItem).join('')}</div>
+            ${earlier.length ? `
+                <h3 class="list-heading">${esc(I18N.t('dashboard.bookings.past'))}</h3>
+                <div class="booking-list">${earlier.map(bookingItem).join('')}</div>` : ''}`;
+    }
+
+    function renderAll() {
+        renderProfile();
+        renderBookings();
+    }
+
+    document.addEventListener('langchange', renderAll);
+    document.addEventListener('languagesaved', event => {
+        if (profile) profile.language = event.detail.language;
+        renderProfile();
+        showNotice(I18N.t('dashboard.langSaved'));
+    });
+    document.addEventListener('languagesavefailed', event => showNotice(Api.errorMessage(event.detail.error), 'error'));
 
     async function init() {
-        await I18N.init({ onUserChange: saveLanguage });
-        render();
+        me = await Farmer.initPage();
+        if (!me) return;
+        renderProfile();
         try {
-            profile = await Api.get('/api/farmers/me');
-            if (profile.language !== I18N.lang) {
-                await I18N.setLang(profile.language);
-            }
-            render();
+            [profile, bookings] = await Promise.all([Api.get('/api/farmers/me'), Api.get('/api/bookings/my')]);
+            if (profile.language !== I18N.lang) await I18N.setLang(profile.language);
+            renderAll();
         } catch (error) {
             showNotice(Api.errorMessage(error), 'error');
         }
     }
 
-    $('logout-btn').addEventListener('click', Auth.logout);
-    document.addEventListener('langchange', render);
-
-    if (me) init();
+    init();
 </script>
 </body>
 </html>

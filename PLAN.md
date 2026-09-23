@@ -85,7 +85,7 @@ Admin browser ── checkout.js popup ──► Razorpay (test)  → success �
 - [x] **M0 — Your setup:** JDK 21 installed, PostgreSQL 18 running, IntelliJ 2026.2 installed.
 - [x] **M1 — Skeleton:** `pom.xml`, Flyway `V1__schema.sql` (all tables) + `V2__seed_data.sql` (centres, crops), `application.yml`, Centre/Crop entities, `/api/centres`, `/api/crops`, `/api/ping`, shared CSS, i18n (en/ta/hi), landing page. ✔ App starts in IntelliJ, tables appear in the DB, landing page shows centres and rates.
 - [x] **M2 — Auth:** OTP send/verify (console sender), JWT, farmer registration (with language choice), staff username/password login, role-based access. Pages: farmer login/register (3 languages), staff login (English).
-- [ ] **M3 — Slots + booking:** slot generator (startup + daily), slot grid with busy colours, booking with capacity check, token + QR, my bookings, cancel.
+- [x] **M3 — Slots + booking:** slot generator (startup + daily), slot grid with busy colours, booking with capacity check, token + QR, my bookings, cancel.
 - [ ] **M4 — Live queue:** check-in, call next (`FOR UPDATE SKIP LOCKED`), SSE hub, TV display page, farmer live position/ETA.
 - [ ] **M5 — Procurement + payment:** weighment form, amount calculation, payments page, Razorpay order + checkout + verify. *You: add Razorpay test keys.*
 - [ ] **M6 — SMS + automation:** textbee sender, SMS templates, daily cap, reminder / no-show / turn-near jobs, in-app notifications. *You: add textbee API key; test real SMS on your phone.*

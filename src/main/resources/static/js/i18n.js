@@ -93,6 +93,19 @@ const I18N = (() => {
         return date.toLocaleTimeString(locale(), { hour: 'numeric', minute: '2-digit' });
     }
 
+    /** "2026-09-24" -> "Thu, 24 Sep" in the current language (options change the format). */
+    function formatDate(isoDate, options = { weekday: 'short', day: 'numeric', month: 'short' }) {
+        const [y, m, d] = isoDate.split('-').map(Number);
+        return new Date(y, m - 1, d).toLocaleDateString(locale(), options);
+    }
+
+    /** "2026-09-24T09:05:12" -> "24 Sep, 9:05 am" in the current language. */
+    function formatDateTime(isoDateTime) {
+        return new Date(isoDateTime).toLocaleString(locale(), {
+            day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit',
+        });
+    }
+
     /** 2369 -> "₹2,369" in the current language. */
     function formatMoney(amount) {
         return new Intl.NumberFormat(locale(), {
@@ -101,7 +114,7 @@ const I18N = (() => {
     }
 
     return {
-        init, t, setLang, apply, locale, formatTime, formatMoney,
+        init, t, setLang, apply, locale, formatTime, formatDate, formatDateTime, formatMoney,
         get lang() { return lang; },
     };
 })();

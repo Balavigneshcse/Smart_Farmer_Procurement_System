@@ -61,6 +61,23 @@ A new mobile number goes to the registration form: name, address, district, last
 
 OTP rules: valid for 5 minutes, 3 wrong tries, a new OTP only after 60 seconds, at most 5 per hour per number.
 
+### Booking a slot
+
+After logging in, a farmer clicks **Book a slot** and goes through 4 steps:
+1. **Centre.** Centres in the farmer's own district are listed first.
+2. **Day.** Today plus the next 6 days. A bar shows how busy each day is.
+3. **Time.** Green, amber or red shows how crowded each slot is, and the least crowded time is marked *Suggested*.
+4. **Crop and quantity.** An approximate amount is shown (quantity × rate).
+
+The farmer then gets a **token** (e.g. `TNJ-001`) and a **QR code** to show at the centre. They can cancel until the slot starts, and the place goes back to the slot.
+
+How it works (for the viva):
+- **Slot generation.** `SlotGenerationJob` creates slots at startup and every morning at 7:00 for the next 7 days. The insert uses `ON CONFLICT DO NOTHING`, so running it twice doesn't create duplicates. Places per slot = counters × slot minutes ÷ average service minutes.
+- **No overbooking.** A place is taken with a single SQL statement: `UPDATE slots SET booked = booked + 1 WHERE id = ? AND booked < capacity`. If it changes 0 rows, the slot is full. In a test, 6 farmers booked the last 5 places at the same moment: exactly 5 succeeded and 1 was told the slot is full.
+- **One booking per day.** A partial unique index (`uq_active_booking`) stops a farmer from holding two active bookings on the same day.
+- **Tokens.** `token_counters` is updated with `INSERT … ON CONFLICT DO UPDATE … RETURNING`, so two bookings can never get the same number.
+- **Status history.** Every change is saved in `booking_events` and shown to the farmer as a timeline.
+
 ### Configuration
 
 Local defaults are in `src/main/resources/application.yml`. To override them, set environment variables in IntelliJ (Run → Edit Configurations → Environment variables):
@@ -88,6 +105,7 @@ src/main/java/com/cropcoders/procurement/
 ├── entity/                       JPA entities (tables)
 ├── enums/                        Role, ...
 ├── dto/                          request/response objects
+├── scheduler/                    timed jobs (slot generation)
 ├── sms/                          SmsSender interface + console sender (textbee in M6)
 └── exception/                    ApiException + GlobalExceptionHandler (JSON errors)
 src/main/resources/

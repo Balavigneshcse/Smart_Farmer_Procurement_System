@@ -46,3 +46,6 @@ app:
 
   sms:
     provider: ${SMS_PROVIDER:console}  # console = print in log, textbee = real SMS (M6)
+
+  booking:
+    days-ahead: 7                      # today + the next 6 days can be booked
