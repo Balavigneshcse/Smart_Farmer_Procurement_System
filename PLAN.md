@@ -3,7 +3,7 @@
 College mini project · Theme: Smart Automation · Built by you + Claude (no other team members)
 
 **Problem:** Farmers face long waits, no information about procurement schedules, and no visibility into procurement/payment status.
-**Solution:** Farmers book time slots, the centre runs a live token queue, SMS goes out at key moments, and every booking has a tracked timeline from arrival to payment.
+**Solution:** Farmers book time slots, the centre runs a live token queue, email and in-app notifications go out at key moments, and every booking has a tracked timeline from arrival to payment.
 
 ---
 
@@ -17,14 +17,15 @@ College mini project · Theme: Smart Automation · Built by you + Claude (no oth
 | Database | PostgreSQL · Flyway migrations · local = PostgreSQL 18 installed on the PC (**no Docker**), database `farmer_procurement`, user `postgres` / `postgres` · production = Neon |
 | Realtime | Server-Sent Events (`SseEmitter` + browser `EventSource`) |
 | Payments | Razorpay **test mode** (Checkout + server-side signature verification) |
-| SMS | textbee.dev (your Android phone is the SMS gateway) · `console` sender for local dev |
+| Notifications | **Email + in-app** (no SMS). On the PC: **Gmail SMTP** with an App Password (500/day). On Render: **Brevo** HTTPS email API (free 300/day), because Render's free plan blocks SMTP ports 25/465/587. `console` provider prints emails in the log during development |
 | Hosting | Render free web service (Docker) + Neon free Postgres |
 | IDE | IntelliJ IDEA 2026.2, project SDK = JDK 21 (`C:\Program Files\Java\jdk-21.0.12.1`) |
 | Source control | https://github.com/Balavigneshcse/Smart_Farmer_Procurement_System — commit + push after each milestone |
 
 **Decisions made**
-- Farmer registration asks: name, mobile (OTP-verified), address + district, Aadhaar last 4 digits, preferred language. The crop is asked **at booking**, not at registration.
-- A farmer's SMS are sent in their registered language.
+- Farmers log in with **email + OTP** (the OTP is emailed). Registration asks: name, email (OTP-verified), mobile number (shown to the operator, not verified), address + district, Aadhaar last 4 digits, preferred language. The crop is asked **at booking**, not at registration.
+- A farmer's emails are sent in their registered language.
+- Decision 2026-09-23: SMS dropped entirely (first textbee, then the Android SMS gateway). Notifications are email + in-app.
 - Docker is used only by Render in the cloud (Render has no native Java runtime). Nothing Docker runs on the PC.
 
 ## 2. Deployment architecture
@@ -35,7 +36,8 @@ Operator PC  ─┼── HTTPS ──►  Render (free, Docker)
 Admin PC     ─┤              Spring Boot app + static pages
 TV display   ─┘                 │ JDBC+SSL      │ HTTPS           │ HTTPS
                                 ▼               ▼                 ▼
-                          Neon Postgres    Razorpay API     textbee cloud ──push──► your Android phone ──SMS──► farmer
+                          Neon Postgres    Razorpay API     Brevo email API ──► farmer's inbox
+                                                            (on the PC: Gmail SMTP instead)
 
 Admin browser ── checkout.js popup ──► Razorpay (test)  → success → backend verifies signature
 ```
@@ -47,15 +49,16 @@ Admin browser ── checkout.js popup ──► Razorpay (test)  → success �
 | Render web service | 750 h/month, 512 MB RAM, sleeps after 15 min idle, ~1 min to wake | Open the site 2 min before any demo. JVM tuned for 512 MB. Optional: cron-job.org pings `/api/ping` (no DB hit) only 8 AM–8 PM |
 | Render Postgres | Deleted 30 days after creation | **Don't use it** — use Neon |
 | Neon Postgres | 0.5 GB storage, 100 CU-hours/month, sleeps after 5 min idle | Scheduled jobs run every 15 min, 7 AM–9 PM IST only, so the DB can sleep. Hikari pool max 5 |
-| textbee.dev | 1 device, 50 SMS/day, 300 SMS/month, 60 req/min | SMS only for 6 key events (below). Code enforces a daily cap (default 45) then falls back to in-app only. Use `console` sender while developing |
+| Gmail SMTP | 500 recipients/day; needs 2-Step Verification + App Password; **blocked on Render free** (SMTP ports) | Used only on the PC. Daily cap in code, then in-app only |
+| Brevo | 300 emails/day free, HTTPS API | Used on Render (M8). Same daily cap |
 | Razorpay | Test mode is free, no KYC | Test keys only. Test UPI ID `success@razorpay` |
 
 ## 4. Who does what
 
 | Claude | You |
 |---|---|
-| Writes all code: Java, SQL, HTML/CSS/JS, Dockerfile, README | Create accounts: Razorpay, textbee, GitHub, Neon, Render |
-| Builds and runs locally, fixes errors, tests pages in the browser | Install the textbee app on an Android phone (Android 7+) and link it |
+| Writes all code: Java, SQL, HTML/CSS/JS, Dockerfile, README | Create accounts: Razorpay, GitHub, Neon, Render, Brevo (at deploy) |
+| Builds and runs locally, fixes errors, tests pages in the browser | Create a Gmail App Password and put it in `.env` |
 | Git commits with clear messages | Put secret keys into IntelliJ run config / Render env vars (never in code) |
 | Writes deploy + demo steps | Run it in IntelliJ, test on your phone, click Deploy on Render, review each milestone |
 
@@ -69,7 +72,7 @@ Admin browser ── checkout.js popup ──► Razorpay (test)  → success �
 5. Live TV display + farmer live position/ETA (SSE)
 6. Weighment entry (weight, moisture, grade) → automatic amount → accept/reject
 7. Razorpay test payment → status PAID
-8. SMS on key events (budgeted) + in-app notification list
+8. Email on key events (daily cap) + in-app notification list
 9. Farmer tracking timeline (booked → arrived → at counter → weighed → paid)
 10. Automation jobs: reminders, no-show marking, "turn near" alert
 11. Admin dashboard: today's farmers, average wait, queue length, quantity procured, payments pending/paid
@@ -88,9 +91,9 @@ Admin browser ── checkout.js popup ──► Razorpay (test)  → success �
 - [x] **M3 — Slots + booking:** slot generator (startup + daily), slot grid with busy colours, booking with capacity check, token + QR, my bookings, cancel.
 - [x] **M4 — Live queue:** check-in (token / QR text / camera), call next (`FOR UPDATE SKIP LOCKED`), call again, not present (back of the line), SSE hub, TV display page, farmer live position/ETA.
 - [x] **M5 — Procurement + payment:** weighment form (moisture limit blocks accept, rejection needs a reason), amount calculation, payments page, Razorpay order + checkout + HMAC verify (own `RazorpayGateway`, no SDK; live keys refused). Keys in git-ignored `.env`.
-- [ ] **M6 — SMS + automation:** textbee sender, SMS templates, daily cap, reminder / no-show / turn-near jobs, in-app notifications. *You: add textbee API key; test real SMS on your phone.*
+- [ ] **M6 — Email + automation:** farmer login switches to **email + OTP** (Flyway V4: `users.email`, OTP and notifications keyed by email), `EmailSender` with `console` and Gmail `smtp` providers, email templates in en/ta/hi, daily cap, in-app notification list, reminder / no-show / turn-near jobs. SMS code removed. *You: Gmail 2-Step Verification + App Password in `.env`.*
 - [ ] **M7 — Dashboard + polish:** admin dashboard, tracking timeline, mobile-friendly styling, demo seed data, README.
-- [ ] **M8 — Deploy:** Dockerfile, push to GitHub, Neon DB, Render web service + env vars, smoke test on the live URL, demo checklist.
+- [ ] **M8 — Deploy:** Dockerfile, push to GitHub, Neon DB, **Brevo email provider** (HTTPS API, since Render blocks SMTP), Render web service + env vars, smoke test on the live URL, demo checklist.
 
 ---
 
@@ -99,7 +102,7 @@ Admin browser ── checkout.js popup ──► Razorpay (test)  → success �
 ### Roles
 | Role | Login | Can do |
 |---|---|---|
-| FARMER | Mobile + OTP | Profile, book/cancel slots, see live status, timeline, payments, notifications |
+| FARMER | Email + OTP | Profile, book/cancel slots, see live status, timeline, payments, notifications |
 | OPERATOR | Username + password | For their centre: check-in, call next, weighment, mark no-show |
 | ADMIN | Username + password | Centres, crops/rates, slot settings, payments (Razorpay), dashboard |
 | Public | none | TV display for a centre (token numbers only — no names/phones) |
@@ -146,41 +149,35 @@ Token = centre code + daily number, e.g. `TNJ-017`, from an upsert counter:
 - "Not present": a called farmer who doesn't come goes back to the end of the line (`SKIPPED` timeline event).
 - Every queue change broadcasts a snapshot on `/api/queue/{centreId}/stream` (SSE). Heartbeat comment every 20 s; dead emitters removed. The farmer page subscribes to the same public stream and finds its own token in the snapshot.
 
-### SMS budget (textbee free = 50/day, 300/month)
+### Notifications (email + in-app)
 | Event | Channel |
 |---|---|
-| OTP | SMS |
-| Booking confirmed (token, date, time, centre) | SMS |
-| Reminder (~1 hour before slot) | SMS |
-| Turn near (position ≤ 3) | SMS |
-| Procured / rejected (weight, grade, amount or reason) | SMS |
-| Payment credited (amount, reference) | SMS |
+| OTP | Email |
+| Booking confirmed (token, date, time, centre) | Email + in-app |
+| Reminder (~1 hour before slot) | Email + in-app |
+| Turn near (position ≤ 3) | Email + in-app |
+| Procured / rejected (weight, grade, amount or reason) | Email + in-app |
+| Payment credited (amount, reference) | Email + in-app |
 | Checked in, called to counter, cancelled, no-show | In-app only |
 
-About 6 SMS per farmer journey → ~50 full journeys per month. All messages (sent or not) are stored in `notifications` and shown in-app. When today's SMS count reaches `SMS_DAILY_LIMIT`, we still save the notification, but it is shown in-app only.
+All messages are stored in `notifications` and shown in-app, in the farmer's language. A daily cap (below Gmail's 500 and Brevo's 300) protects the free quota: after it is reached, notifications are in-app only.
 
-textbee call:
-```
-POST https://api.textbee.dev/api/v1/gateway/send-sms
-Header: x-api-key: <TEXTBEE_API_KEY>
-Body:   { "recipients": ["+91XXXXXXXXXX"], "message": "..." }
-```
-Phone tips: keep the phone on Wi-Fi/data, disable battery optimisation for the textbee app, SIM needs an SMS pack. SMS arrive from your own number.
+Providers (`EMAIL_PROVIDER`): `console` (print to log), `smtp` (Gmail: smtp.gmail.com:587, STARTTLS, App Password), `brevo` (M8: `POST https://api.brevo.com/v3/smtp/email` with an `api-key` header).
 
 ### Payment flow (Razorpay test mode)
 1. Weighment saved → `payments` row `PENDING`, amount computed on the server (in paise).
 2. Admin clicks **Pay** → `POST /api/payments/{id}/order` → backend creates a Razorpay order → returns `order_id` + public `key_id`.
 3. Browser opens Razorpay Checkout; pay with test UPI `success@razorpay`.
-4. Success handler posts `razorpay_order_id`, `razorpay_payment_id`, `razorpay_signature` to `/api/payments/verify` → `Utils.verifyPaymentSignature(...)` → `PAID` → SMS + timeline update.
+4. Success handler posts `razorpay_order_id`, `razorpay_payment_id`, `razorpay_signature` to `/api/payments/verify` → HMAC-SHA256 signature check (`RazorpayGateway`) → `PAID` → email + timeline update.
 5. Viva note: in reality money goes government → farmer (DBT / RazorpayX Payouts). In the demo, the admin paying via test Checkout represents that disbursement.
 
 ### Scheduled jobs (`zone = "Asia/Kolkata"`)
 | Job | When | What |
 |---|---|---|
 | Slot generator | On startup + `0 0 7 * * *` | Ensure slots exist for the next 7 days |
-| Reminder | `0 */15 7-21 * * *` | BOOKED, slot starts within 90 min, `reminder_sent = false` → SMS |
+| Reminder | `0 */15 7-21 * * *` | BOOKED, slot starts within 90 min, `reminder_sent = false` → email |
 | No-show | `0 */15 7-21 * * *` | BOOKED and slot end + 30 min passed → NO_SHOW (in-app) |
-| Turn near | Event-driven (after each call-next) | Farmers now at position ≤ 3 who weren't alerted → SMS |
+| Turn near | Event-driven (after each call-next) | Farmers now at position ≤ 3 who weren't alerted → email |
 
 ### Database tables (Flyway)
 | Table | Key columns |
@@ -251,14 +248,15 @@ Smart Farmer Procurement System/
     │   ├── dto/          request/response records
     │   ├── service/      AuthService, JwtService, OtpService, SlotService, BookingService, QueueService,
     │   │                 ProcurementService, PaymentService, NotificationService, DashboardService
-    │   ├── sms/          SmsSender (interface), ConsoleSmsSender, TextBeeSmsSender, SmsTemplates
+    │   ├── payment/      RazorpayGateway
+    │   ├── notification/ EmailSender (interface), ConsoleEmailSender, SmtpEmailSender, (M8) BrevoEmailSender
     │   ├── realtime/     QueueSseHub
     │   ├── scheduler/    SlotGenerationJob, ReminderJob, NoShowJob
     │   ├── controller/   Auth, Farmer, Catalogue, Booking, Queue, Operator, Payment, Admin, Ping
     │   └── exception/    ApiException, ApiError, GlobalExceptionHandler
     └── resources/
         ├── application.yml
-        ├── messages.properties, messages_ta.properties, messages_hi.properties   (SMS texts)
+        ├── messages.properties, messages_ta.properties, messages_hi.properties   (email texts)
         ├── db/migration/ V1__schema.sql, V2__seed_data.sql, V3__staff_accounts.sql
         └── static/       (pages above, css/, js/, i18n/)
 ```
@@ -270,12 +268,12 @@ Smart Farmer Procurement System/
 | `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | `postgres` / `postgres` (hard-coded in `application.yml`) | from Neon (overrides the yml) |
 | `JWT_SECRET` | dev default | random 32+ characters |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | test keys | test keys |
-| `SMS_PROVIDER` | `console` | `textbee` |
-| `TEXTBEE_API_KEY` | (only to test real SMS) | your key |
-| `SMS_DAILY_LIMIT` | `45` | `45` |
+| `EMAIL_PROVIDER` | `console` or `smtp` | `brevo` |
+| `MAIL_USERNAME` / `MAIL_PASSWORD` | your Gmail + App Password | – |
+| `BREVO_API_KEY` / `MAIL_FROM` | – | Brevo key + verified sender email |
 | `PORT` | — | set by Render |
 
-Secrets live only in IntelliJ Run Configuration → Environment variables, and in Render → Environment. `.env` files are git-ignored.
+Secrets live only in the git-ignored `.env` file on the PC (template: `example.env`) and in Render → Environment.
 
 ### Render deploy notes
 - Web Service → connect GitHub repo → Runtime **Docker** → Instance **Free** → env vars above → health check path `/api/ping`.
@@ -284,9 +282,9 @@ Secrets live only in IntelliJ Run Configuration → Environment variables, and i
 
 ### Demo script (~5 min)
 1. Admin: centre settings and auto-generated slots with capacity.
-2. Farmer (phone): OTP login (real SMS) → book slot → token `TNJ-017` + QR + confirmation SMS.
-3. Operator: check in seeded farmers + you → TV and phone update live ("Position 3 · ETA 20 min") → "turn near" SMS.
+2. Farmer (phone): email OTP login → book slot → token `TNJ-017` + QR + confirmation email.
+3. Operator: check in seeded farmers + you → TV and phone update live ("Position 3 · ETA 20 min") → "turn near" email.
 4. Operator: **Call next** → TV shows `TNJ-017 → Counter 2`.
-5. Operator: record 24.5 qtl, moisture 15%, Grade A → amount auto-calculated → SMS.
-6. Admin: Payments → Pay → Razorpay test checkout → farmer timeline shows **Paid** + SMS.
+5. Operator: record 24.5 qtl, moisture 15%, Grade A → amount auto-calculated → email.
+6. Admin: Payments → Pay → Razorpay test checkout → farmer timeline shows **Paid** + email.
 7. Dashboard: average wait, queue length, farmers served, quantity procured.
