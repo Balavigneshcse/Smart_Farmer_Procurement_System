@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
+import com.cropcoders.procurement.TestProperties;
 import com.cropcoders.procurement.config.AppProperties;
 import com.cropcoders.procurement.enums.Role;
 
@@ -58,11 +59,6 @@ class JwtServiceTest {
     }
 
     private static AppProperties properties(String secret) {
-        return new AppProperties("test",
-                new AppProperties.Jwt(secret, 168, 12, 15),
-                new AppProperties.Otp(5, 3, 60, 5),
-                new AppProperties.Sms("console"),
-                new AppProperties.Booking(7),
-                new AppProperties.Queue(15));
+        return TestProperties.withJwtSecret(secret);
     }
 }

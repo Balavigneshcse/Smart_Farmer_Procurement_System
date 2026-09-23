@@ -4,7 +4,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /** Everything under "app:" in application.yml. */
 @ConfigurationProperties(prefix = "app")
-public record AppProperties(String name, Jwt jwt, Otp otp, Sms sms, Booking booking, Queue queue) {
+public record AppProperties(String name, Jwt jwt, Otp otp, Sms sms, Booking booking, Queue queue, Razorpay razorpay) {
+
+    /** Razorpay test-mode keys (from .env locally, environment variables on Render). */
+    public record Razorpay(String keyId, String keySecret, String apiUrl) {
+    }
 
     /** A farmer who checks in later than slot end + lateGraceMinutes joins the back of the queue. */
     public record Queue(int lateGraceMinutes) {

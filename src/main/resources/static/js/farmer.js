@@ -97,5 +97,14 @@ const Farmer = (() => {
         return isoDate(new Date());
     }
 
-    return { initPage, esc, cropName, isActive, statusBadge, slotTime, dayName, dayLabel, quantity, renderQr, todayIso };
+    /** "Paid ₹58,040" (green) or "Payment pending ₹58,040" (amber). */
+    function paymentBadge(payment) {
+        const style = payment.status === 'PAID' ? '' : payment.status === 'FAILED' ? 'badge-red' : 'badge-amber';
+        return `<span class="badge ${style}">${esc(I18N.t(`payment.${payment.status}`))} · ${esc(I18N.formatMoney(payment.amount))}</span>`;
+    }
+
+    return {
+        initPage, esc, cropName, isActive, statusBadge, paymentBadge, slotTime, dayName, dayLabel, quantity, renderQr,
+        todayIso,
+    };
 })();

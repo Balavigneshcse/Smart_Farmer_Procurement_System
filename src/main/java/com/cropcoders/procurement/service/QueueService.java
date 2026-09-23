@@ -253,7 +253,8 @@ public class QueueService {
         return new OperatorQueueResponse(CentreResponse.from(day.centre()), counters, waiting, expected, stats);
     }
 
-    private OperatorActionResponse afterChange(Centre centre, Booking booking, String message) {
+    /** Tells the live screens about the change and returns the updated operator desk. Also used by ProcurementService. */
+    OperatorActionResponse afterChange(Centre centre, Booking booking, String message) {
         // Screens are refreshed after this transaction commits (see QueueSseHub).
         events.publishEvent(new QueueChangedEvent(centre.getId()));
 
@@ -279,6 +280,8 @@ public class QueueService {
                 b.getFarmer().getMobile(),
                 profile == null ? null : profile.getAadhaarLast4(),
                 b.getCrop().getNameEn(),
+                b.getCrop().getRatePerQtl(),
+                b.getCrop().getMaxMoisturePct(),
                 b.getEstQtyQtl(),
                 b.getSlot().getStartTime(),
                 b.getSlot().getEndTime(),
@@ -303,7 +306,7 @@ public class QueueService {
         return arrivedAt.isAfter(booking.getSlot().endsAt().plusMinutes(lateGraceMinutes));
     }
 
-    private Centre operatorCentre(AuthUser operator) {
+    Centre operatorCentre(AuthUser operator) {
         if (operator.centreId() == null) {
             throw new ApiException(HttpStatus.FORBIDDEN, "NO_CENTRE", "Your account is not linked to a centre.");
         }
@@ -343,7 +346,8 @@ public class QueueService {
         return booking;
     }
 
-    private Booking bookingAtCounter(Centre centre, Long bookingId) {
+    /** A booking of this centre that is currently at a counter (status CALLED). */
+    Booking bookingAtCounter(Centre centre, Long bookingId) {
         return bookingRepository.findDetailedById(bookingId)
                 .filter(b -> b.getCentre().getId().equals(centre.getId()))
                 .filter(b -> b.getStatus() == BookingStatus.CALLED)

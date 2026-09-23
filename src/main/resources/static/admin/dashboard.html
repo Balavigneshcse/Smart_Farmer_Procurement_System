@@ -21,6 +21,10 @@
             </span>
             <span class="brand-text">Admin</span>
         </a>
+        <nav class="header-nav" aria-label="Admin">
+            <a href="/admin/dashboard.html" aria-current="page">Dashboard</a>
+            <a href="/admin/payments.html">Payments</a>
+        </nav>
         <div class="header-actions">
             <span class="user-chip" id="user-name"></span>
             <button type="button" class="btn btn-outline btn-sm" id="logout-btn">Log out</button>
@@ -38,7 +42,8 @@
 
     <section class="card">
         <p>Signed in as <strong id="who"></strong>.</p>
-        <p class="muted" style="margin: 0">Today's numbers, centre settings and farmer payments will appear here.</p>
+        <p class="muted">Today's numbers and centre settings will appear here.</p>
+        <a class="btn btn-primary" href="/admin/payments.html">Go to farmer payments</a>
     </section>
 </main>
 

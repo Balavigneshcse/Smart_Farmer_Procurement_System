@@ -9,6 +9,8 @@ import java.util.List;
 
 import com.cropcoders.procurement.entity.Booking;
 import com.cropcoders.procurement.entity.Centre;
+import com.cropcoders.procurement.entity.Payment;
+import com.cropcoders.procurement.entity.Procurement;
 import com.cropcoders.procurement.enums.BookingStatus;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -31,7 +33,9 @@ public record BookingResponse(
         boolean cancellable,
         String qrText,
         LocalDateTime createdAt,
-        List<BookingEventResponse> events) {
+        List<BookingEventResponse> events,
+        ProcurementSummary procurement,
+        PaymentSummary payment) {
 
     public record CentreSummary(Long id, String code, String name, String address) {
 
@@ -41,6 +45,11 @@ public record BookingResponse(
     }
 
     public static BookingResponse from(Booking booking, LocalDateTime now, List<BookingEventResponse> events) {
+        return from(booking, now, events, null, null);
+    }
+
+    public static BookingResponse from(Booking booking, LocalDateTime now, List<BookingEventResponse> events,
+                                       Procurement procurement, Payment payment) {
         BigDecimal estAmount = booking.getEstQtyQtl()
                 .multiply(booking.getCrop().getRatePerQtl())
                 .setScale(2, RoundingMode.HALF_UP);
@@ -58,7 +67,9 @@ public record BookingResponse(
                 booking.isCancellable(now),
                 qrText(booking),
                 booking.getCreatedAt(),
-                events);
+                events,
+                procurement == null ? null : ProcurementSummary.from(procurement),
+                payment == null ? null : PaymentSummary.from(payment));
     }
 
     /** "SFPS:<booking id>:<token>" - the id makes a QR from another day unusable. */

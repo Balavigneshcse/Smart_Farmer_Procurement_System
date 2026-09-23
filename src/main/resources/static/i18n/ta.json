@@ -171,6 +171,23 @@
   "event.PAID": "பணம் வரவு வைக்கப்பட்டது",
   "event.SKIPPED": "அழைத்தபோது கவுண்டரில் இல்லை – மீண்டும் வரிசையில் சேர்க்கப்பட்டது",
 
+  "result.title": "எடை மற்றும் தர முடிவு",
+  "result.weight": "எடை",
+  "result.moisture": "ஈரப்பதம்",
+  "result.grade": "தரம்",
+  "result.rate": "விலை",
+  "result.amount": "தொகை",
+  "result.rejected": "உங்கள் விளைபொருள் ஏற்றுக்கொள்ளப்படவில்லை.",
+  "result.reason": "காரணம்: {reason}",
+
+  "payment.title": "பணம்",
+  "payment.PENDING": "பணம் நிலுவையில்",
+  "payment.PAID": "பணம் செலுத்தப்பட்டது",
+  "payment.FAILED": "பணம் செலுத்துதல் தோல்வி",
+  "payment.reference": "குறிப்பு எண்: {ref}",
+  "payment.paidOn": "{date} அன்று செலுத்தப்பட்டது",
+  "payment.pendingNote": "தொகை விரைவில் வரவு வைக்கப்படும். பணம் செலுத்தியதும் உங்களுக்கு SMS வரும்.",
+
   "live.title": "நேரலை வரிசை",
   "live.notArrived": "நிலையத்திற்கு வந்ததும், பதிவு மேசையில் உங்கள் டோக்கனைக் காட்டுங்கள்.",
   "live.waitingNow": "இப்போது காத்திருக்கும் விவசாயிகள்: {n}",

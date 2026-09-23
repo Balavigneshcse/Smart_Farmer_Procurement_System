@@ -106,10 +106,11 @@ const I18N = (() => {
         });
     }
 
-    /** 2369 -> "₹2,369" in the current language. */
+    /** 2369 -> "₹2,369", 58040.5 -> "₹58,040.50" (paise always shown with 2 digits). */
     function formatMoney(amount) {
+        const digits = Math.round(Number(amount) * 100) % 100 === 0 ? 0 : 2;
         return new Intl.NumberFormat(locale(), {
-            style: 'currency', currency: 'INR', maximumFractionDigits: 2, minimumFractionDigits: 0,
+            style: 'currency', currency: 'INR', maximumFractionDigits: digits, minimumFractionDigits: digits,
         }).format(amount);
     }
 

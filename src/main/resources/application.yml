@@ -4,6 +4,13 @@ spring:
   application:
     name: smart-farmer-procurement
 
+  # Local secrets (Razorpay keys, ...) live in a git-ignored ".env" file in the project folder:
+  #   RAZORPAY_KEY_ID=rzp_test_...
+  #   RAZORPAY_KEY_SECRET=...
+  # On Render the same names are set as environment variables instead.
+  config:
+    import: optional:file:.env[.properties]
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/farmer_procurement}
     username: postgres
@@ -52,3 +59,8 @@ app:
 
   queue:
     late-grace-minutes: 15             # checked in later than slot end + 15 min = back of the queue
+
+  razorpay:
+    key-id: ${RAZORPAY_KEY_ID:}        # must be a TEST key (rzp_test_...); live keys are refused
+    key-secret: ${RAZORPAY_KEY_SECRET:}
+    api-url: https://api.razorpay.com/v1

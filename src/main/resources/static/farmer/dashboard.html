@@ -101,6 +101,7 @@
                 <div>
                     <div class="token-sm">${esc(b.token)}</div>
                     ${Farmer.statusBadge(b.status)}
+                    ${b.payment ? `<div style="margin-top: 4px">${Farmer.paymentBadge(b.payment)}</div>` : ''}
                 </div>
                 <div>
                     <strong>${esc(Farmer.dayLabel(b.date))} · ${esc(Farmer.slotTime(b.startTime, b.endTime))}</strong><br>

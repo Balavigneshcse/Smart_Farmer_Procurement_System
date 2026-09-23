@@ -93,6 +93,38 @@ How it works (for the viva):
 - **Live updates** use Server-Sent Events. Each screen keeps one connection open (`/api/queue/{centreId}/stream`), and after every change is committed, `QueueSseHub` pushes the new queue to all screens of that centre. The browser reconnects by itself if the connection drops.
 - **Privacy.** The public queue contains token numbers only, never names or phone numbers.
 
+### Weighment and payment
+
+**Operator.** On a busy counter, click **Record weighment**, then enter:
+- weight (quintals)
+- moisture (%)
+- grade (A/B/C)
+- decision: Accept or Reject
+
+If the moisture is above the crop's limit (e.g. 17% for paddy), **Accept is blocked**. A rejection needs a reason.
+
+- **Accepted:** amount = weight × the crop's rate, the booking becomes *Procured*, and a **pending payment** is created.
+- **Rejected:** no payment. The farmer sees the reason.
+
+**Admin.** Go to **Admin → Payments**, find a pending payment and click **Pay**. Razorpay Checkout opens in **test mode**: use UPI ID `success@razorpay`, or a test card from Razorpay's documentation. After payment the row shows **Paid** with the Razorpay reference (`pay_…`), and the farmer's page shows it too.
+
+**Setup.** Put your Razorpay **test** keys in a `.env` file in the project folder. It is git-ignored and is read automatically at startup:
+
+```
+RAZORPAY_KEY_ID=rzp_test_...
+RAZORPAY_KEY_SECRET=...
+```
+
+The startup log shows `Razorpay: test mode, key rzp_test_…` when the keys are found. Live keys (`rzp_live_…`) are refused, so this project can never move real money.
+
+How it works (for the viva):
+1. **Create the order.** The server calls the Razorpay Orders API. The amount always comes from the database, never from the browser.
+2. **Pay.** The browser opens Razorpay Checkout for that order.
+3. **Receive the result.** Checkout returns `razorpay_order_id`, `razorpay_payment_id` and `razorpay_signature` to the browser.
+4. **Verify.** The server recomputes `HMAC-SHA256(order_id + "|" + payment_id, key_secret)` and compares it with the signature, then marks the payment Paid. Only Razorpay and our server know the secret, so a forged "success" is rejected. `RazorpayGatewayTest` checks this against a value computed with `openssl`.
+5. **Store amounts safely.** Amounts are stored in **paise** as whole numbers, so there are no rounding errors.
+6. **Real life.** Money would flow from the government to the farmer (DBT / RazorpayX Payouts). In the demo, the admin paying through Checkout stands in for that step.
+
 ### Testing the queue outside centre hours
 
 Centres close at 16:00 or 17:00, so in the evening there are no slots left for today. To test at night, temporarily keep Thanjavur open late (run in pgAdmin), then restart the app so it creates the extra slots:
@@ -137,6 +169,7 @@ src/main/java/com/cropcoders/procurement/
 ├── dto/                          request/response objects
 ├── scheduler/                    timed jobs (slot generation)
 ├── realtime/                     live queue updates (Server-Sent Events)
+├── payment/                      RazorpayGateway (orders API + signature check)
 ├── sms/                          SmsSender interface + console sender (textbee in M6)
 └── exception/                    ApiException + GlobalExceptionHandler (JSON errors)
 src/main/resources/
@@ -144,7 +177,7 @@ src/main/resources/
 ├── messages*.properties          SMS texts in English, Tamil, Hindi
 ├── db/migration/                 Flyway: V1 schema, V2 centres + crops, V3 staff accounts
 └── static/                       HTML pages, css/, js/, i18n/ (en, ta, hi)
-src/test/java/                    unit tests (JwtServiceTest, EtaCalculatorTest)
+src/test/java/                    unit tests (JwtServiceTest, EtaCalculatorTest, RazorpayGatewayTest)
 ```
 
 ### How login works (for the viva)

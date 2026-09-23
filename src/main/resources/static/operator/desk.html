@@ -69,6 +69,51 @@
                 <h2 id="counters-title">Counters</h2>
                 <div id="counters" class="counter-grid"></div>
             </section>
+
+            <!-- Weighment form: opened from a counter with "Record weighment" -->
+            <section class="card hidden" id="weigh-panel" aria-labelledby="weigh-title">
+                <h2 id="weigh-title">Weighment · <span id="w-token"></span></h2>
+                <p class="muted" id="w-info"></p>
+                <form id="weigh-form" novalidate>
+                    <div class="form-row">
+                        <div class="field">
+                            <label for="w-weight">Weight (quintals)</label>
+                            <input id="w-weight" type="number" inputmode="decimal" min="0.1" max="1000" step="0.01">
+                        </div>
+                        <div class="field">
+                            <label for="w-moisture">Moisture (%)</label>
+                            <input id="w-moisture" type="number" inputmode="decimal" min="0" max="40" step="0.1" aria-describedby="w-limit">
+                            <span class="hint" id="w-limit"></span>
+                        </div>
+                    </div>
+                    <fieldset class="field">
+                        <legend>Grade</legend>
+                        <div class="choice-group">
+                            <label class="choice"><input type="radio" name="grade" value="A" checked><span>A</span></label>
+                            <label class="choice"><input type="radio" name="grade" value="B"><span>B</span></label>
+                            <label class="choice"><input type="radio" name="grade" value="C"><span>C</span></label>
+                        </div>
+                    </fieldset>
+                    <fieldset class="field">
+                        <legend>Decision</legend>
+                        <div class="choice-group two">
+                            <label class="choice"><input type="radio" name="decision" value="accept" checked><span>Accept</span></label>
+                            <label class="choice"><input type="radio" name="decision" value="reject"><span>Reject</span></label>
+                        </div>
+                        <p class="field-error" id="w-moisture-warning"></p>
+                    </fieldset>
+                    <div class="field">
+                        <label for="w-remarks">Remarks <span class="muted small">(required when rejecting)</span></label>
+                        <textarea id="w-remarks" rows="2" maxlength="255"></textarea>
+                    </div>
+                    <div class="summary-box" id="w-amount"></div>
+                    <p class="field-error" id="w-error"></p>
+                    <div class="counter-actions">
+                        <button type="submit" class="btn btn-primary" id="w-save">Save weighment</button>
+                        <button type="button" class="btn btn-outline" id="w-cancel">Cancel</button>
+                    </div>
+                </form>
+            </section>
         </div>
 
         <div class="stack">
@@ -155,6 +200,8 @@
         renderCounters();
         renderWaiting();
         renderExpected();
+        // The farmer being weighed is no longer at a counter (e.g. skipped from another screen): close the form.
+        if (weighing && !queue.counters.some(c => c.booking?.id === weighing.id)) closeWeighment();
     }
 
     function renderCounters() {
@@ -166,6 +213,7 @@
                 <div><strong>${esc(b.farmerName)}</strong> · Aadhaar ••••${esc(b.aadhaarLast4 ?? '')}</div>
                 <div class="muted small">${esc(b.cropName)} · ${esc(qty(b.estQtyQtl))} · called ${esc(clock(b.calledAt))}</div>
                 <div class="counter-actions">
+                    <button type="button" class="btn btn-primary btn-sm" data-weigh="${b.id}">Record weighment</button>
                     <button type="button" class="btn btn-outline btn-sm" data-recall="${b.id}">Call again</button>
                     <button type="button" class="btn btn-danger btn-sm" data-skip="${b.id}" data-token="${esc(b.token)}">Not present</button>
                 </div>
@@ -269,6 +317,10 @@
     $('counters').addEventListener('click', async event => {
         const button = event.target.closest('button');
         if (!button) return;
+        if (button.dataset.weigh) {
+            openWeighment(Number(button.dataset.weigh));
+            return;
+        }
         button.disabled = true;
         if (button.dataset.call) {
             await act('/api/operator/call-next', { counterNo: Number(button.dataset.call) });
@@ -280,6 +332,79 @@
             }
         }
         button.disabled = false;
+    });
+
+    // ---------- Weighment ----------
+
+    let weighing = null;    // the booking being weighed
+
+    const money = amount => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
+
+    function openWeighment(bookingId) {
+        weighing = queue.counters.map(c => c.booking).find(b => b && b.id === bookingId);
+        if (!weighing) return;
+        $('w-token').textContent = weighing.token;
+        $('w-info').textContent = `${weighing.farmerName} · ${weighing.cropName} · booked ${qty(weighing.estQtyQtl)} · `
+            + `rate ${money(weighing.cropRatePerQtl)}/qtl`;
+        $('w-limit').textContent = `Limit for ${weighing.cropName}: ${weighing.cropMaxMoisturePct}%`;
+        $('weigh-form').reset();
+        $('w-error').textContent = '';
+        updateWeighment();
+        $('weigh-panel').classList.remove('hidden');
+        $('weigh-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        $('w-weight').focus();
+    }
+
+    function closeWeighment() {
+        weighing = null;
+        $('weigh-panel').classList.add('hidden');
+    }
+
+    /** Moisture above the crop's limit forces "Reject"; the amount preview follows the inputs. */
+    function updateWeighment() {
+        if (!weighing) return;
+        const moisture = parseFloat($('w-moisture').value);
+        const tooWet = moisture > weighing.cropMaxMoisturePct;
+        const accept = document.querySelector('input[name="decision"][value="accept"]');
+        accept.disabled = tooWet;
+        if (tooWet) document.querySelector('input[name="decision"][value="reject"]').checked = true;
+        $('w-moisture-warning').textContent = tooWet
+            ? `Moisture ${moisture}% is above the ${weighing.cropMaxMoisturePct}% limit – the crop must be rejected.` : '';
+
+        const weight = parseFloat($('w-weight').value);
+        const accepted = document.querySelector('input[name="decision"]:checked').value === 'accept';
+        $('w-amount').textContent = !(weight > 0) ? 'Enter the weight to see the amount.'
+            : accepted ? `Amount to pay: ${money(Math.round(weight * weighing.cropRatePerQtl * 100) / 100)}`
+            : 'Rejected – no payment.';
+    }
+
+    $('weigh-form').addEventListener('input', updateWeighment);
+    $('w-cancel').addEventListener('click', closeWeighment);
+
+    $('weigh-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        const weight = parseFloat($('w-weight').value);
+        const moisture = parseFloat($('w-moisture').value);
+        const accepted = document.querySelector('input[name="decision"]:checked').value === 'accept';
+        const remarks = $('w-remarks').value.trim();
+        const problems = [];
+        if (!(weight >= 0.1 && weight <= 1000)) problems.push('Enter a weight between 0.1 and 1000 quintals.');
+        if (!(moisture >= 0 && moisture <= 40)) problems.push('Enter the moisture between 0 and 40%.');
+        if (!accepted && !remarks) problems.push('Write the reason for rejecting.');
+        $('w-error').textContent = problems.join(' ');
+        if (problems.length) return;
+
+        const body = {
+            weightQtl: Math.round(weight * 100) / 100,
+            moisturePct: Math.round(moisture * 10) / 10,
+            grade: document.querySelector('input[name="grade"]:checked').value,
+            accepted,
+            remarks: remarks || null,
+        };
+        $('w-save').disabled = true;
+        const result = await act(`/api/operator/bookings/${weighing.id}/weighment`, body);
+        $('w-save').disabled = false;
+        if (result) closeWeighment();
     });
 
     $('expected').addEventListener('click', event => {

@@ -64,6 +64,10 @@
         </div>
 
         <div class="stack">
+            <section class="card hidden" id="result-card" aria-labelledby="result-title">
+                <h2 id="result-title" data-i18n="result.title">Weighment result</h2>
+                <div id="result"></div>
+            </section>
             <section class="card">
                 <dl class="details" id="details"></dl>
             </section>
@@ -123,8 +127,50 @@
             </li>`).join('');
 
         $('cancel-btn').classList.toggle('hidden', !b.cancellable);
+        renderResult();
         $('content').classList.remove('hidden');
         updateLive();
+    }
+
+    /** Weighment result and payment, once the crop has been weighed at the counter. */
+    function renderResult() {
+        const p = booking.procurement;
+        $('result-card').classList.toggle('hidden', !p);
+        if (!p) return;
+
+        const number = (n, digits) => new Intl.NumberFormat(I18N.locale(), { maximumFractionDigits: digits }).format(n);
+        const measured = `
+            <dt>${esc(t('result.weight'))}</dt><dd>${esc(Farmer.quantity(p.weightQtl))}</dd>
+            <dt>${esc(t('result.moisture'))}</dt><dd>${esc(number(p.moisturePct, 1))}%</dd>
+            <dt>${esc(t('result.grade'))}</dt><dd>${esc(p.grade)}</dd>`;
+
+        if (!p.accepted) {
+            $('result').innerHTML = `
+                <div class="alert alert-error">
+                    <strong>${esc(t('result.rejected'))}</strong><br>${esc(t('result.reason', { reason: p.remarks }))}
+                </div>
+                <dl class="details">${measured}</dl>`;
+            return;
+        }
+
+        const pay = booking.payment;
+        let paymentHtml = '';
+        if (pay) {
+            paymentHtml = `
+                <h3 style="margin-top: 20px">${esc(t('payment.title'))}</h3>
+                <p>${Farmer.paymentBadge(pay)}</p>
+                ${pay.status === 'PAID'
+                    ? `<p class="small muted" style="margin: 0">${esc(t('payment.paidOn', { date: I18N.formatDateTime(pay.paidAt) }))}<br>
+                         ${esc(t('payment.reference', { ref: pay.reference }))}</p>`
+                    : `<p class="small muted" style="margin: 0">${esc(t('payment.pendingNote'))}</p>`}`;
+        }
+        $('result').innerHTML = `
+            <dl class="details">
+                ${measured}
+                <dt>${esc(t('result.rate'))}</dt><dd>${esc(t('book.ratePerQtl', { rate: I18N.formatMoney(p.ratePerQtl) }))}</dd>
+                <dt>${esc(t('result.amount'))}</dt><dd class="estimate" style="margin: 0">${esc(I18N.formatMoney(p.amount))}</dd>
+            </dl>
+            ${paymentHtml}`;
     }
 
     // ---------- Live queue (only on the day of the booking, while it is active) ----------

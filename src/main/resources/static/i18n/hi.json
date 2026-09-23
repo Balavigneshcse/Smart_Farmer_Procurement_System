@@ -171,6 +171,23 @@
   "event.PAID": "भुगतान खाते में जमा हुआ",
   "event.SKIPPED": "बुलाने पर काउंटर पर नहीं थे – फिर से कतार में जोड़ा गया",
 
+  "result.title": "तौल का परिणाम",
+  "result.weight": "वज़न",
+  "result.moisture": "नमी",
+  "result.grade": "ग्रेड",
+  "result.rate": "दर",
+  "result.amount": "राशि",
+  "result.rejected": "आपकी फसल स्वीकार नहीं की गई।",
+  "result.reason": "कारण: {reason}",
+
+  "payment.title": "भुगतान",
+  "payment.PENDING": "भुगतान बाकी",
+  "payment.PAID": "भुगतान हो गया",
+  "payment.FAILED": "भुगतान विफल",
+  "payment.reference": "संदर्भ: {ref}",
+  "payment.paidOn": "{date} को भुगतान हुआ",
+  "payment.pendingNote": "राशि जल्द ही जमा होगी। भुगतान होने पर आपको SMS मिलेगा।",
+
   "live.title": "लाइव कतार",
   "live.notArrived": "केंद्र पहुँचने पर चेक-इन डेस्क पर अपना टोकन दिखाएँ।",
   "live.waitingNow": "अभी इंतज़ार कर रहे किसान: {n}",

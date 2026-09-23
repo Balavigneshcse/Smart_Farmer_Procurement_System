@@ -3,6 +3,9 @@ package com.cropcoders.procurement.service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
@@ -16,6 +19,8 @@ import com.cropcoders.procurement.dto.CreateBookingRequest;
 import com.cropcoders.procurement.entity.Booking;
 import com.cropcoders.procurement.entity.BookingEvent;
 import com.cropcoders.procurement.entity.Crop;
+import com.cropcoders.procurement.entity.Payment;
+import com.cropcoders.procurement.entity.Procurement;
 import com.cropcoders.procurement.entity.Slot;
 import com.cropcoders.procurement.enums.BookingEventType;
 import com.cropcoders.procurement.enums.BookingStatus;
@@ -24,6 +29,8 @@ import com.cropcoders.procurement.realtime.QueueChangedEvent;
 import com.cropcoders.procurement.repository.BookingEventRepository;
 import com.cropcoders.procurement.repository.BookingRepository;
 import com.cropcoders.procurement.repository.CropRepository;
+import com.cropcoders.procurement.repository.PaymentRepository;
+import com.cropcoders.procurement.repository.ProcurementRepository;
 import com.cropcoders.procurement.repository.SlotRepository;
 import com.cropcoders.procurement.repository.UserRepository;
 
@@ -36,18 +43,23 @@ public class BookingService {
     private final SlotRepository slotRepository;
     private final CropRepository cropRepository;
     private final UserRepository userRepository;
+    private final ProcurementRepository procurementRepository;
+    private final PaymentRepository paymentRepository;
     private final TokenService tokenService;
     private final ApplicationEventPublisher events;
     private final int daysAhead;
 
     public BookingService(BookingRepository bookingRepository, BookingEventRepository eventRepository,
                           SlotRepository slotRepository, CropRepository cropRepository, UserRepository userRepository,
+                          ProcurementRepository procurementRepository, PaymentRepository paymentRepository,
                           TokenService tokenService, ApplicationEventPublisher events, AppProperties properties) {
         this.bookingRepository = bookingRepository;
         this.eventRepository = eventRepository;
         this.slotRepository = slotRepository;
         this.cropRepository = cropRepository;
         this.userRepository = userRepository;
+        this.procurementRepository = procurementRepository;
+        this.paymentRepository = paymentRepository;
         this.tokenService = tokenService;
         this.events = events;
         this.daysAhead = properties.booking().daysAhead();
@@ -93,8 +105,13 @@ public class BookingService {
     @Transactional(readOnly = true)
     public List<BookingResponse> myBookings(Long farmerId) {
         LocalDateTime now = LocalDateTime.now();
-        return bookingRepository.findAllForFarmer(farmerId).stream()
-                .map(booking -> BookingResponse.from(booking, now, null))
+        List<Booking> bookings = bookingRepository.findAllForFarmer(farmerId);
+        Results results = loadResults(bookings.stream().map(Booking::getId).toList());
+        return bookings.stream()
+                .map(booking -> {
+                    Procurement procurement = results.procurementOf(booking);
+                    return BookingResponse.from(booking, now, null, procurement, results.paymentOf(procurement));
+                })
                 .toList();
     }
 
@@ -135,6 +152,33 @@ public class BookingService {
                 .stream()
                 .map(BookingEventResponse::from)
                 .toList();
-        return BookingResponse.from(booking, LocalDateTime.now(), events);
+        Results results = loadResults(List.of(booking.getId()));
+        Procurement procurement = results.procurementOf(booking);
+        return BookingResponse.from(booking, LocalDateTime.now(), events, procurement, results.paymentOf(procurement));
+    }
+
+    /** Weighment results and payments for a set of bookings, loaded with two queries. */
+    private record Results(Map<Long, Procurement> byBooking, Map<Long, Payment> byProcurement) {
+
+        Procurement procurementOf(Booking booking) {
+            return byBooking.get(booking.getId());
+        }
+
+        Payment paymentOf(Procurement procurement) {
+            return procurement == null ? null : byProcurement.get(procurement.getId());
+        }
+    }
+
+    private Results loadResults(List<Long> bookingIds) {
+        if (bookingIds.isEmpty()) {
+            return new Results(Map.of(), Map.of());
+        }
+        Map<Long, Procurement> byBooking = procurementRepository.findByBookingIds(bookingIds).stream()
+                .collect(Collectors.toMap(p -> p.getBooking().getId(), Function.identity()));
+        Map<Long, Payment> byProcurement = byBooking.isEmpty() ? Map.of()
+                : paymentRepository.findByProcurementIds(byBooking.values().stream().map(Procurement::getId).toList())
+                .stream()
+                .collect(Collectors.toMap(p -> p.getProcurement().getId(), Function.identity()));
+        return new Results(byBooking, byProcurement);
     }
 }

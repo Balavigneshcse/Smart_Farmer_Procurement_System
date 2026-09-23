@@ -17,6 +17,8 @@ public record OperatorBookingView(
         String mobile,
         String aadhaarLast4,
         String cropName,
+        BigDecimal cropRatePerQtl,
+        BigDecimal cropMaxMoisturePct,
         BigDecimal estQtyQtl,
         LocalTime slotStart,
         LocalTime slotEnd,

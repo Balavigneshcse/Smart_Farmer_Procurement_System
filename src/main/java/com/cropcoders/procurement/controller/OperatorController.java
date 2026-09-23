@@ -12,7 +12,9 @@ import com.cropcoders.procurement.dto.CallNextRequest;
 import com.cropcoders.procurement.dto.CheckInRequest;
 import com.cropcoders.procurement.dto.OperatorActionResponse;
 import com.cropcoders.procurement.dto.OperatorQueueResponse;
+import com.cropcoders.procurement.dto.WeighmentRequest;
 import com.cropcoders.procurement.security.AuthUser;
+import com.cropcoders.procurement.service.ProcurementService;
 import com.cropcoders.procurement.service.QueueService;
 
 import jakarta.validation.Valid;
@@ -23,9 +25,11 @@ import jakarta.validation.Valid;
 public class OperatorController {
 
     private final QueueService queueService;
+    private final ProcurementService procurementService;
 
-    public OperatorController(QueueService queueService) {
+    public OperatorController(QueueService queueService, ProcurementService procurementService) {
         this.queueService = queueService;
+        this.procurementService = procurementService;
     }
 
     @GetMapping("/queue")
@@ -53,5 +57,11 @@ public class OperatorController {
     @PostMapping("/bookings/{id}/skip")
     public OperatorActionResponse skip(@AuthenticationPrincipal AuthUser operator, @PathVariable("id") Long id) {
         return queueService.skip(operator, id);
+    }
+
+    @PostMapping("/bookings/{id}/weighment")
+    public OperatorActionResponse weighment(@AuthenticationPrincipal AuthUser operator, @PathVariable("id") Long id,
+                                            @Valid @RequestBody WeighmentRequest request) {
+        return procurementService.recordWeighment(operator, id, request);
     }
 }

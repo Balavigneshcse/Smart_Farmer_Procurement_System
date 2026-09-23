@@ -171,6 +171,23 @@
   "event.PAID": "Payment credited",
   "event.SKIPPED": "Not at the counter when called – back in the queue",
 
+  "result.title": "Weighment result",
+  "result.weight": "Weight",
+  "result.moisture": "Moisture",
+  "result.grade": "Grade",
+  "result.rate": "Rate",
+  "result.amount": "Amount",
+  "result.rejected": "Your crop was not accepted.",
+  "result.reason": "Reason: {reason}",
+
+  "payment.title": "Payment",
+  "payment.PENDING": "Payment pending",
+  "payment.PAID": "Paid",
+  "payment.FAILED": "Payment failed",
+  "payment.reference": "Reference: {ref}",
+  "payment.paidOn": "Paid on {date}",
+  "payment.pendingNote": "The amount will be credited soon. You will get an SMS when it is paid.",
+
   "live.title": "Live queue",
   "live.notArrived": "When you reach the centre, show your token at the check-in desk.",
   "live.waitingNow": "Farmers waiting now: {n}",

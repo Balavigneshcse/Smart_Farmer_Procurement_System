@@ -87,7 +87,7 @@ Admin browser ── checkout.js popup ──► Razorpay (test)  → success �
 - [x] **M2 — Auth:** OTP send/verify (console sender), JWT, farmer registration (with language choice), staff username/password login, role-based access. Pages: farmer login/register (3 languages), staff login (English).
 - [x] **M3 — Slots + booking:** slot generator (startup + daily), slot grid with busy colours, booking with capacity check, token + QR, my bookings, cancel.
 - [x] **M4 — Live queue:** check-in (token / QR text / camera), call next (`FOR UPDATE SKIP LOCKED`), call again, not present (back of the line), SSE hub, TV display page, farmer live position/ETA.
-- [ ] **M5 — Procurement + payment:** weighment form, amount calculation, payments page, Razorpay order + checkout + verify. *You: add Razorpay test keys.*
+- [x] **M5 — Procurement + payment:** weighment form (moisture limit blocks accept, rejection needs a reason), amount calculation, payments page, Razorpay order + checkout + HMAC verify (own `RazorpayGateway`, no SDK; live keys refused). Keys in git-ignored `.env`.
 - [ ] **M6 — SMS + automation:** textbee sender, SMS templates, daily cap, reminder / no-show / turn-near jobs, in-app notifications. *You: add textbee API key; test real SMS on your phone.*
 - [ ] **M7 — Dashboard + polish:** admin dashboard, tracking timeline, mobile-friendly styling, demo seed data, README.
 - [ ] **M8 — Deploy:** Dockerfile, push to GitHub, Neon DB, Render web service + env vars, smoke test on the live URL, demo checklist.

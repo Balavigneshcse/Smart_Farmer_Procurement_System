@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Payments · Smart Farmer Procurement System</title>
+    <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+<header class="site-header">
+    <div class="container header-row">
+        <a class="brand" href="/admin/dashboard.html">
+            <span class="brand-mark">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 21V11"/>
+                    <path d="M12 11C12 7 9 4 4 4c0 4 3 7 8 7z"/>
+                    <path d="M12 14c0-4 3-7 8-7 0 4-3 7-8 7z"/>
+                </svg>
+            </span>
+            <span class="brand-text">Admin</span>
+        </a>
+        <nav class="header-nav" aria-label="Admin">
+            <a href="/admin/dashboard.html">Dashboard</a>
+            <a href="/admin/payments.html" aria-current="page">Payments</a>
+        </nav>
+        <div class="header-actions">
+            <span class="user-chip" id="user-name"></span>
+            <button type="button" class="btn btn-outline btn-sm" id="logout-btn">Log out</button>
+        </div>
+    </div>
+</header>
+
+<main class="container">
+    <div class="page-head">
+        <h1>Farmer payments</h1>
+        <p class="muted">Accepted crops waiting to be paid. Payments run in <strong>Razorpay test mode</strong> – no real money moves.</p>
+    </div>
+
+    <div id="config-warning" class="alert alert-error hidden">
+        Razorpay test keys are not set. Put <code>RAZORPAY_KEY_ID</code> and <code>RAZORPAY_KEY_SECRET</code> in the
+        <code>.env</code> file (on Render: environment variables) and restart the app.
+    </div>
+    <div id="notice" class="alert hidden" role="status"></div>
+
+    <div class="stat-row">
+        <div class="stat-tile"><div class="stat-label">Waiting for payment</div><div class="stat-value" id="s-pending">–</div><div class="small muted" id="s-pending-amount"></div></div>
+        <div class="stat-tile"><div class="stat-label">Paid today</div><div class="stat-value" id="s-today">–</div><div class="small muted" id="s-today-count"></div></div>
+        <div class="stat-tile"><div class="stat-label">Paid in total</div><div class="stat-value" id="s-total">–</div></div>
+    </div>
+
+    <section class="card table-wrap">
+        <div class="table-tools">
+            <div class="segmented" role="group" aria-label="Show payments">
+                <button type="button" data-filter="PENDING" aria-pressed="true">Pending</button>
+                <button type="button" data-filter="PAID" aria-pressed="false">Paid</button>
+                <button type="button" data-filter="" aria-pressed="false">All</button>
+            </div>
+            <span class="small muted">Test payment: UPI ID <code>success@razorpay</code></span>
+        </div>
+        <table>
+            <thead>
+            <tr><th>Date</th><th>Token</th><th>Farmer</th><th>Crop</th><th class="num">Amount</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody id="rows"><tr class="empty-row"><td colspan="7">Loading…</td></tr></tbody>
+        </table>
+    </section>
+</main>
+
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script>
+    const $ = id => document.getElementById(id);
+    const me = Auth.require('ADMIN');
+    let filter = 'PENDING';
+    let data = null;
+    let noticeTimer = null;
+
+    const money = amount => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
+    const date = iso => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    const dateTime = iso => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+
+    function esc(value) {
+        const div = document.createElement('div');
+        div.textContent = value ?? '';
+        return div.innerHTML;
+    }
+
+    function showNotice(text, type = 'success', stay = false) {
+        $('notice').textContent = text;
+        $('notice').className = `alert alert-${type}`;
+        clearTimeout(noticeTimer);
+        if (!stay) noticeTimer = setTimeout(() => { $('notice').className = 'alert hidden'; }, 8000);
+    }
+
+    function render() {
+        const { payments, summary, razorpayConfigured } = data;
+        $('config-warning').classList.toggle('hidden', razorpayConfigured);
+        $('s-pending').textContent = summary.pendingCount;
+        $('s-pending-amount').textContent = money(summary.pendingAmount);
+        $('s-today').textContent = money(summary.paidTodayAmount);
+        $('s-today-count').textContent = `${summary.paidTodayCount} payment(s)`;
+        $('s-total').textContent = money(summary.paidTotalAmount);
+
+        $('rows').innerHTML = payments.length ? payments.map(p => `
+            <tr>
+                <td>${esc(date(p.bookingDate))}</td>
+                <td><strong>${esc(p.token)}</strong></td>
+                <td>${esc(p.farmerName)}<br><span class="small muted">+91 ${esc(p.farmerMobile)}</span></td>
+                <td>${esc(p.cropName)}<br><span class="small muted">${esc(p.weightQtl)} qtl · grade ${esc(p.grade)} · ${esc(p.centreName)}</span></td>
+                <td class="num"><strong>${esc(money(p.amount))}</strong></td>
+                <td>${p.status === 'PAID'
+                    ? `<span class="badge">Paid</span><br><span class="small muted">${esc(dateTime(p.paidAt))}</span><br><span class="mono">${esc(p.rzpPaymentId)}</span>`
+                    : `<span class="badge badge-amber">${p.status === 'PENDING' ? 'Pending' : 'Failed'}</span>`}</td>
+                <td class="num">${p.status !== 'PAID'
+                    ? `<button type="button" class="btn btn-primary btn-sm" data-pay="${p.id}" ${razorpayConfigured ? '' : 'disabled'}>Pay</button>`
+                    : ''}</td>
+            </tr>`).join('')
+            : `<tr class="empty-row"><td colspan="7">${filter === 'PENDING' ? 'No payments waiting.' : 'No payments yet.'}</td></tr>`;
+
+        document.querySelectorAll('[data-filter]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.filter === filter)));
+    }
+
+    async function load() {
+        try {
+            data = await Api.get(`/api/admin/payments${filter ? `?status=${filter}` : ''}`);
+            render();
+        } catch (error) {
+            showNotice(Api.errorMessage(error), 'error', true);
+        }
+    }
+
+    /** Pay: our server creates the Razorpay order, Checkout collects the (test) payment, our server verifies it. */
+    async function pay(paymentId, button) {
+        if (typeof Razorpay === 'undefined') {
+            showNotice('Razorpay Checkout did not load. Check your internet connection.', 'error', true);
+            return;
+        }
+        button.disabled = true;
+        let order;
+        try {
+            order = await Api.post(`/api/payments/${paymentId}/order`);
+        } catch (error) {
+            showNotice(Api.errorMessage(error), 'error', true);
+            button.disabled = false;
+            return;
+        }
+
+        const checkout = new Razorpay({
+            key: order.keyId,
+            order_id: order.orderId,
+            amount: order.amountPaise,
+            currency: order.currency,
+            name: 'Smart Farmer Procurement System',
+            description: order.description,
+            prefill: { name: order.farmerName, contact: `+91${order.farmerMobile}` },
+            notes: { paymentId: String(order.paymentId) },
+            theme: { color: '#1e6b3a' },
+            handler: async response => {
+                try {
+                    const paid = await Api.post('/api/payments/verify', {
+                        razorpayOrderId: response.razorpay_order_id,
+                        razorpayPaymentId: response.razorpay_payment_id,
+                        razorpaySignature: response.razorpay_signature,
+                    });
+                    showNotice(`Paid ${money(paid.amount)} to ${paid.farmerName} (${paid.token}). Reference ${paid.rzpPaymentId}.`);
+                } catch (error) {
+                    showNotice(Api.errorMessage(error), 'error', true);
+                }
+                load();
+            },
+            modal: {
+                ondismiss: () => {
+                    button.disabled = false;
+                },
+            },
+        });
+        checkout.on('payment.failed', response => {
+            showNotice(`Payment failed: ${response.error.description}`, 'error', true);
+        });
+        checkout.open();
+    }
+
+    $('rows').addEventListener('click', event => {
+        const button = event.target.closest('[data-pay]');
+        if (button) pay(Number(button.dataset.pay), button);
+    });
+
+    document.querySelectorAll('[data-filter]').forEach(button => button.addEventListener('click', () => {
+        filter = button.dataset.filter;
+        load();
+    }));
+
+    $('logout-btn').addEventListener('click', Auth.logout);
+
+    if (me) {
+        $('user-name').textContent = me.name;
+        load();
+    }
+</script>
+</body>
+</html>
