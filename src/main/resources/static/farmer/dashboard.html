@@ -104,6 +104,7 @@
     }
 
     function renderProfile() {
+        if (!me) return;   // the page language can switch before the farmer is known
         $('welcome').textContent = I18N.t('dashboard.welcome', { name: profile?.name ?? me.name });
         if (!profile) return;
         $('p-email').textContent = profile.email;
@@ -216,13 +217,16 @@
     document.addEventListener('languagesavefailed', event => showNotice(Api.errorMessage(event.detail.error), 'error'));
 
     async function init() {
+        // Ask for the data straight away, while the page texts (language file) are still loading.
+        const loading = Auth.user()?.role === 'FARMER'
+            ? Promise.all([Api.get('/api/farmers/me'), Api.get('/api/bookings/my'), Api.get('/api/notifications/my')])
+            : null;
+        loading?.catch(() => {});   // an error is shown below, once the page is ready
         me = await Farmer.initPage();
         if (!me) return;
         renderProfile();
         try {
-            [profile, bookings, notifications] = await Promise.all([
-                Api.get('/api/farmers/me'), Api.get('/api/bookings/my'), Api.get('/api/notifications/my'),
-            ]);
+            [profile, bookings, notifications] = await loading;
             if (profile.language !== I18N.lang) await I18N.setLang(profile.language);
             renderAll();
         } catch (error) {

@@ -157,6 +157,8 @@ How it works (for the viva):
 - **Free quota.** At most `EMAIL_DAILY_LIMIT` (default 250) notification emails per day (Gmail allows 500, Brevo 300). After that, notifications are shown in the app only (`SKIPPED`). OTP emails are never capped, so farmers can always log in.
 - **Scheduled jobs.** `AutomationJob` runs every 15 minutes from 7 am to 10 pm and also at startup (the free Render server sleeps and may miss runs). Nothing runs at night, so the free database can sleep too.
 - **Pluggable sender.** `EmailSender` is an interface; `ConsoleEmailSender` and `SmtpEmailSender` are chosen by `EMAIL_PROVIDER`. On Render, a Brevo sender will be added (M8), because Render's free plan blocks SMTP ports.
+- **Fast OTP.** The OTP email is also sent in the background, so "Send OTP" answers in about 0.2 seconds and the farmer can type the code as soon as it arrives.
+- **One kept-open Gmail connection.** Connecting to Gmail (TCP + TLS + login) takes about 2-3 seconds from here, so `SmtpEmailSender` opens the connection once at startup and reuses it for every email, like a connection pool with one connection. An email then leaves in about 2 seconds instead of 5-8. If Gmail has closed the connection, the sender reconnects and tries once more.
 
 ### Admin pages
 
@@ -184,6 +186,12 @@ How it works (for the viva):
 - Demo farmers have email addresses ending in `@demo.invalid`. `.invalid` is a domain that can never exist, so demo farmers never get a real email (notifications are in-app only) and cannot log in.
 - The day is built around the current time, so whenever you load it the queue looks live: counter 3 at Thanjavur is left free, so you can press **Call next** straight away.
 - The data is written with plain SQL (so past check-in, weighment and payment times can be set), using the same safe "take a place" statement as real bookings and the same token counter, so real bookings made later that day get the next token number.
+
+### Keeping the pages smooth
+
+- **Live pages pause in hidden tabs.** A browser keeps at most 6 connections open to one server, and every live page (operator desk, TV, farmer's booking) holds one. `js/live.js` closes the connection while a tab is hidden and reopens it when the tab is shown; the server then sends the current queue at once.
+- **Cheap animations.** The pulsing "live" dot only changes `transform` and `opacity`, which the graphics card handles without redrawing the page. The header is solid (no blur effect), and the field picture at the bottom of the screen sits on its own layer, so scrolling doesn't redraw it.
+- **Load in parallel.** Farmer pages ask for their data at the same time as the language file, the admin charts library loads in the background (numbers first, charts a moment later), and the operator desk only downloads the camera QR scanner when "Scan QR" is pressed.
 
 ### Look and feel
 

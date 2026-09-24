@@ -24,6 +24,7 @@
             opacity: .35;
             z-index: -1;
             pointer-events: none;
+            transform: translateZ(0);   /* own graphics layer, drawn once */
         }
         .tv a { color: #9fe0b5; }
         .tv-wrap { padding: 2vh 3vw; display: flex; flex-direction: column; gap: 2vh; height: 100vh; overflow: hidden; }
@@ -111,6 +112,7 @@
     </footer>
 </div>
 
+<script src="/js/live.js"></script>
 <script>
     const $ = id => document.getElementById(id);
     const centreId = Number(new URLSearchParams(location.search).get('centre'));
@@ -210,13 +212,7 @@
     }
 
     function connect() {
-        const source = new EventSource(`/api/queue/${centreId}/stream`);
-        source.addEventListener('open', () => setLive(true));
-        source.addEventListener('error', () => setLive(false));
-        source.addEventListener('queue', event => {
-            setLive(true);
-            render(JSON.parse(event.data));
-        });
+        LiveQueue.connect(centreId, { onSnapshot: render, onStatus: setLive });
     }
 
     async function showPicker() {

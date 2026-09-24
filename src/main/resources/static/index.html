@@ -204,9 +204,13 @@
         renderRates();
     }
 
+    // Asked for straight away, while the page texts (language file) are still loading.
+    const dataRequest = Promise.all([Api.get('/api/centres'), Api.get('/api/crops')]);
+    dataRequest.catch(() => {});
+
     async function loadData() {
         try {
-            [centres, crops] = await Promise.all([Api.get('/api/centres'), Api.get('/api/crops')]);
+            [centres, crops] = await dataRequest;
         } catch {
             loadFailed = true;
         }

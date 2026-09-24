@@ -84,6 +84,7 @@
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/farmer.js"></script>
+<script src="/js/live.js"></script>
 <script>
     const $ = id => document.getElementById(id);
     const { esc } = Farmer;
@@ -193,14 +194,15 @@
         }
         $('live').classList.remove('hidden');
         if (!source) {
-            source = new EventSource(`/api/queue/${booking.centre.id}/stream`);
-            source.addEventListener('queue', event => {
-                snapshot = JSON.parse(event.data);
-                renderLive();
-                syncStatus();
-            });
-            source.addEventListener('error', () => {
-                $('live-updated').textContent = t('live.reconnecting');
+            source = LiveQueue.connect(booking.centre.id, {
+                onSnapshot: queue => {
+                    snapshot = queue;
+                    renderLive();
+                    syncStatus();
+                },
+                onStatus: online => {
+                    if (!online) $('live-updated').textContent = t('live.reconnecting');
+                },
             });
         }
         renderLive();
@@ -285,6 +287,9 @@
     document.addEventListener('langchange', render);
 
     async function init() {
+        // Ask for the booking straight away, while the page texts (language file) are still loading.
+        const loading = bookingId && Auth.user()?.role === 'FARMER' ? Api.get(`/api/bookings/${bookingId}`) : null;
+        loading?.catch(() => {});   // an error is shown below, once the page is ready
         const me = await Farmer.initPage();
         if (!me) return;
         if (!bookingId) {
@@ -292,7 +297,7 @@
             return;
         }
         try {
-            booking = await Api.get(`/api/bookings/${bookingId}`);
+            booking = await loading;
             render();
         } catch (error) {
             showAlert(Api.errorMessage(error));

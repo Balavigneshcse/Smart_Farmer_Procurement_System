@@ -34,13 +34,30 @@ public class EmailDispatcher {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onEmailQueued(EmailQueuedEvent event) {
+        Long id = event.notificationId();
+        long start = System.currentTimeMillis();
         try {
             String ref = emailSender.send(event.message());
-            notificationRepository.updateEmailStatus(event.notificationId(), EmailStatus.SENT, shorten(ref));
+            log.info("Email \"{}\" sent to {} in {} ms", event.message().subject().replaceAll("\\d{6}", "******"),
+                    masked(event.message().to()), System.currentTimeMillis() - start);
+            if (id != null) {
+                notificationRepository.updateEmailStatus(id, EmailStatus.SENT, shorten(ref));
+            }
         } catch (RuntimeException e) {
-            log.warn("Email for notification {} failed: {}", event.notificationId(), e.getMessage());
-            notificationRepository.updateEmailStatus(event.notificationId(), EmailStatus.FAILED, shorten(e.getMessage()));
+            if (id == null) {
+                // OTP email: the farmer can press "Resend" after a minute.
+                log.warn("OTP email could not be sent: {}", e.getMessage());
+                return;
+            }
+            log.warn("Email for notification {} failed: {}", id, e.getMessage());
+            notificationRepository.updateEmailStatus(id, EmailStatus.FAILED, shorten(e.getMessage()));
         }
+    }
+
+    /** "ravi.kumar@gmail.com" -> "r***@gmail.com", so the log does not show full addresses. */
+    private static String masked(String email) {
+        int at = email.indexOf('@');
+        return at <= 1 ? "***" + email.substring(Math.max(at, 0)) : email.charAt(0) + "***" + email.substring(at);
     }
 
     private static String shorten(String value) {

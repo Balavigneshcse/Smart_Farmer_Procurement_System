@@ -118,7 +118,8 @@
     </section>
 </main>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<!-- async: the numbers and table show at once; the charts appear when the library has downloaded -->
+<script id="chart-lib" async src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/admin.js"></script>
@@ -128,6 +129,11 @@
     const REFRESH_MS = 30_000;
     const GREEN = '#25804a', DARK_GREEN = '#1e6b3a', AMBER = '#e3a008', GREY = '#b9c3bb';
     let charts = {};
+    const chartLibrary = new Promise(resolve => {
+        if (typeof Chart !== 'undefined') resolve();
+        $('chart-lib').addEventListener('load', resolve);
+        $('chart-lib').addEventListener('error', resolve);   // renderCharts shows a message instead
+    });
 
     const minutes = m => m == null ? '–' : `${m} min`;
     const dayLabel = iso => new Date(iso + 'T00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric' });
@@ -211,10 +217,10 @@
             charts.farmers.data.datasets[0].data = served;
             charts.farmers.data.datasets[1].data = pending;
             charts.farmers.data.datasets[2].data = noShow;
-            charts.farmers.update();
+            charts.farmers.update('none');   // no animation on the 30-second refresh
             charts.qty.data.labels = labels;
             charts.qty.data.datasets[0].data = qty;
-            charts.qty.update();
+            charts.qty.update('none');
             return;
         }
         Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
@@ -260,7 +266,7 @@
             renderCentres(d);
             renderPayments(d);
             renderCrops(d);
-            renderCharts(d);
+            chartLibrary.then(() => renderCharts(d));
             const at = new Date(d.updatedAt).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
             $('refresh-status').innerHTML = `<span class="live-dot"></span> Updated ${esc(at)}`;
             $('refresh-status').classList.remove('offline');

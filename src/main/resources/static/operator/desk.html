@@ -145,9 +145,9 @@
     </div>
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
+<script src="/js/live.js"></script>
 <script>
     const $ = id => document.getElementById(id);
     const me = Auth.require('OPERATOR');
@@ -424,17 +424,35 @@
 
     /** Any change at this centre (another counter, a farmer booking for today, ...) refreshes the desk. */
     function connectLive(centreId) {
-        source = new EventSource(`/api/queue/${centreId}/stream`);
-        source.addEventListener('open', () => setLive(true));
-        source.addEventListener('error', () => setLive(false));
-        source.addEventListener('queue', () => {
-            setLive(true);
-            clearTimeout(refreshTimer);
-            refreshTimer = setTimeout(refresh, 250);
+        source = LiveQueue.connect(centreId, {
+            onStatus: setLive,
+            onSnapshot: () => {
+                clearTimeout(refreshTimer);
+                refreshTimer = setTimeout(refresh, 250);
+            },
         });
     }
 
     // ---------- QR scanning with the camera (optional) ----------
+
+    // The scanner library is big (~370 KB), so it is only downloaded the first time the camera is used.
+    const QR_LIBRARY = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
+    let qrLibrary = null;
+
+    function loadQrLibrary() {
+        qrLibrary ??= new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = QR_LIBRARY;
+            script.onload = resolve;
+            script.onerror = () => {
+                qrLibrary = null;
+                script.remove();
+                reject(new Error('the scanner could not be downloaded (check the internet connection)'));
+            };
+            document.head.appendChild(script);
+        });
+        return qrLibrary;
+    }
 
     async function stopScan() {
         if (scanner) {
@@ -449,6 +467,15 @@
         if (scanner) {
             await stopScan();
             return;
+        }
+        $('scan-btn').disabled = true;
+        try {
+            await loadQrLibrary();
+        } catch (error) {
+            showNotice(`Camera not available: ${error.message}`, 'error');
+            return;
+        } finally {
+            $('scan-btn').disabled = false;
         }
         $('reader').classList.remove('hidden');
         $('scan-btn').textContent = 'Stop camera';
@@ -467,7 +494,7 @@
 
     async function init() {
         $('user-name').textContent = me.name;
-        if (typeof Html5Qrcode !== 'undefined') $('scan-btn').classList.remove('hidden');
+        if (navigator.mediaDevices?.getUserMedia) $('scan-btn').classList.remove('hidden');   // this device has a camera API
         await refresh();
         if (queue) connectLive(queue.centre.id);
         $('code').focus();

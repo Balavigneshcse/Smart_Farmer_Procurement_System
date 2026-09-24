@@ -64,6 +64,7 @@ body.field-bg::before {
     background: url("/img/field-band.svg") bottom center / cover no-repeat;
     z-index: -1;
     pointer-events: none;
+    transform: translateZ(0);   /* own graphics layer: the picture is drawn once, not again on every scroll */
 }
 body.field-bg main { padding-bottom: 150px; }
 
@@ -83,8 +84,8 @@ img, svg { max-width: 100%; }
 
 /* ---------- Header ---------- */
 .site-header {
-    background: rgba(255, 255, 255, .92);
-    backdrop-filter: blur(8px);
+    /* solid (no blur effect): a blurred see-through header must be redrawn on every scroll */
+    background: #fff;
     border-bottom: 1px solid var(--line);
     position: sticky;
     top: 0;
@@ -676,22 +677,32 @@ fieldset.field legend { font-weight: 600; padding: 0; margin-bottom: 6px; }
 
 /* ---------- Live indicator ---------- */
 .live-dot {
+    position: relative;
     display: inline-block;
     width: 10px;
     height: 10px;
     border-radius: 50%;
     background: var(--green-600);
     vertical-align: middle;
-    animation: live-pulse 1.8s infinite;
 }
-.offline .live-dot { background: var(--red-600); animation: none; }
+/* The pulse is a ring that grows and fades. Only transform and opacity change, which the
+   graphics card does by itself - animating a shadow would repaint the page 60 times a second. */
+.live-dot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: inherit;
+    animation: live-pulse 1.8s ease-out infinite;
+}
+.offline .live-dot { background: var(--red-600); }
+.offline .live-dot::after { animation: none; opacity: 0; }
 @keyframes live-pulse {
-    0% { box-shadow: 0 0 0 0 rgba(37, 128, 74, .5); }
-    70% { box-shadow: 0 0 0 10px rgba(37, 128, 74, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(37, 128, 74, 0); }
+    from { transform: scale(1); opacity: .55; }
+    to { transform: scale(2.6); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-    .live-dot { animation: none; }
+    .live-dot::after { animation: none; opacity: 0; }
 }
 .live-status { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: .9rem; color: var(--green-700); }
 .live-status.offline { color: var(--red-600); }

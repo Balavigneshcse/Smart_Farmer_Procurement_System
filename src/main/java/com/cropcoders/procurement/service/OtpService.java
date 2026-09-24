@@ -5,16 +5,14 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.cropcoders.procurement.config.AppProperties;
-import com.cropcoders.procurement.email.EmailSendException;
-import com.cropcoders.procurement.email.EmailSender;
+import com.cropcoders.procurement.email.EmailQueuedEvent;
 import com.cropcoders.procurement.email.EmailTemplates;
 import com.cropcoders.procurement.entity.OtpCode;
 import com.cropcoders.procurement.exception.ApiException;
@@ -31,28 +29,27 @@ import com.cropcoders.procurement.repository.OtpCodeRepository;
 @Service
 public class OtpService {
 
-    private static final Logger log = LoggerFactory.getLogger(OtpService.class);
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final OtpCodeRepository otpCodeRepository;
     private final PasswordEncoder passwordEncoder;
-    private final EmailSender emailSender;
+    private final ApplicationEventPublisher events;
     private final EmailTemplates templates;
     private final AppProperties.Otp rules;
 
-    public OtpService(OtpCodeRepository otpCodeRepository, PasswordEncoder passwordEncoder, EmailSender emailSender,
-                      EmailTemplates templates, AppProperties properties) {
+    public OtpService(OtpCodeRepository otpCodeRepository, PasswordEncoder passwordEncoder,
+                      ApplicationEventPublisher events, EmailTemplates templates, AppProperties properties) {
         this.otpCodeRepository = otpCodeRepository;
         this.passwordEncoder = passwordEncoder;
-        this.emailSender = emailSender;
+        this.events = events;
         this.templates = templates;
         this.rules = properties.otp();
     }
 
     /**
      * Creates a new OTP and emails it in the given language. Returns seconds until a resend is allowed.
-     * The email is sent right away (not in the background): if it fails, the farmer is told and
-     * the OTP is not saved, so they can try again at once.
+     * The email is sent in the background right after the OTP is saved (EmailDispatcher), so the
+     * farmer sees the "enter OTP" step at once instead of waiting 2-3 seconds for Gmail.
      */
     @Transactional
     public int sendOtp(String email, String language) {
@@ -75,13 +72,7 @@ public class OtpService {
         otpCodeRepository.save(new OtpCode(email, passwordEncoder.encode(code), now,
                 now.plusMinutes(rules.validMinutes())));
 
-        try {
-            emailSender.send(templates.otp(email, language, code, rules.validMinutes()));
-        } catch (EmailSendException e) {
-            log.warn("OTP email could not be sent: {}", e.getMessage());
-            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "EMAIL_FAILED",
-                    "We could not send the email right now. Please try again in a minute.");
-        }
+        events.publishEvent(new EmailQueuedEvent(null, templates.otp(email, language, code, rules.validMinutes())));
         return rules.resendSeconds();
     }
 
