@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Centres &amp; crops · Smart Farmer Procurement System</title>
+    <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="field-bg">
+
+<header class="site-header">
+    <div class="container header-row">
+        <a class="brand" href="/admin/dashboard.html">
+            <span class="brand-mark">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 21V11"/>
+                    <path d="M12 11C12 7 9 4 4 4c0 4 3 7 8 7z"/>
+                    <path d="M12 14c0-4 3-7 8-7 0 4-3 7-8 7z"/>
+                </svg>
+            </span>
+            <span class="brand-text">Admin</span>
+        </a>
+        <nav class="header-nav" aria-label="Admin">
+            <a href="/admin/dashboard.html">Dashboard</a>
+            <a href="/admin/payments.html">Payments</a>
+            <a href="/admin/settings.html" aria-current="page">Centres &amp; crops</a>
+        </nav>
+        <div class="header-actions">
+            <span class="user-chip" id="user-name"></span>
+            <button type="button" class="btn btn-outline btn-sm" id="logout-btn">Log out</button>
+        </div>
+    </div>
+</header>
+
+<main class="container">
+    <div class="page-head">
+        <h1>Centres &amp; crops</h1>
+        <p class="muted">Rates, moisture limits, counters and opening hours. Changes apply straight away.</p>
+    </div>
+
+    <div id="notice" class="alert hidden" role="status"></div>
+
+    <!-- Crops -->
+    <section class="card table-wrap dash-section" aria-labelledby="crops-title">
+        <div class="table-tools">
+            <h2 id="crops-title">Crops and rates</h2>
+            <button type="button" class="btn btn-primary btn-sm" id="add-crop-btn">Add crop</button>
+        </div>
+
+        <form id="crop-form" class="crop-form hidden" novalidate>
+            <h3 id="crop-form-title">Add crop</h3>
+            <div class="form-row">
+                <div class="field">
+                    <label for="c-name-en">Name in English</label>
+                    <input id="c-name-en" maxlength="60" required>
+                </div>
+                <div class="field">
+                    <label for="c-name-ta">Name in Tamil</label>
+                    <input id="c-name-ta" maxlength="60" lang="ta" required>
+                </div>
+                <div class="field">
+                    <label for="c-name-hi">Name in Hindi</label>
+                    <input id="c-name-hi" maxlength="60" lang="hi" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="field">
+                    <label for="c-rate">Rate per quintal (₹)</label>
+                    <input id="c-rate" type="number" min="1" max="100000" step="0.01" inputmode="decimal" required>
+                </div>
+                <div class="field">
+                    <label for="c-moisture">Max moisture (%)</label>
+                    <input id="c-moisture" type="number" min="1" max="40" step="0.1" inputmode="decimal" required>
+                    <span class="hint">Crop above this is rejected at the counter.</span>
+                </div>
+                <div class="field" style="justify-content: center">
+                    <label class="switch"><input type="checkbox" id="c-active" checked> Farmers can book it</label>
+                </div>
+            </div>
+            <p class="small muted">A new rate is used for weighments from now on. Weighments already saved keep their rate.</p>
+            <div class="actions" style="margin-top: 0">
+                <button type="submit" class="btn btn-primary" id="crop-save-btn">Save crop</button>
+                <button type="button" class="btn btn-outline" id="crop-cancel-btn">Cancel</button>
+            </div>
+        </form>
+
+        <table>
+            <thead>
+            <tr><th>Crop</th><th class="num">Rate per quintal</th><th class="num">Max moisture</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody id="crop-rows"><tr class="empty-row"><td colspan="5">Loading…</td></tr></tbody>
+        </table>
+    </section>
+
+    <!-- Centres -->
+    <section class="dash-section" aria-labelledby="centres-title">
+        <h2 class="section-title" id="centres-title">Procurement centres</h2>
+        <p class="muted small">Farmers per slot = counters × slot minutes ÷ minutes per farmer. Farmers who already
+            booked always keep their place; new or changed hours create or remove empty slots automatically.</p>
+        <div class="grid grid-2" id="centres"><p class="muted">Loading…</p></div>
+    </section>
+</main>
+
+<script src="/js/auth.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/admin.js"></script>
+<script>
+    const $ = id => document.getElementById(id);
+    const { esc, money } = Admin;
+    let crops = [];
+    let centres = [];
+    let editingCropId = null;
+
+    // ---------- Crops ----------
+
+    function renderCrops() {
+        $('crop-rows').innerHTML = crops.map(c => `
+            <tr>
+                <td><span class="crop-name">${esc(c.nameEn)}</span>
+                    <span class="small muted">${esc(c.nameTa)} · ${esc(c.nameHi)}</span></td>
+                <td class="num"><strong>${esc(money(c.ratePerQtl))}</strong></td>
+                <td class="num">${esc(c.maxMoisturePct)}%</td>
+                <td>${c.active ? '<span class="badge">Bookable</span>' : '<span class="badge badge-grey">Switched off</span>'}</td>
+                <td class="num"><button type="button" class="btn btn-outline btn-sm" data-edit-crop="${c.id}">Edit</button></td>
+            </tr>`).join('') || '<tr class="empty-row"><td colspan="5">No crops yet.</td></tr>';
+    }
+
+    function openCropForm(crop) {
+        editingCropId = crop?.id ?? null;
+        $('crop-form-title').textContent = crop ? `Edit ${crop.nameEn}` : 'Add crop';
+        $('c-name-en').value = crop?.nameEn ?? '';
+        $('c-name-ta').value = crop?.nameTa ?? '';
+        $('c-name-hi').value = crop?.nameHi ?? '';
+        $('c-rate').value = crop?.ratePerQtl ?? '';
+        $('c-moisture').value = crop?.maxMoisturePct ?? '';
+        $('c-active').checked = crop?.active ?? true;
+        $('crop-form').classList.remove('hidden');
+        $('c-name-en').focus();
+    }
+
+    function closeCropForm() {
+        editingCropId = null;
+        $('crop-form').classList.add('hidden');
+    }
+
+    $('add-crop-btn').addEventListener('click', () => openCropForm(null));
+    $('crop-cancel-btn').addEventListener('click', closeCropForm);
+    $('crop-rows').addEventListener('click', event => {
+        const button = event.target.closest('[data-edit-crop]');
+        if (button) openCropForm(crops.find(c => c.id === Number(button.dataset.editCrop)));
+    });
+
+    $('crop-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        const body = {
+            nameEn: $('c-name-en').value.trim(),
+            nameTa: $('c-name-ta').value.trim(),
+            nameHi: $('c-name-hi').value.trim(),
+            ratePerQtl: $('c-rate').value,
+            maxMoisturePct: $('c-moisture').value,
+            active: $('c-active').checked,
+        };
+        if (!body.nameEn || !body.nameTa || !body.nameHi || !body.ratePerQtl || !body.maxMoisturePct) {
+            Admin.notice('Fill in all names, the rate and the moisture limit.', 'error');
+            return;
+        }
+        $('crop-save-btn').disabled = true;
+        try {
+            const saved = editingCropId
+                ? await Api.put(`/api/admin/crops/${editingCropId}`, body)
+                : await Api.post('/api/admin/crops', body);
+            Admin.notice(`${saved.nameEn} saved: ${money(saved.ratePerQtl)} per quintal, max ${saved.maxMoisturePct}% moisture.`);
+            closeCropForm();
+            crops = await Api.get('/api/admin/crops');
+            renderCrops();
+        } catch (error) {
+            const fields = Object.values(error.fieldErrors || {});
+            Admin.notice(fields.length ? fields.join(' ') : Api.errorMessage(error), 'error', true);
+        } finally {
+            $('crop-save-btn').disabled = false;
+        }
+    });
+
+    // ---------- Centres ----------
+
+    /** Opening/closing times on slot boundaries, e.g. every 30 minutes from 5:00 to 22:00. */
+    function timeOptions(selected, slotMinutes) {
+        const options = [];
+        for (let m = 5 * 60; m <= 22 * 60; m += slotMinutes) {
+            const value = `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+            options.push(`<option value="${value}" ${selected.startsWith(value) ? 'selected' : ''}>${esc(Admin.time(value))}</option>`);
+        }
+        return options.join('');
+    }
+
+    function centreCard(c) {
+        return `
+        <form class="card centre-form" data-centre="${c.id}" novalidate>
+            <div class="centre-form-head">
+                <div>
+                    <span class="centre-code">${esc(c.code)}</span>
+                    <h3>${esc(c.name)}</h3>
+                </div>
+                <label class="switch"><input type="checkbox" name="active" ${c.active ? 'checked' : ''}> Open for bookings</label>
+            </div>
+            <div class="field"><label>Name</label><input name="name" maxlength="100" value="${esc(c.name)}"></div>
+            <div class="form-row">
+                <div class="field"><label>District</label><input name="district" maxlength="60" value="${esc(c.district)}"></div>
+                <div class="field"><label>Address</label><input name="address" maxlength="255" value="${esc(c.address)}"></div>
+            </div>
+            <div class="form-row">
+                <div class="field"><label>Opens at</label><select name="openTime">${timeOptions(c.openTime, c.slotMinutes)}</select></div>
+                <div class="field"><label>Closes at</label><select name="closeTime">${timeOptions(c.closeTime, c.slotMinutes)}</select></div>
+            </div>
+            <div class="form-row">
+                <div class="field"><label>Counters</label><input name="counters" type="number" min="1" max="20" value="${c.counters}"></div>
+                <div class="field"><label>Minutes per farmer</label><input name="avgServiceMin" type="number" min="1" max="60" value="${c.avgServiceMin}"></div>
+            </div>
+            <p class="capacity-note" data-capacity></p>
+            <button type="submit" class="btn btn-primary">Save ${esc(c.code)}</button>
+        </form>`;
+    }
+
+    // form.elements.namedItem, because form.name would be the form's own name, not the "name" input.
+    const field = (form, name) => form.elements.namedItem(name);
+
+    function updateCapacity(form) {
+        const centre = centres.find(c => c.id === Number(form.dataset.centre));
+        const counters = Number(field(form, 'counters').value) || 0;
+        const service = Number(field(form, 'avgServiceMin').value) || 0;
+        const perSlot = service ? Math.floor(counters * centre.slotMinutes / service) : 0;
+        form.querySelector('[data-capacity]').innerHTML = perSlot > 0
+            ? `<strong>${perSlot} farmers</strong> per ${centre.slotMinutes}-minute slot`
+            : '<strong>0 farmers</strong> per slot – add counters or lower the minutes per farmer';
+    }
+
+    function renderCentres() {
+        $('centres').innerHTML = centres.map(centreCard).join('');
+        document.querySelectorAll('.centre-form').forEach(updateCapacity);
+    }
+
+    $('centres').addEventListener('input', event => {
+        const form = event.target.closest('.centre-form');
+        if (form) updateCapacity(form);
+    });
+
+    $('centres').addEventListener('submit', async event => {
+        event.preventDefault();
+        const form = event.target;
+        const id = Number(form.dataset.centre);
+        const body = {
+            name: field(form, 'name').value.trim(),
+            district: field(form, 'district').value.trim(),
+            address: field(form, 'address').value.trim(),
+            openTime: field(form, 'openTime').value,
+            closeTime: field(form, 'closeTime').value,
+            counters: Number(field(form, 'counters').value),
+            avgServiceMin: Number(field(form, 'avgServiceMin').value),
+            active: field(form, 'active').checked,
+        };
+        const button = form.querySelector('[type="submit"]');
+        button.disabled = true;
+        try {
+            const saved = await Api.put(`/api/admin/centres/${id}`, body);
+            centres = centres.map(c => c.id === id ? saved : c);
+            Admin.notice(`${saved.name} saved: ${saved.counters} counters, ${Admin.time(saved.openTime)} – ${Admin.time(saved.closeTime)}, `
+                + `${saved.slotCapacity} farmers per slot. Slots were updated.`);
+        } catch (error) {
+            const fields = Object.values(error.fieldErrors || {});
+            Admin.notice(fields.length ? fields.join(' ') : Api.errorMessage(error), 'error', true);
+        } finally {
+            button.disabled = false;
+        }
+    });
+
+    async function load() {
+        try {
+            [crops, centres] = await Promise.all([Api.get('/api/admin/crops'), Api.get('/api/admin/centres')]);
+            renderCrops();
+            renderCentres();
+        } catch (error) {
+            Admin.notice(Api.errorMessage(error), 'error', true);
+        }
+    }
+
+    if (Admin.initPage()) {
+        load();
+    }
+</script>
+</body>
+</html>

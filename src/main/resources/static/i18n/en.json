@@ -7,6 +7,9 @@
   "landing.hero.text": "Book a time slot to sell your crop, watch your turn live on your phone, and get an email at every step until the money reaches you.",
   "landing.hero.book": "Book a slot",
   "landing.hero.track": "Track my booking",
+  "landing.fact.slot": "Your own time slot",
+  "landing.fact.live": "Live token on your phone",
+  "landing.fact.paid": "Payment tracked till credited",
 
   "landing.demo.label": "Your token",
   "landing.demo.position": "Position",

@@ -53,6 +53,9 @@ public class AuthService {
     public SendOtpResponse sendOtp(SendOtpRequest request) {
         // A registered farmer gets the OTP in their saved language; a new one in the page language.
         String email = normalise(request.email());
+        if (DemoDataService.isDemoEmail(email)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "DEMO_ACCOUNT", "Demo farmers cannot log in.");
+        }
         String language = userRepository.findByEmail(email)
                 .flatMap(user -> profileRepository.findById(user.getId()))
                 .map(FarmerProfile::getLanguage)

@@ -7,7 +7,24 @@
     <link rel="stylesheet" href="/css/app.css">
     <style>
         /* TV screen: dark, high contrast, readable from across the room */
-        body.tv { background: #0f1f16; color: #f4f7f2; min-height: 100vh; }
+        /* dark screen with the paddy field faintly along the bottom */
+        body.tv {
+            background: radial-gradient(900px 400px at 90% 0%, rgba(227, 160, 8, .12), transparent 70%), #0f1f16;
+            color: #f4f7f2;
+            min-height: 100vh;
+        }
+        body.tv::before {
+            content: "";
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 30vh;
+            background: url("/img/hero-field.svg") bottom center / 100% auto no-repeat;
+            opacity: .35;
+            z-index: -1;
+            pointer-events: none;
+        }
         .tv a { color: #9fe0b5; }
         .tv-wrap { padding: 2vh 3vw; display: flex; flex-direction: column; gap: 2vh; height: 100vh; overflow: hidden; }
         .tv-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }

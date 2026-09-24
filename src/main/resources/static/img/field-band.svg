@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1440" height="220" viewBox="0 0 1440 220" preserveAspectRatio="xMidYMax slice">
+  <!-- Light paddy field along the bottom of the page (for the cream background). -->
+  <defs>
+    <g id="blades" fill="none" stroke-linecap="round">
+      <path d="M0 0 C -1 -30 -8 -58 -24 -84" stroke-width="3"/>
+      <path d="M0 0 C 1 -38 2 -70 8 -104" stroke-width="3.2"/>
+      <path d="M0 0 C 4 -28 14 -52 32 -70" stroke-width="3"/>
+      <path d="M0 0 C -5 -22 -18 -38 -38 -48" stroke-width="2.6"/>
+      <path d="M0 0 C 6 -18 20 -30 40 -34" stroke-width="2.4"/>
+    </g>
+    <g id="stalk" fill="none" stroke-linecap="round">
+      <path d="M0 0 C 0 -50 4 -96 18 -120 C 24 -130 34 -131 40 -123" stroke="#8cc49c" stroke-width="2.4"/>
+      <path d="M40 -123 C 42 -112 42 -100 41 -88" stroke="#d9ad3c" stroke-width="1.2"/>
+      <g fill="#e8c15a" stroke="none">
+        <ellipse cx="40" cy="-119" rx="2.8" ry="5" transform="rotate(-20 40 -119)"/>
+        <ellipse cx="44.5" cy="-113" rx="2.8" ry="5" transform="rotate(25 44.5 -113)"/>
+        <ellipse cx="38.5" cy="-109" rx="2.7" ry="4.8" transform="rotate(-25 38.5 -109)"/>
+        <ellipse cx="44" cy="-103" rx="2.6" ry="4.6" transform="rotate(25 44 -103)"/>
+        <ellipse cx="39" cy="-99" rx="2.5" ry="4.4" transform="rotate(-25 39 -99)"/>
+        <ellipse cx="43" cy="-93" rx="2.3" ry="4.1" transform="rotate(20 43 -93)"/>
+        <ellipse cx="40.5" cy="-88.5" rx="2" ry="3.6" transform="rotate(-15 40.5 -88.5)"/>
+      </g>
+    </g>
+    <g id="plant">
+      <use xlink:href="#blades" stroke="#8cc49c"/>
+      <use xlink:href="#stalk" x="2"/>
+      <use xlink:href="#stalk" x="-4" transform="scale(-.85 .9)"/>
+    </g>
+  </defs>
+
+  <path d="M0 120 C 200 92 420 112 640 104 C 860 96 1080 76 1280 92 C 1360 98 1410 100 1440 98 L1440 220 L0 220 Z" fill="#dff0e3"/>
+  <path d="M0 160 C 260 136 540 154 800 146 C 1060 138 1260 130 1440 140 L1440 220 L0 220 Z" fill="#cfe7d5"/>
+  <path d="M0 160 C 260 136 540 154 800 146 C 1060 138 1260 130 1440 140" fill="none" stroke="#ffffff" stroke-opacity=".6" stroke-width="2"/>
+  <path d="M0 190 C 300 172 620 184 920 178 C 1160 174 1320 168 1440 172 L1440 220 L0 220 Z" fill="#bddfc6"/>
+
+  <g transform="translate(0 222) scale(.8)">
+    <use xlink:href="#plant" x="30"/>
+    <use xlink:href="#blades" x="110" stroke="#8cc49c"/>
+    <use xlink:href="#plant" x="200" y="4"/>
+    <use xlink:href="#plant" x="330"/>
+    <use xlink:href="#blades" x="420" stroke="#8cc49c"/>
+    <use xlink:href="#plant" x="510" y="6"/>
+    <use xlink:href="#plant" x="640"/>
+    <use xlink:href="#blades" x="730" stroke="#8cc49c"/>
+    <use xlink:href="#plant" x="820" y="4"/>
+    <use xlink:href="#plant" x="950"/>
+    <use xlink:href="#blades" x="1040" stroke="#8cc49c"/>
+    <use xlink:href="#plant" x="1130" y="6"/>
+    <use xlink:href="#plant" x="1260"/>
+    <use xlink:href="#blades" x="1350" stroke="#8cc49c"/>
+    <use xlink:href="#plant" x="1440" y="4"/>
+    <use xlink:href="#plant" x="1570"/>
+    <use xlink:href="#blades" x="1660" stroke="#8cc49c"/>
+    <use xlink:href="#plant" x="1750" y="6"/>
+  </g>
+</svg>

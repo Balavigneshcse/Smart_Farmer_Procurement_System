@@ -24,6 +24,19 @@ public class Crop {
     private BigDecimal maxMoisturePct;
     private boolean active = true;
 
+    protected Crop() {
+        // for JPA
+    }
+
+    /** A new crop added by the admin. */
+    public Crop(String nameEn, String nameTa, String nameHi, BigDecimal ratePerQtl, BigDecimal maxMoisturePct) {
+        this.nameEn = nameEn;
+        this.nameTa = nameTa;
+        this.nameHi = nameHi;
+        this.ratePerQtl = ratePerQtl;
+        this.maxMoisturePct = maxMoisturePct;
+    }
+
     /** Crop name in the farmer's language ("en", "ta" or "hi"). */
     public String nameIn(String language) {
         return switch (language) {

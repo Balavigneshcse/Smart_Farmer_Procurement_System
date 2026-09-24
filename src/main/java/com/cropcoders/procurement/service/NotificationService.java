@@ -76,7 +76,9 @@ public class NotificationService {
         String subject = shorten(messages.getMessage("notify." + event.key() + ".subject", args, locale), MAX_SUBJECT);
         String text = shorten(messages.getMessage("notify." + event.key() + ".text", args, locale), MAX_MESSAGE);
 
-        EmailStatus status = !event.sendsEmail() ? EmailStatus.IN_APP_ONLY
+        // Demo farmers (@demo.invalid) are never emailed.
+        boolean emailable = event.sendsEmail() && !DemoDataService.isDemoEmail(farmer.getEmail());
+        EmailStatus status = !emailable ? EmailStatus.IN_APP_ONLY
                 : emailsSentToday() < dailyEmailLimit ? EmailStatus.PENDING
                 : EmailStatus.SKIPPED;
         Notification notification = notificationRepository.save(new Notification(farmer.getId(), farmer.getEmail(),

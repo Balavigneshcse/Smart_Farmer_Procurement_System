@@ -92,7 +92,7 @@ Admin browser ── checkout.js popup ──► Razorpay (test)  → success �
 - [x] **M4 — Live queue:** check-in (token / QR text / camera), call next (`FOR UPDATE SKIP LOCKED`), call again, not present (back of the line), SSE hub, TV display page, farmer live position/ETA.
 - [x] **M5 — Procurement + payment:** weighment form (moisture limit blocks accept, rejection needs a reason), amount calculation, payments page, Razorpay order + checkout + HMAC verify (own `RazorpayGateway`, no SDK; live keys refused). Keys in git-ignored `.env`.
 - [x] **M6 — Email + automation:** farmer login switched to **email + OTP** (Flyway V4: `users.email`, OTP and notifications keyed by email; mobile kept as contact), `EmailSender` with `console` and Gmail `smtp` providers, HTML email templates in en/ta/hi, emails sent in the background after commit, daily cap, in-app notification list on the dashboard, reminder / no-show jobs every 15 min, "turn near" alert. SMS code removed. ✔ Real Gmail send tested (OTP + booking confirmation).
-- [ ] **M7 — Dashboard + polish:** admin dashboard, tracking timeline, mobile-friendly styling, demo seed data, README.
+- [x] **M7 — Dashboard + polish:** admin dashboard (today's numbers, live table per centre, Chart.js charts for 7 days, crops, payments), "Centres & crops" settings (crop rates / moisture / new crops, centre counters / hours / service time with automatic slot updates), demo data button (40 `@demo.invalid` farmers, a live day + 6 days of history, removable), new look with the same greens and hand-drawn paddy-field SVGs on every page, checked at 375 px phone width.
 - [ ] **M8 — Deploy:** Dockerfile, push to GitHub, Neon DB, **Brevo email provider** (HTTPS API, since Render blocks SMTP), Render web service + env vars, smoke test on the live URL, demo checklist.
 
 ---
@@ -209,11 +209,13 @@ Farmer     GET/PUT /api/farmers/me · PUT /api/farmers/me/language
            POST /api/bookings · GET /api/bookings/my · GET /api/bookings/{id} · POST /api/bookings/{id}/cancel
            GET  /api/notifications/my · POST /api/notifications/read-all
 Operator   GET  /api/operator/queue
-           POST /api/operator/checkin · /api/operator/call-next · /api/operator/bookings/{id}/no-show
-           POST /api/operator/procurements
-Admin      CRUD /api/admin/centres · /api/admin/crops
+           POST /api/operator/checkin · /api/operator/call-next
+           POST /api/operator/bookings/{id}/recall · /skip · /weighment
+Admin      GET  /api/admin/dashboard
+           GET/POST /api/admin/crops · PUT /api/admin/crops/{id}
+           GET  /api/admin/centres · PUT /api/admin/centres/{id}
+           GET/POST/DELETE /api/admin/demo      (demo data status / load / remove)
            GET  /api/admin/payments?status= · POST /api/payments/{id}/order · POST /api/payments/verify
-           GET  /api/admin/dashboard
 ```
 
 ### Pages (`src/main/resources/static`)
@@ -225,14 +227,15 @@ Admin      CRUD /api/admin/centres · /api/admin/crops
 | `farmer/dashboard.html` | Bookings, live position/ETA, timeline, payments, notifications |
 | `staff/login.html` | Operator/admin login |
 | `operator/desk.html` | Check-in, live queue, **Call next**, weighment form |
-| `admin/dashboard.html`, `admin/centres.html`, `admin/payments.html` | Stats, settings, Razorpay payments |
+| `admin/dashboard.html`, `admin/settings.html`, `admin/payments.html` | Stats + charts + demo data, centres & crops, Razorpay payments |
 | `display.html?centre=1` | TV board: now serving per counter + next tokens |
-| `css/app.css`, `js/api.js`, `js/auth.js` | Shared styles, fetch wrapper (adds JWT, handles 401), auth helpers |
+| `css/app.css`, `js/api.js`, `js/auth.js`, `js/admin.js` | Shared styles, fetch wrapper (adds JWT, handles 401), auth helpers, admin page helpers |
+| `img/*.svg` | Hand-drawn paddy fields and crop sprigs used as backgrounds |
 | `js/i18n.js`, `i18n/en.json`, `ta.json`, `hi.json` | Translations for farmer-facing pages only |
 
 Operator, admin and staff-login pages are English only and don't load `i18n.js`.
 
-CDN scripts: Razorpay `checkout.js`, `qrcodejs`.
+CDN scripts: Razorpay `checkout.js`, `qrcodejs`, `html5-qrcode`, Chart.js (admin dashboard).
 
 ### Project structure (layered — easy to explain in the viva)
 ```
@@ -245,10 +248,11 @@ Smart Farmer Procurement System/
     │   ├── security/     SecurityConfig, JwtAuthFilter, JwtService, AuthUser
     │   ├── entity/       User, FarmerProfile, Centre, Crop, Slot, Booking, BookingEvent, Procurement, Payment, Notification, OtpCode
     │   ├── enums/        Role, BookingStatus, BookingEventType, PaymentStatus, NotificationEvent, EmailStatus
-    │   ├── repository/   one Spring Data repository per entity
+    │   ├── repository/   one Spring Data repository per entity + DashboardRepository (SQL)
     │   ├── dto/          request/response records
     │   ├── service/      AuthService, JwtService, OtpService, SlotService, BookingService, QueueService,
-    │   │                 ProcurementService, PaymentService, NotificationService, AutomationService, DashboardService
+    │   │                 ProcurementService, PaymentService, NotificationService, AutomationService,
+    │   │                 AdminDashboardService, AdminCatalogueService, DemoDataService
     │   ├── payment/      RazorpayGateway
     │   ├── email/        EmailSender (interface), ConsoleEmailSender, SmtpEmailSender, (M8) BrevoEmailSender,
     │   │                 EmailTemplates, EmailDispatcher (background sending)
@@ -283,9 +287,10 @@ Secrets live only in the git-ignored `.env` file on the PC (template: `example.e
 - `server.port=${PORT:8080}`; timezone forced to `Asia/Kolkata`.
 
 ### Demo script (~5 min)
-1. Admin: centre settings and auto-generated slots with capacity.
+0. Before the viva: Admin → Dashboard → **Load demo day** (fills every centre with a live queue and a week of history).
+1. Admin: dashboard numbers and charts; Centres & crops (change a rate or counters, slots update).
 2. Farmer (phone): email OTP login → book slot → token `TNJ-017` + QR + confirmation email.
-3. Operator: check in seeded farmers + you → TV and phone update live ("Position 3 · ETA 20 min") → "turn near" email.
+3. Operator: check in your own booking (demo farmers are already waiting) → TV and phone update live ("Position 6 · ETA 20 min") → "turn near" email when you reach the front.
 4. Operator: **Call next** → TV shows `TNJ-017 → Counter 2`.
 5. Operator: record 24.5 qtl, moisture 15%, Grade A → amount auto-calculated → email.
 6. Admin: Payments → Pay → Razorpay test checkout → farmer timeline shows **Paid** + email.

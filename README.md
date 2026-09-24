@@ -6,6 +6,7 @@ Farmers often wait all day at procurement centres without knowing the schedule o
 - **Live queue.** Operators check farmers in and call them to counters. Farmers see their position and waiting time live, and a TV screen at the centre shows who is being served.
 - **Email alerts.** Farmers get an email at key moments (booked, reminder, turn near, weighed, paid), in their chosen language (English, Tamil or Hindi). Every update also appears on their dashboard.
 - **Tracking.** Every booking has a timeline, from booked through weighed to paid, with payment through Razorpay (test mode).
+- **Admin dashboard.** Today's farmers, queue lengths, average wait, crop procured and payments at every centre, with charts for the last 7 days. The admin also sets crop rates, moisture limits, counters and opening hours.
 
 Theme: Smart Automation · College mini project
 
@@ -157,6 +158,43 @@ How it works (for the viva):
 - **Scheduled jobs.** `AutomationJob` runs every 15 minutes from 7 am to 10 pm and also at startup (the free Render server sleeps and may miss runs). Nothing runs at night, so the free database can sleep too.
 - **Pluggable sender.** `EmailSender` is an interface; `ConsoleEmailSender` and `SmtpEmailSender` are chosen by `EMAIL_PROVIDER`. On Render, a Brevo sender will be added (M8), because Render's free plan blocks SMTP ports.
 
+### Admin pages
+
+| Page | What the admin does there |
+|---|---|
+| **Dashboard** (`/admin/dashboard.html`) | Today at a glance: farmers booked, waiting, served, average wait, crop procured, payments pending. A live table per centre (refreshes every 30 seconds) with a link to each TV screen. Charts of farmers and quintals per day for the last 7 days, and the crops bought this week. |
+| **Payments** (`/admin/payments.html`) | Pays farmers through Razorpay test mode (see above). |
+| **Centres & crops** (`/admin/settings.html`) | Changes crop rates and moisture limits, adds crops (with Tamil and Hindi names), switches crops or centres off, and changes a centre's counters, opening hours and minutes per farmer. |
+
+How it works (for the viva):
+- **Numbers from SQL.** `DashboardRepository` lets PostgreSQL do the counting with `COUNT(*) FILTER (WHERE status = …)`, `SUM` and `AVG`, so the dashboard needs a handful of queries instead of loading every booking. `generate_series` makes one row per day, so a day without bookings still shows as 0 in the chart. The charts use Chart.js.
+- **Changing a centre safely.** Places per slot = counters × slot minutes ÷ minutes per farmer. After a change, slots that have not started get the new capacity, but never less than what is already booked (`GREATEST(new, booked)`). Empty slots outside new hours are deleted and slots for new hours are created. Farmers who already booked always keep their place. Hours must fall on slot boundaries (e.g. 8:00 or 8:30), and a counter that is serving a farmer cannot be removed.
+- **Rates.** A new rate is used for weighments from now on. Every weighment stores the rate it used, so old amounts never change.
+
+### Demo data (for presentations)
+
+On the admin dashboard, **Load demo day** adds:
+- 40 demo farmers (most speaking Tamil, some Hindi and English),
+- a busy day in progress at each centre: farmers already weighed and paid, some at the counters, a waiting line and some still to come,
+- the last 6 days of history, so the charts have something to show.
+
+**Remove demo data** deletes all of it again. Real farmers, their bookings and payments are never touched.
+
+How it works (for the viva):
+- Demo farmers have email addresses ending in `@demo.invalid`. `.invalid` is a domain that can never exist, so demo farmers never get a real email (notifications are in-app only) and cannot log in.
+- The day is built around the current time, so whenever you load it the queue looks live: counter 3 at Thanjavur is left free, so you can press **Call next** straight away.
+- The data is written with plain SQL (so past check-in, weighment and payment times can be set), using the same safe "take a place" statement as real bookings and the same token counter, so real bookings made later that day get the next token number.
+
+### Look and feel
+
+The pages use the same dark and light greens throughout, with paddy fields drawn as SVG pictures in `static/img/`:
+- `hero-field.svg`: fields at dusk with ripe paddy, used on the home page, page banners, login cards and the footer,
+- `field-band.svg`: a light field along the bottom of the screen,
+- `crop-pattern.svg`: a faint wallpaper of crop sprigs,
+- `sprig.svg`: the small paddy icon next to headings and crop names.
+
+They are hand-made vector drawings (a few KB each), so they stay sharp on any screen, load fast on a slow phone connection and need no photo licences.
+
 ### Testing the queue outside centre hours
 
 Centres close at 16:00 or 17:00, so in the evening there are no slots left for today. To test at night, temporarily keep Thanjavur open late (run in pgAdmin), then restart the app so it creates the extra slots:
@@ -197,8 +235,9 @@ src/main/java/com/cropcoders/procurement/
 ├── config/                       AppProperties (the "app:" settings)
 ├── security/                     SecurityConfig (who can call what), JWT service + filter
 ├── controller/                   REST endpoints
-├── service/                      business logic (OTP, login, farmer profile, ...)
-├── repository/                   Spring Data JPA repositories
+├── service/                      business logic (login, booking, queue, weighment, payment, notifications,
+│                                 admin dashboard and settings, demo data, ...)
+├── repository/                   Spring Data JPA repositories + DashboardRepository (SQL for the dashboard)
 ├── entity/                       JPA entities (tables)
 ├── enums/                        Role, BookingStatus, NotificationEvent, EmailStatus, ...
 ├── dto/                          request/response objects
@@ -211,7 +250,7 @@ src/main/resources/
 ├── application.yml               configuration
 ├── messages*.properties          email texts in English, Tamil, Hindi
 ├── db/migration/                 Flyway: V1 schema, V2 centres + crops, V3 staff accounts, V4 email instead of SMS
-└── static/                       HTML pages, css/, js/, i18n/ (en, ta, hi)
+└── static/                       HTML pages, css/, js/, i18n/ (en, ta, hi), img/ (paddy field drawings)
 src/test/java/                    unit tests (JwtServiceTest, EtaCalculatorTest, RazorpayGatewayTest, EmailTemplatesTest)
 ```
 
