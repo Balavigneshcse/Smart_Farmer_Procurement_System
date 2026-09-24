@@ -4,7 +4,7 @@ spring:
   application:
     name: smart-farmer-procurement
 
-  # Local secrets (Razorpay keys, ...) live in a git-ignored ".env" file in the project folder:
+  # Local secrets (Razorpay keys, Gmail App Password) live in a git-ignored ".env" file in the project folder:
   #   RAZORPAY_KEY_ID=rzp_test_...
   #   RAZORPAY_KEY_SECRET=...
   # On Render the same names are set as environment variables instead.
@@ -27,10 +27,25 @@ spring:
   flyway:
     enabled: true
 
-  # SMS texts: messages.properties (English), messages_ta.properties, messages_hi.properties
+  # Email texts: messages.properties (English), messages_ta.properties, messages_hi.properties
   messages:
     basename: messages
     fallback-to-system-locale: false
+
+  # Gmail SMTP (used when app.email.provider = smtp). Render's free plan blocks these ports,
+  # so the deployed site uses the Brevo HTTPS API instead (M8).
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      "[mail.smtp.auth]": true
+      "[mail.smtp.starttls.enable]": true
+      "[mail.smtp.starttls.required]": true
+      "[mail.smtp.connectiontimeout]": 10000
+      "[mail.smtp.timeout]": 10000
+      "[mail.smtp.writetimeout]": 10000
 
 server:
   port: ${PORT:8080}
@@ -41,7 +56,7 @@ app:
   jwt:
     # Set JWT_SECRET (32+ random characters) on Render. The default is for local development only.
     secret: ${JWT_SECRET:local-dev-secret-change-me-on-render-0123456789}
-    farmer-expiry-hours: 168          # farmers stay logged in for 7 days (fewer OTP SMS)
+    farmer-expiry-hours: 168          # farmers stay logged in for 7 days (fewer OTP emails)
     staff-expiry-hours: 12
     registration-expiry-minutes: 15
 
@@ -51,14 +66,20 @@ app:
     resend-seconds: 60
     max-per-hour: 5
 
-  sms:
-    provider: ${SMS_PROVIDER:console}  # console = print in log, textbee = real SMS (M6)
+  email:
+    provider: ${EMAIL_PROVIDER:console}   # console = print in the log, smtp = Gmail
+    from: ${MAIL_FROM:${MAIL_USERNAME:}}
+    from-name: Smart Farmer Procurement System
+    daily-limit: ${EMAIL_DAILY_LIMIT:250}  # notification emails per day (Gmail allows 500, Brevo 300); OTPs are not capped
+    app-url: ${APP_URL:http://localhost:8080}   # used for links inside emails
 
   booking:
     days-ahead: 7                      # today + the next 6 days can be booked
+    reminder-before-minutes: 120       # reminder email about 2 hours before the slot starts
 
   queue:
     late-grace-minutes: 15             # checked in later than slot end + 15 min = back of the queue
+    no-show-after-minutes: 120         # not checked in by slot end + 2 h = marked as missed (NO_SHOW)
 
   razorpay:
     key-id: ${RAZORPAY_KEY_ID:}        # must be a TEST key (rzp_test_...); live keys are refused

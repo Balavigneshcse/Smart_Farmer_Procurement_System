@@ -29,6 +29,7 @@ import com.cropcoders.procurement.entity.Centre;
 import com.cropcoders.procurement.entity.FarmerProfile;
 import com.cropcoders.procurement.enums.BookingEventType;
 import com.cropcoders.procurement.enums.BookingStatus;
+import com.cropcoders.procurement.enums.NotificationEvent;
 import com.cropcoders.procurement.exception.ApiException;
 import com.cropcoders.procurement.realtime.QueueChangedEvent;
 import com.cropcoders.procurement.repository.BookingEventRepository;
@@ -49,6 +50,9 @@ public class QueueService {
 
     private static final String QR_PREFIX = "SFPS:";
 
+    /** Farmers this close to the front get a "your turn is near" email (once per visit). */
+    private static final int TURN_NEAR_POSITION = 3;
+
     /** Waiting line order: queue priority, then who checked in first. */
     private static final Comparator<Booking> QUEUE_ORDER =
             Comparator.comparing(Booking::getQueuePriority).thenComparing(Booking::getCheckedInAt);
@@ -57,16 +61,19 @@ public class QueueService {
     private final BookingEventRepository eventRepository;
     private final CentreRepository centreRepository;
     private final FarmerProfileRepository profileRepository;
+    private final NotificationService notificationService;
     private final ApplicationEventPublisher events;
     private final int lateGraceMinutes;
 
     public QueueService(BookingRepository bookingRepository, BookingEventRepository eventRepository,
                         CentreRepository centreRepository, FarmerProfileRepository profileRepository,
-                        ApplicationEventPublisher events, AppProperties properties) {
+                        NotificationService notificationService, ApplicationEventPublisher events,
+                        AppProperties properties) {
         this.bookingRepository = bookingRepository;
         this.eventRepository = eventRepository;
         this.centreRepository = centreRepository;
         this.profileRepository = profileRepository;
+        this.notificationService = notificationService;
         this.events = events;
         this.lateGraceMinutes = properties.queue().lateGraceMinutes();
     }
@@ -95,7 +102,11 @@ public class QueueService {
         eventRepository.save(new BookingEvent(booking, BookingEventType.CHECKED_IN,
                 late ? "Late arrival - joined the back of the queue" : "Checked in", operator.id()));
 
-        return afterChange(centre, booking, "Checked in " + booking.getToken() + (late ? " (late arrival)" : ""));
+        OperatorActionResponse response = afterChange(centre, booking,
+                "Checked in " + booking.getToken() + (late ? " (late arrival)" : ""), true);
+        notificationService.notifyBooking(booking, NotificationEvent.CHECKED_IN,
+                response.booking().position(), response.booking().etaMinutes());
+        return response;
     }
 
     /** Calls the first farmer in the waiting line to a free counter. */
@@ -119,6 +130,7 @@ public class QueueService {
         next.setCounterNo(counterNo);
         next.setCalledAt(LocalDateTime.now());
         eventRepository.save(new BookingEvent(next, BookingEventType.CALLED, "Counter " + counterNo, operator.id()));
+        notificationService.notifyBooking(next, NotificationEvent.CALLED, counterNo);
 
         return afterChange(centre, next, "Called " + next.getToken() + " to counter " + counterNo);
     }
@@ -144,6 +156,7 @@ public class QueueService {
         booking.setCounterNo(null);
         booking.setCalledAt(null);
         booking.setQueuePriority(LocalDateTime.now());
+        booking.setTurnAlertSent(false);     // tell them again when they are near the front
         eventRepository.save(new BookingEvent(booking, BookingEventType.SKIPPED,
                 "Not at counter " + counterNo + " when called", operator.id()));
 
@@ -253,12 +266,21 @@ public class QueueService {
         return new OperatorQueueResponse(CentreResponse.from(day.centre()), counters, waiting, expected, stats);
     }
 
-    /** Tells the live screens about the change and returns the updated operator desk. Also used by ProcurementService. */
+    /**
+     * Tells the live screens about the change, emails farmers who are now near the front,
+     * and returns the updated operator desk. Also used by ProcurementService.
+     */
     OperatorActionResponse afterChange(Centre centre, Booking booking, String message) {
+        return afterChange(centre, booking, message, false);
+    }
+
+    /** justCheckedIn: the booking's own check-in message already gives its place in the queue. */
+    private OperatorActionResponse afterChange(Centre centre, Booking booking, String message, boolean justCheckedIn) {
         // Screens are refreshed after this transaction commits (see QueueSseHub).
         events.publishEvent(new QueueChangedEvent(centre.getId()));
 
         DayState day = loadDay(centre);
+        alertFarmersNearTheFront(day, justCheckedIn ? booking : null);
         Integer position = null;
         Integer eta = null;
         int index = day.waiting().indexOf(booking);
@@ -268,6 +290,21 @@ public class QueueService {
         }
         OperatorBookingView view = view(booking, profilesOf(day), position, eta);
         return new OperatorActionResponse(message, view, toOperatorView(day));
+    }
+
+    /** The first few farmers in the waiting line get one "your turn is near" email each. */
+    private void alertFarmersNearTheFront(DayState day, Booking justCheckedIn) {
+        int count = Math.min(TURN_NEAR_POSITION, day.waiting().size());
+        for (int i = 0; i < count; i++) {
+            Booking b = day.waiting().get(i);
+            if (b.isTurnAlertSent()) {
+                continue;
+            }
+            b.setTurnAlertSent(true);
+            if (b != justCheckedIn) {
+                notificationService.notifyBooking(b, NotificationEvent.TURN_NEAR, i + 1, day.etaFor(i + 1));
+            }
+        }
     }
 
     private OperatorBookingView view(Booking b, Map<Long, FarmerProfile> profiles, Integer position, Integer eta) {

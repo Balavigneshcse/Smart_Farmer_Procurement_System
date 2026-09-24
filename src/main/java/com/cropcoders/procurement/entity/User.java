@@ -17,8 +17,8 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
 /**
- * Anyone who can log in. Farmers have a mobile number (OTP login);
- * operators and admins have a username and password.
+ * Anyone who can log in. Farmers log in with their email address (OTP sent by email) and also
+ * give a mobile number for the centre; operators and admins have a username and password.
  */
 @Entity
 @Table(name = "users")
@@ -33,6 +33,7 @@ public class User {
     @Enumerated(EnumType.STRING)
     private Role role;
 
+    private String email;
     private String mobile;
     private String username;
     private String passwordHash;
@@ -49,9 +50,10 @@ public class User {
         // for JPA
     }
 
-    public static User newFarmer(String name, String mobile) {
+    public static User newFarmer(String name, String email, String mobile) {
         User user = new User();
         user.name = name;
+        user.email = email;
         user.mobile = mobile;
         user.role = Role.FARMER;
         return user;
@@ -78,6 +80,10 @@ public class User {
 
     public Role getRole() {
         return role;
+    }
+
+    public String getEmail() {
+        return email;
     }
 
     public String getMobile() {

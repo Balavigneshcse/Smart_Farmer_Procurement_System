@@ -107,7 +107,7 @@ const Auth = (() => {
         location.replace(role === 'FARMER' ? '/' : '/staff/login.html');
     }
 
-    // A new farmer's verified mobile, kept only until the registration form is submitted.
+    // A new farmer's verified email, kept only until the registration form is submitted.
     function setPendingRegistration(data) {
         writeJson(sessionStorage, REGISTRATION_KEY, data);
     }

@@ -19,6 +19,7 @@ import com.cropcoders.procurement.entity.Booking;
 import com.cropcoders.procurement.entity.BookingEvent;
 import com.cropcoders.procurement.entity.Payment;
 import com.cropcoders.procurement.enums.BookingEventType;
+import com.cropcoders.procurement.enums.NotificationEvent;
 import com.cropcoders.procurement.enums.PaymentStatus;
 import com.cropcoders.procurement.exception.ApiException;
 import com.cropcoders.procurement.payment.RazorpayGateway;
@@ -38,12 +39,14 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final BookingEventRepository eventRepository;
     private final RazorpayGateway razorpay;
+    private final NotificationService notificationService;
 
     public PaymentService(PaymentRepository paymentRepository, BookingEventRepository eventRepository,
-                          RazorpayGateway razorpay) {
+                          RazorpayGateway razorpay, NotificationService notificationService) {
         this.paymentRepository = paymentRepository;
         this.eventRepository = eventRepository;
         this.razorpay = razorpay;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -111,8 +114,11 @@ public class PaymentService {
 
         if (payment.getStatus() != PaymentStatus.PAID) {       // verifying twice is harmless
             payment.markPaid(request.razorpayPaymentId());
-            eventRepository.save(new BookingEvent(payment.getProcurement().getBooking(), BookingEventType.PAID,
+            Booking booking = payment.getProcurement().getBooking();
+            eventRepository.save(new BookingEvent(booking, BookingEventType.PAID,
                     "Rs " + payment.amountRupees() + ", ref " + request.razorpayPaymentId(), admin.id()));
+            notificationService.notifyBooking(booking, NotificationEvent.PAID,
+                    NotificationService.money(payment.amountRupees()), request.razorpayPaymentId());
         }
         return PaymentView.from(payment);
     }

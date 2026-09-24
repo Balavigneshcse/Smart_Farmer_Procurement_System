@@ -8,7 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** A one-time password sent to a mobile number. Only a hash of the code is stored. */
+/** A one-time password sent to an email address. Only a hash of the code is stored. */
 @Entity
 @Table(name = "otp_codes")
 public class OtpCode {
@@ -17,7 +17,7 @@ public class OtpCode {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String mobile;
+    private String email;
     private String codeHash;
     private LocalDateTime expiresAt;
     private int attempts;
@@ -28,8 +28,8 @@ public class OtpCode {
         // for JPA
     }
 
-    public OtpCode(String mobile, String codeHash, LocalDateTime createdAt, LocalDateTime expiresAt) {
-        this.mobile = mobile;
+    public OtpCode(String email, String codeHash, LocalDateTime createdAt, LocalDateTime expiresAt) {
+        this.email = email;
         this.codeHash = codeHash;
         this.createdAt = createdAt;
         this.expiresAt = expiresAt;
@@ -39,8 +39,8 @@ public class OtpCode {
         return id;
     }
 
-    public String getMobile() {
-        return mobile;
+    public String getEmail() {
+        return email;
     }
 
     public String getCodeHash() {

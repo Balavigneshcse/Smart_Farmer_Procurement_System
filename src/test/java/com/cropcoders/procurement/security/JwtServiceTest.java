@@ -34,10 +34,10 @@ class JwtServiceTest {
 
     @Test
     void registrationTokenCannotBeUsedToLogIn() {
-        String registrationToken = jwtService.createRegistrationToken("9876543210");
+        String registrationToken = jwtService.createRegistrationToken("ravi@example.com");
 
         assertThat(jwtService.parseLoginToken(registrationToken)).isEmpty();
-        assertThat(jwtService.parseRegistrationToken(registrationToken)).contains("9876543210");
+        assertThat(jwtService.parseRegistrationToken(registrationToken)).contains("ravi@example.com");
     }
 
     @Test

@@ -8,6 +8,7 @@ import com.cropcoders.procurement.entity.User;
 public record FarmerProfileResponse(
         Long id,
         String name,
+        String email,
         String mobile,
         String address,
         String district,
@@ -20,6 +21,7 @@ public record FarmerProfileResponse(
         return new FarmerProfileResponse(
                 user.getId(),
                 user.getName(),
+                user.getEmail(),
                 user.getMobile(),
                 profile.getAddress(),
                 profile.getDistrict(),

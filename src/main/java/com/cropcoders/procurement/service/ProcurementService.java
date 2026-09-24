@@ -18,6 +18,7 @@ import com.cropcoders.procurement.entity.Payment;
 import com.cropcoders.procurement.entity.Procurement;
 import com.cropcoders.procurement.enums.BookingEventType;
 import com.cropcoders.procurement.enums.BookingStatus;
+import com.cropcoders.procurement.enums.NotificationEvent;
 import com.cropcoders.procurement.exception.ApiException;
 import com.cropcoders.procurement.repository.BookingEventRepository;
 import com.cropcoders.procurement.repository.PaymentRepository;
@@ -35,13 +36,16 @@ public class ProcurementService {
     private final ProcurementRepository procurementRepository;
     private final PaymentRepository paymentRepository;
     private final BookingEventRepository eventRepository;
+    private final NotificationService notificationService;
 
     public ProcurementService(QueueService queueService, ProcurementRepository procurementRepository,
-                              PaymentRepository paymentRepository, BookingEventRepository eventRepository) {
+                              PaymentRepository paymentRepository, BookingEventRepository eventRepository,
+                              NotificationService notificationService) {
         this.queueService = queueService;
         this.procurementRepository = procurementRepository;
         this.paymentRepository = paymentRepository;
         this.eventRepository = eventRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -83,6 +87,10 @@ public class ProcurementService {
             long paise = amount.movePointRight(2).longValueExact();
             paymentRepository.save(new Payment(procurement, paise));
             eventRepository.save(new BookingEvent(booking, BookingEventType.PAYMENT_PENDING, "Rs " + amount, null));
+            notificationService.notifyBooking(booking, NotificationEvent.PROCURED,
+                    request.weightQtl().stripTrailingZeros().toPlainString(), NotificationService.money(amount));
+        } else {
+            notificationService.notifyBooking(booking, NotificationEvent.REJECTED, remarks);
         }
 
         String message = accepted

@@ -33,12 +33,12 @@
     <form id="register-form" class="card auth-card" novalidate>
         <h1 class="auth-title" data-i18n="register.title">Create your account</h1>
         <p class="muted" data-i18n="register.subtitle">Just a few details. You only do this once.</p>
-        <p class="badge" id="mobile-verified"></p>
+        <p class="badge badge-wrap" id="email-verified"></p>
 
         <div id="alert" class="alert hidden" role="alert" style="margin-top: 16px"></div>
 
         <fieldset class="field" style="margin-top: 16px">
-            <legend data-i18n="register.language">Language for this app and your SMS</legend>
+            <legend data-i18n="register.language">Language for this app and your emails</legend>
             <div class="choice-group">
                 <label class="choice"><input type="radio" name="language" value="en"><span>English</span></label>
                 <label class="choice"><input type="radio" name="language" value="ta"><span>தமிழ்</span></label>
@@ -51,6 +51,17 @@
             <input id="name" autocomplete="name" maxlength="100" data-i18n-placeholder="register.name.placeholder"
                    aria-describedby="name-error">
             <p class="field-error" id="name-error"></p>
+        </div>
+
+        <div class="field">
+            <label for="mobile" data-i18n="register.mobile">Mobile number</label>
+            <div class="input-group">
+                <span class="input-prefix">+91</span>
+                <input id="mobile" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10"
+                       data-i18n-placeholder="register.mobile.placeholder" aria-describedby="mobile-hint mobile-error">
+            </div>
+            <span class="hint" id="mobile-hint" data-i18n="register.mobile.hint">So the centre can call you if needed.</span>
+            <p class="field-error" id="mobile-error"></p>
         </div>
 
         <div class="field">
@@ -87,7 +98,7 @@
     const $ = id => document.getElementById(id);
     const pending = Auth.pendingRegistration();
 
-    // This page is only reachable right after verifying a new mobile number.
+    // This page is only reachable right after verifying a new email address.
     if (!pending?.token) {
         location.replace('/farmer/login.html');
     }
@@ -111,6 +122,7 @@
     function readForm() {
         const values = {
             name: $('name').value.trim(),
+            mobile: $('mobile').value.trim(),
             address: $('address').value.trim(),
             district: $('district').value.trim(),
             aadhaarLast4: $('aadhaar').value.trim(),
@@ -118,6 +130,7 @@
         };
         const invalid = [];
         if (values.name.length < 2) invalid.push(['name', 'validation.name']);
+        if (!/^[6-9]\d{9}$/.test(values.mobile)) invalid.push(['mobile', 'validation.mobile']);
         if (!values.address) invalid.push(['address', 'validation.address']);
         if (!values.district) invalid.push(['district', 'validation.district']);
         if (!/^\d{4}$/.test(values.aadhaarLast4)) invalid.push(['aadhaar', 'validation.aadhaar']);
@@ -130,8 +143,8 @@
         return values;
     }
 
-    function renderMobile() {
-        $('mobile-verified').textContent = '✓ ' + I18N.t('register.mobileVerified', { mobile: pending?.mobile ?? '' });
+    function renderEmail() {
+        $('email-verified').textContent = '✓ ' + I18N.t('register.emailVerified', { email: pending?.email ?? '' });
     }
 
     // Picking a language switches the page straight away.
@@ -140,14 +153,15 @@
     });
 
     document.addEventListener('langchange', () => {
-        renderMobile();
+        renderEmail();
         const radio = document.querySelector(`input[name="language"][value="${I18N.lang}"]`);
         if (radio) radio.checked = true;
     });
 
-    $('aadhaar').addEventListener('input', event => {
+    // Only digits in the number fields.
+    ['mobile', 'aadhaar'].forEach(id => $(id).addEventListener('input', event => {
         event.target.value = event.target.value.replace(/\D/g, '');
-    });
+    }));
 
     $('register-form').addEventListener('submit', async event => {
         event.preventDefault();
@@ -187,7 +201,7 @@
 
     if (pending?.token) {
         I18N.init().then(() => {
-            renderMobile();
+            renderEmail();
             loadDistrictSuggestions();
             $('name').focus();
         });

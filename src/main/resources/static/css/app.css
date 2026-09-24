@@ -483,6 +483,26 @@ fieldset.field legend { font-weight: 600; padding: 0; margin-bottom: 6px; }
 .token-sm { font-size: 1.3rem; font-weight: 800; color: var(--green-700); font-variant-numeric: tabular-nums; }
 .booking-item-go { font-size: 1.6rem; color: var(--muted); }
 .list-heading { font-size: 1rem; color: var(--muted); margin: 24px 0 12px; }
+.badge-wrap { white-space: normal; overflow-wrap: anywhere; }
+.details dd { overflow-wrap: anywhere; }
+
+/* Notifications */
+.notif-head { align-items: center; margin-bottom: 8px; }
+.notif-head h2 { margin: 0; }
+.notif-list { list-style: none; margin: 0; padding: 0; }
+.notif-item { border-top: 1px solid var(--line); }
+.notif-item:first-child { border-top: 0; }
+.notif-item a {
+    display: grid;
+    gap: 2px;
+    padding: 12px 0 12px 14px;
+    color: inherit;
+    text-decoration: none;
+    border-left: 4px solid transparent;
+}
+.notif-item.unread a { border-left-color: var(--green-600); }
+.notif-item a:hover strong { text-decoration: underline; }
+.notif-meta { font-size: .85rem; color: var(--muted); }
 
 /* ---------- Live indicator ---------- */
 .live-dot {

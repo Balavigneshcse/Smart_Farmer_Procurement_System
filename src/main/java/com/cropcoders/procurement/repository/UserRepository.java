@@ -8,9 +8,9 @@ import com.cropcoders.procurement.entity.User;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    Optional<User> findByMobile(String mobile);
+    Optional<User> findByEmail(String email);
 
     Optional<User> findByUsername(String username);
 
-    boolean existsByMobile(String mobile);
+    boolean existsByEmail(String email);
 }

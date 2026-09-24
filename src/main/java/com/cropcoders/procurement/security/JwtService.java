@@ -23,7 +23,7 @@ import io.jsonwebtoken.security.Keys;
  * Creates and checks signed tokens (JWT).
  *
  * Login token: proves who the user is. Sent by the browser as "Authorization: Bearer <token>".
- * Registration token: short-lived proof that a new farmer verified their mobile with OTP;
+ * Registration token: short-lived proof that a new farmer verified their email with OTP;
  * it can only be used to finish registration, never to call other APIs.
  */
 @Service
@@ -72,13 +72,13 @@ public class JwtService {
                 });
     }
 
-    public String createRegistrationToken(String mobile) {
-        return baseToken(mobile, Duration.ofMinutes(config.registrationExpiryMinutes()))
+    public String createRegistrationToken(String email) {
+        return baseToken(email, Duration.ofMinutes(config.registrationExpiryMinutes()))
                 .claim(CLAIM_PURPOSE, PURPOSE_REGISTER)
                 .compact();
     }
 
-    /** Returns the verified mobile number for a valid registration token. */
+    /** Returns the verified email address for a valid registration token. */
     public Optional<String> parseRegistrationToken(String token) {
         return parse(token)
                 .filter(claims -> PURPOSE_REGISTER.equals(claims.get(CLAIM_PURPOSE)))

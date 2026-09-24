@@ -35,7 +35,7 @@ public class FarmerService {
         return FarmerProfileResponse.from(profile);
     }
 
-    /** Changes the language of the farmer's pages and SMS. */
+    /** Changes the language of the farmer's pages and emails. */
     public FarmerProfileResponse updateLanguage(Long farmerId, String language) {
         FarmerProfile profile = find(farmerId);
         profile.setLanguage(language);

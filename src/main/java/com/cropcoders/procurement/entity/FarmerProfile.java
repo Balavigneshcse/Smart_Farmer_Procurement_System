@@ -29,7 +29,7 @@ public class FarmerProfile {
     private String district;
     private String aadhaarLast4;
 
-    /** "en", "ta" or "hi" - used for the farmer's pages and SMS. */
+    /** "en", "ta" or "hi" - used for the farmer's pages and emails. */
     private String language;
 
     private LocalDateTime updatedAt;

@@ -91,7 +91,7 @@ Admin browser ── checkout.js popup ──► Razorpay (test)  → success �
 - [x] **M3 — Slots + booking:** slot generator (startup + daily), slot grid with busy colours, booking with capacity check, token + QR, my bookings, cancel.
 - [x] **M4 — Live queue:** check-in (token / QR text / camera), call next (`FOR UPDATE SKIP LOCKED`), call again, not present (back of the line), SSE hub, TV display page, farmer live position/ETA.
 - [x] **M5 — Procurement + payment:** weighment form (moisture limit blocks accept, rejection needs a reason), amount calculation, payments page, Razorpay order + checkout + HMAC verify (own `RazorpayGateway`, no SDK; live keys refused). Keys in git-ignored `.env`.
-- [ ] **M6 — Email + automation:** farmer login switches to **email + OTP** (Flyway V4: `users.email`, OTP and notifications keyed by email), `EmailSender` with `console` and Gmail `smtp` providers, email templates in en/ta/hi, daily cap, in-app notification list, reminder / no-show / turn-near jobs. SMS code removed. *You: Gmail 2-Step Verification + App Password in `.env`.*
+- [x] **M6 — Email + automation:** farmer login switched to **email + OTP** (Flyway V4: `users.email`, OTP and notifications keyed by email; mobile kept as contact), `EmailSender` with `console` and Gmail `smtp` providers, HTML email templates in en/ta/hi, emails sent in the background after commit, daily cap, in-app notification list on the dashboard, reminder / no-show jobs every 15 min, "turn near" alert. SMS code removed. ✔ Real Gmail send tested (OTP + booking confirmation).
 - [ ] **M7 — Dashboard + polish:** admin dashboard, tracking timeline, mobile-friendly styling, demo seed data, README.
 - [ ] **M8 — Deploy:** Dockerfile, push to GitHub, Neon DB, **Brevo email provider** (HTTPS API, since Render blocks SMTP), Render web service + env vars, smoke test on the live URL, demo checklist.
 
@@ -152,15 +152,16 @@ Token = centre code + daily number, e.g. `TNJ-017`, from an upsert counter:
 ### Notifications (email + in-app)
 | Event | Channel |
 |---|---|
-| OTP | Email |
-| Booking confirmed (token, date, time, centre) | Email + in-app |
-| Reminder (~1 hour before slot) | Email + in-app |
-| Turn near (position ≤ 3) | Email + in-app |
-| Procured / rejected (weight, grade, amount or reason) | Email + in-app |
-| Payment credited (amount, reference) | Email + in-app |
-| Checked in, called to counter, cancelled, no-show | In-app only |
+| OTP | Email (sent straight away; not stored in `notifications`) |
+| Booking confirmed / cancelled (token, day, time, centre, crop) | Email + in-app |
+| Reminder (~2 hours before the slot) | Email + in-app |
+| Turn near (position ≤ 3, once per visit; again after "not present") | Email + in-app |
+| Procured / rejected (weight, amount or reason) | Email + in-app |
+| Payment done (amount, reference) | Email + in-app |
+| No-show (slot end + 2 h, not checked in) | Email + in-app |
+| Checked in (position, ETA), called to counter | In-app only (the farmer is at the centre) |
 
-All messages are stored in `notifications` and shown in-app, in the farmer's language. A daily cap (below Gmail's 500 and Brevo's 300) protects the free quota: after it is reached, notifications are in-app only.
+All messages are stored in `notifications` and shown on the farmer dashboard, in the farmer's language (`messages*.properties`). A notification is saved in the same transaction as the change; its email is sent **after commit, on a background thread** (`EmailDispatcher`, `@Async` + `@TransactionalEventListener`), then marked `SENT` / `FAILED`. A daily cap (`EMAIL_DAILY_LIMIT`, default 250 — below Gmail's 500 and Brevo's 300) protects the free quota: after it is reached, notifications are `SKIPPED` (in-app only). OTP emails are not capped.
 
 Providers (`EMAIL_PROVIDER`): `console` (print to log), `smtp` (Gmail: smtp.gmail.com:587, STARTTLS, App Password), `brevo` (M8: `POST https://api.brevo.com/v3/smtp/email` with an `api-key` header).
 
@@ -175,16 +176,16 @@ Providers (`EMAIL_PROVIDER`): `console` (print to log), `smtp` (Gmail: smtp.gmai
 | Job | When | What |
 |---|---|---|
 | Slot generator | On startup + `0 0 7 * * *` | Ensure slots exist for the next 7 days |
-| Reminder | `0 */15 7-21 * * *` | BOOKED, slot starts within 90 min, `reminder_sent = false` → email |
-| No-show | `0 */15 7-21 * * *` | BOOKED and slot end + 30 min passed → NO_SHOW (in-app) |
-| Turn near | Event-driven (after each call-next) | Farmers now at position ≤ 3 who weren't alerted → email |
+| Reminder (`AutomationJob`) | On startup + `0 */15 7-21 * * *` | BOOKED, slot starts within 120 min, `reminder_sent = false` → email (a booking made less than 2 h before its slot gets no separate reminder) |
+| No-show (`AutomationJob`) | On startup + `0 */15 7-21 * * *` | BOOKED and slot end + 120 min passed → NO_SHOW + email (only for slots that ended in the last 24 h) |
+| Turn near | Event-driven (after every queue change) | Farmers now at position ≤ 3 with `turn_alert_sent = false` → email |
 
 ### Database tables (Flyway)
 | Table | Key columns |
 |---|---|
-| `users` | id, name, mobile (unique), username (unique, staff), password_hash (staff), role, centre_id (operators), created_at |
+| `users` | id, name, email (unique, lower case, farmers), mobile (farmers), username (unique, staff), password_hash (staff), role, centre_id (operators), created_at |
 | `farmer_profiles` | user_id (PK/FK), address, district, aadhaar_last4, language (en/ta/hi) |
-| `otp_codes` | id, mobile, code_hash, expires_at, attempts, used |
+| `otp_codes` | id, email, code_hash, expires_at, attempts, used |
 | `centres` | id, code, name, district, address, open_time, close_time, slot_minutes, counters, avg_service_min, active |
 | `crops` | id, name, rate_per_qtl, max_moisture_pct, active |
 | `slots` | id, centre_id, slot_date, start_time, end_time, capacity, booked · UNIQUE(centre_id, slot_date, start_time) |
@@ -193,9 +194,9 @@ Providers (`EMAIL_PROVIDER`): `console` (print to log), `smtp` (Gmail: smtp.gmai
 | `booking_events` | id, booking_id, status, note, created_by, created_at |
 | `procurements` | id, booking_id (unique), weight_qtl, moisture_pct, grade, rate_per_qtl, amount, accepted, remarks, recorded_by, recorded_at |
 | `payments` | id, procurement_id (unique), amount_paise, status, rzp_order_id, rzp_payment_id, paid_at |
-| `notifications` | id, user_id, mobile, channel, event, message, status, provider_ref, created_at, read_at |
+| `notifications` | id, user_id, email, booking_id, event, subject, message, email_status (PENDING/SENT/FAILED/SKIPPED/IN_APP_ONLY), provider_ref, created_at, read_at |
 
-Migrations: `V1__schema.sql`, `V2__seed_data.sql` (crops, 3 centres, admin + operator accounts). Never edit an applied migration — add `V3__...`. JPA runs with `ddl-auto: validate`.
+Migrations: `V1__schema.sql`, `V2__seed_data.sql` (crops, 3 centres), `V3__staff_accounts.sql` (admin + operators), `V4__email_instead_of_sms.sql`. Never edit an applied migration — add a new `V5__...`. JPA runs with `ddl-auto: validate`.
 
 ### REST API
 ```
@@ -203,10 +204,10 @@ Public     GET  /api/ping
            GET  /api/centres · /api/crops · /api/centres/{id}/slots?date=
            GET  /api/queue/{centreId}          (snapshot)
            GET  /api/queue/{centreId}/stream   (SSE)
-Auth       POST /api/auth/otp/send · /api/auth/otp/verify · /api/auth/login
-Farmer     GET/PUT /api/farmers/me
+Auth       POST /api/auth/otp/send · /api/auth/otp/verify · /api/auth/register · /api/auth/login · GET /api/auth/me
+Farmer     GET/PUT /api/farmers/me · PUT /api/farmers/me/language
            POST /api/bookings · GET /api/bookings/my · GET /api/bookings/{id} · POST /api/bookings/{id}/cancel
-           GET  /api/notifications/my
+           GET  /api/notifications/my · POST /api/notifications/read-all
 Operator   GET  /api/operator/queue
            POST /api/operator/checkin · /api/operator/call-next · /api/operator/bookings/{id}/no-show
            POST /api/operator/procurements
@@ -243,21 +244,22 @@ Smart Farmer Procurement System/
     │   ├── config/       AppProperties
     │   ├── security/     SecurityConfig, JwtAuthFilter, JwtService, AuthUser
     │   ├── entity/       User, FarmerProfile, Centre, Crop, Slot, Booking, BookingEvent, Procurement, Payment, Notification, OtpCode
-    │   ├── enums/        Role, BookingStatus, PaymentStatus, NotificationEvent
+    │   ├── enums/        Role, BookingStatus, BookingEventType, PaymentStatus, NotificationEvent, EmailStatus
     │   ├── repository/   one Spring Data repository per entity
     │   ├── dto/          request/response records
     │   ├── service/      AuthService, JwtService, OtpService, SlotService, BookingService, QueueService,
-    │   │                 ProcurementService, PaymentService, NotificationService, DashboardService
+    │   │                 ProcurementService, PaymentService, NotificationService, AutomationService, DashboardService
     │   ├── payment/      RazorpayGateway
-    │   ├── notification/ EmailSender (interface), ConsoleEmailSender, SmtpEmailSender, (M8) BrevoEmailSender
+    │   ├── email/        EmailSender (interface), ConsoleEmailSender, SmtpEmailSender, (M8) BrevoEmailSender,
+    │   │                 EmailTemplates, EmailDispatcher (background sending)
     │   ├── realtime/     QueueSseHub
-    │   ├── scheduler/    SlotGenerationJob, ReminderJob, NoShowJob
+    │   ├── scheduler/    SlotGenerationJob, AutomationJob (reminders + no-shows)
     │   ├── controller/   Auth, Farmer, Catalogue, Booking, Queue, Operator, Payment, Admin, Ping
     │   └── exception/    ApiException, ApiError, GlobalExceptionHandler
     └── resources/
         ├── application.yml
         ├── messages.properties, messages_ta.properties, messages_hi.properties   (email texts)
-        ├── db/migration/ V1__schema.sql, V2__seed_data.sql, V3__staff_accounts.sql
+        ├── db/migration/ V1__schema.sql, V2__seed_data.sql, V3__staff_accounts.sql, V4__email_instead_of_sms.sql
         └── static/       (pages above, css/, js/, i18n/)
 ```
 

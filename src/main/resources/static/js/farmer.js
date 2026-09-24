@@ -24,7 +24,7 @@ const Farmer = (() => {
         return me;
     }
 
-    /** A language button was clicked: save it so the farmer's SMS use it too. */
+    /** A language button was clicked: save it so the farmer's emails use it too. */
     async function saveLanguage(language) {
         try {
             await Api.put('/api/farmers/me/language', { language });

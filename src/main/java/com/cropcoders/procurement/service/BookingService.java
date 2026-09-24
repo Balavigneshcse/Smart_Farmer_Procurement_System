@@ -24,6 +24,7 @@ import com.cropcoders.procurement.entity.Procurement;
 import com.cropcoders.procurement.entity.Slot;
 import com.cropcoders.procurement.enums.BookingEventType;
 import com.cropcoders.procurement.enums.BookingStatus;
+import com.cropcoders.procurement.enums.NotificationEvent;
 import com.cropcoders.procurement.exception.ApiException;
 import com.cropcoders.procurement.realtime.QueueChangedEvent;
 import com.cropcoders.procurement.repository.BookingEventRepository;
@@ -46,13 +47,16 @@ public class BookingService {
     private final ProcurementRepository procurementRepository;
     private final PaymentRepository paymentRepository;
     private final TokenService tokenService;
+    private final NotificationService notificationService;
     private final ApplicationEventPublisher events;
     private final int daysAhead;
+    private final int reminderBeforeMinutes;
 
     public BookingService(BookingRepository bookingRepository, BookingEventRepository eventRepository,
                           SlotRepository slotRepository, CropRepository cropRepository, UserRepository userRepository,
                           ProcurementRepository procurementRepository, PaymentRepository paymentRepository,
-                          TokenService tokenService, ApplicationEventPublisher events, AppProperties properties) {
+                          TokenService tokenService, NotificationService notificationService,
+                          ApplicationEventPublisher events, AppProperties properties) {
         this.bookingRepository = bookingRepository;
         this.eventRepository = eventRepository;
         this.slotRepository = slotRepository;
@@ -61,8 +65,10 @@ public class BookingService {
         this.procurementRepository = procurementRepository;
         this.paymentRepository = paymentRepository;
         this.tokenService = tokenService;
+        this.notificationService = notificationService;
         this.events = events;
         this.daysAhead = properties.booking().daysAhead();
+        this.reminderBeforeMinutes = properties.booking().reminderBeforeMinutes();
     }
 
     /**
@@ -97,6 +103,11 @@ public class BookingService {
                 new Booking(token, userRepository.getReferenceById(farmerId), slot, crop, request.estQtyQtl()));
         BookingEvent event = eventRepository.save(new BookingEvent(booking, BookingEventType.BOOKED,
                 "Slot " + slot.getStartTime() + "-" + slot.getEndTime(), farmerId));
+        // Booked shortly before the slot: the confirmation already has the time, no separate reminder needed.
+        if (!slot.startsAt().isAfter(now.plusMinutes(reminderBeforeMinutes))) {
+            booking.setReminderSent(true);
+        }
+        notificationService.notifyBooking(booking, NotificationEvent.BOOKING_CONFIRMED);
         notifyQueueIfToday(booking);
 
         return BookingResponse.from(booking, now, List.of(BookingEventResponse.from(event)));
@@ -131,6 +142,7 @@ public class BookingService {
         booking.setStatus(BookingStatus.CANCELLED);
         slotRepository.releaseSeat(booking.getSlot().getId());
         eventRepository.save(new BookingEvent(booking, BookingEventType.CANCELLED, "Cancelled by farmer", farmerId));
+        notificationService.notifyBooking(booking, NotificationEvent.BOOKING_CANCELLED);
         notifyQueueIfToday(booking);
         return withTimeline(booking);
     }

@@ -1,5 +1,6 @@
 package com.cropcoders.procurement.service;
 
+import java.util.Locale;
 import java.util.Optional;
 
 import org.springframework.http.HttpStatus;
@@ -26,7 +27,7 @@ import com.cropcoders.procurement.security.AuthUser;
 import com.cropcoders.procurement.security.JwtService;
 
 /**
- * Farmer login:  send OTP -> verify OTP -> (new farmer) register -> login token.
+ * Farmer login:  send OTP to email -> verify OTP -> (new farmer) register -> login token.
  * Staff login:   username + password -> login token.
  */
 @Service
@@ -51,21 +52,23 @@ public class AuthService {
 
     public SendOtpResponse sendOtp(SendOtpRequest request) {
         // A registered farmer gets the OTP in their saved language; a new one in the page language.
-        String language = userRepository.findByMobile(request.mobile())
+        String email = normalise(request.email());
+        String language = userRepository.findByEmail(email)
                 .flatMap(user -> profileRepository.findById(user.getId()))
                 .map(FarmerProfile::getLanguage)
                 .orElse(request.language() == null ? "en" : request.language());
 
-        int resendAfter = otpService.sendOtp(request.mobile(), language);
+        int resendAfter = otpService.sendOtp(email, language);
         return new SendOtpResponse(resendAfter, properties.otp().validMinutes());
     }
 
     public VerifyOtpResponse verifyOtp(VerifyOtpRequest request) {
-        otpService.verifyOtp(request.mobile(), request.otp());
+        String email = normalise(request.email());
+        otpService.verifyOtp(email, request.otp());
 
-        Optional<User> existing = userRepository.findByMobile(request.mobile());
+        Optional<User> existing = userRepository.findByEmail(email);
         if (existing.isEmpty()) {
-            return VerifyOtpResponse.needsRegistration(jwtService.createRegistrationToken(request.mobile()));
+            return VerifyOtpResponse.needsRegistration(jwtService.createRegistrationToken(email));
         }
         User user = existing.get();
         ensureActive(user);
@@ -74,15 +77,15 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        String mobile = jwtService.parseRegistrationToken(request.registrationToken())
+        String email = jwtService.parseRegistrationToken(request.registrationToken())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "REGISTRATION_EXPIRED",
-                        "Your verification has expired. Please verify your mobile again."));
-        if (userRepository.existsByMobile(mobile)) {
+                        "Your verification has expired. Please verify your email again."));
+        if (userRepository.existsByEmail(email)) {
             throw new ApiException(HttpStatus.CONFLICT, "ALREADY_REGISTERED",
-                    "This mobile number is already registered. Please log in.");
+                    "This email address is already registered. Please log in.");
         }
 
-        User user = userRepository.save(User.newFarmer(request.name().trim(), mobile));
+        User user = userRepository.save(User.newFarmer(request.name().trim(), email, request.mobile()));
         profileRepository.save(new FarmerProfile(user, request.address().trim(), request.district().trim(),
                 request.aadhaarLast4(), request.language()));
 
@@ -112,6 +115,11 @@ public class AuthService {
     private UserResponse farmerResponse(User user) {
         String language = profileRepository.findById(user.getId()).map(FarmerProfile::getLanguage).orElse("en");
         return UserResponse.farmer(user, language);
+    }
+
+    /** Emails are stored in lower case, so "Ravi@Gmail.com" and "ravi@gmail.com" are the same farmer. */
+    private static String normalise(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 
     private static void ensureActive(User user) {

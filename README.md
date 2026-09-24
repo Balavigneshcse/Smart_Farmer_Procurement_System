@@ -2,9 +2,9 @@
 
 Farmers often wait all day at procurement centres without knowing the schedule or what happened to their crop and payment. This app fixes that:
 
-- **Slot booking.** Farmers register with their mobile number (OTP) and book a time slot at a procurement centre.
+- **Slot booking.** Farmers register with their email address (a one-time password is emailed to them) and book a time slot at a procurement centre.
 - **Live queue.** Operators check farmers in and call them to counters. Farmers see their position and waiting time live, and a TV screen at the centre shows who is being served.
-- **SMS alerts.** Farmers get an SMS at key moments (booking, reminder, turn near, weighed, paid), in their chosen language (English, Tamil or Hindi).
+- **Email alerts.** Farmers get an email at key moments (booked, reminder, turn near, weighed, paid), in their chosen language (English, Tamil or Hindi). Every update also appears on their dashboard.
 - **Tracking.** Every booking has a timeline, from booked through weighed to paid, with payment through Razorpay (test mode).
 
 Theme: Smart Automation · College mini project
@@ -17,7 +17,7 @@ Theme: Smart Automation · College mini project
 | Backend | Java 21, Spring Boot 4.1, Maven, Spring Data JPA, Flyway |
 | Database | PostgreSQL |
 | Payments | Razorpay (test mode) |
-| SMS | textbee.dev (Android phone as SMS gateway) |
+| Email | Gmail SMTP on the PC; Brevo email API on Render (M8) |
 | Hosting | Render (app) + Neon (PostgreSQL), both free tiers |
 
 ## Run it locally (IntelliJ IDEA)
@@ -41,14 +41,15 @@ Useful URLs:
 
 ### Logging in
 
-**Farmers** log in with their mobile number and an OTP. While `SMS_PROVIDER` is `console` (the default), no real SMS is sent. The OTP is printed in the IntelliJ **Run** console:
+**Farmers** log in with their email address and an OTP that is emailed to them. With `EMAIL_PROVIDER=smtp` in `.env` the email really goes out through Gmail (see *Emails and automation* below). With `EMAIL_PROVIDER=console` (the default when `.env` doesn't set it), nothing is sent and the email is printed in the IntelliJ **Run** console instead:
 
 ```
-======== SMS to +91 98XXXXXXXX ========
-123456 is your OTP to log in to Smart Farmer Procurement System. ...
+======== Email to ravi@example.com ========
+Subject: 123456 is your login OTP
+...
 ```
 
-A new mobile number goes to the registration form: name, address, district, last 4 digits of Aadhaar, and language. That language is then used for the farmer's pages and SMS.
+A new email address goes to the registration form: name, mobile number (for the centre to call), address, district, last 4 digits of Aadhaar, and language. That language is then used for the farmer's pages and emails.
 
 **Staff** demo accounts (created by `V3__staff_accounts.sql`):
 
@@ -59,7 +60,7 @@ A new mobile number goes to the registration form: name, address, district, last
 | `operator.tvr` | `Operator@123` | Operator, Tiruvarur |
 | `operator.ngt` | `Operator@123` | Operator, Nagapattinam |
 
-OTP rules: valid for 5 minutes, 3 wrong tries, a new OTP only after 60 seconds, at most 5 per hour per number.
+OTP rules: valid for 5 minutes, 3 wrong tries, a new OTP only after 60 seconds, at most 5 per hour per email address.
 
 ### Booking a slot
 
@@ -125,6 +126,37 @@ How it works (for the viva):
 5. **Store amounts safely.** Amounts are stored in **paise** as whole numbers, so there are no rounding errors.
 6. **Real life.** Money would flow from the government to the farmer (DBT / RazorpayX Payouts). In the demo, the admin paying through Checkout stands in for that step.
 
+### Emails and automation
+
+**Setup (Gmail).** Turn on 2-Step Verification for the Gmail account, create an **App Password** (Google Account → Security → App passwords), and put it in `.env`:
+
+```
+EMAIL_PROVIDER=smtp
+MAIL_USERNAME=yourname@gmail.com
+MAIL_PASSWORD=the16letterapppassword
+```
+
+Use `EMAIL_PROVIDER=console` to print emails in the log instead (handy for testing with made-up addresses).
+
+| Email | When |
+|---|---|
+| Login OTP | Farmer asks for an OTP |
+| Booking confirmed / cancelled | Farmer books or cancels |
+| Reminder | About 2 hours before the slot (checked every 15 minutes, 7 am to 10 pm) |
+| Your turn is near | Farmer reaches position 3 or better in the queue |
+| Crop accepted / not accepted | Operator saves the weighment (weight and amount, or the reason) |
+| Payment done | Admin's Razorpay payment is verified |
+| Missed slot | Not checked in by slot end + 2 hours (booking becomes *No show*) |
+
+"Checked in" and "Go to counter N" are shown in the app only, because the farmer is already at the centre. All of these appear under **Notifications** on the farmer dashboard, with a ✉ mark when an email was sent.
+
+How it works (for the viva):
+- **Texts in 3 languages.** Email texts live in `messages.properties` (English), `messages_ta.properties` and `messages_hi.properties`, and are picked by the farmer's saved language. Every text is HTML-escaped before it goes into the email.
+- **Sent after commit, in the background.** A notification is saved in the same transaction as the booking change. The email is sent by `EmailDispatcher` only **after** that transaction commits (`@TransactionalEventListener(AFTER_COMMIT)`), on a separate thread (`@Async`), so the operator's click is not slowed down by Gmail and no email goes out for a change that failed. The row is then marked `SENT` (with Gmail's message id) or `FAILED`.
+- **Free quota.** At most `EMAIL_DAILY_LIMIT` (default 250) notification emails per day (Gmail allows 500, Brevo 300). After that, notifications are shown in the app only (`SKIPPED`). OTP emails are never capped, so farmers can always log in.
+- **Scheduled jobs.** `AutomationJob` runs every 15 minutes from 7 am to 10 pm and also at startup (the free Render server sleeps and may miss runs). Nothing runs at night, so the free database can sleep too.
+- **Pluggable sender.** `EmailSender` is an interface; `ConsoleEmailSender` and `SmtpEmailSender` are chosen by `EMAIL_PROVIDER`. On Render, a Brevo sender will be added (M8), because Render's free plan blocks SMTP ports.
+
 ### Testing the queue outside centre hours
 
 Centres close at 16:00 or 17:00, so in the evening there are no slots left for today. To test at night, temporarily keep Thanjavur open late (run in pgAdmin), then restart the app so it creates the extra slots:
@@ -150,9 +182,12 @@ Local defaults are in `src/main/resources/application.yml`. To override them, se
 | `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | `postgres` / `postgres` (from `application.yml`) | Database login |
 | `PORT` | `8080` | HTTP port |
 | `JWT_SECRET` | a local development value | Signs login tokens. **Set a random 32+ character value in production** |
-| `SMS_PROVIDER` | `console` | `console` prints SMS in the log; `textbee` sends real SMS (M6) |
+| `EMAIL_PROVIDER` | `console` | `console` prints emails in the log; `smtp` sends them with Gmail |
+| `MAIL_USERNAME` / `MAIL_PASSWORD` | – | Gmail address and App Password (for `smtp`) |
+| `EMAIL_DAILY_LIMIT` | `250` | Notification emails per day before switching to in-app only |
+| `APP_URL` | `http://localhost:8080` | Website address used for links inside emails |
 
-Secret keys (JWT, Razorpay, textbee) are always set as environment variables and never committed.
+Secrets (JWT secret, Razorpay keys, Gmail App Password) live in the git-ignored `.env` file on the PC, or in environment variables on Render. They are never committed.
 
 ## Project structure
 
@@ -165,24 +200,24 @@ src/main/java/com/cropcoders/procurement/
 ├── service/                      business logic (OTP, login, farmer profile, ...)
 ├── repository/                   Spring Data JPA repositories
 ├── entity/                       JPA entities (tables)
-├── enums/                        Role, ...
+├── enums/                        Role, BookingStatus, NotificationEvent, EmailStatus, ...
 ├── dto/                          request/response objects
-├── scheduler/                    timed jobs (slot generation)
+├── scheduler/                    timed jobs (slot generation, reminders + no-shows)
 ├── realtime/                     live queue updates (Server-Sent Events)
 ├── payment/                      RazorpayGateway (orders API + signature check)
-├── sms/                          SmsSender interface + console sender (textbee in M6)
+├── email/                        EmailSender (console / Gmail SMTP), EmailTemplates, EmailDispatcher (background sending)
 └── exception/                    ApiException + GlobalExceptionHandler (JSON errors)
 src/main/resources/
 ├── application.yml               configuration
-├── messages*.properties          SMS texts in English, Tamil, Hindi
-├── db/migration/                 Flyway: V1 schema, V2 centres + crops, V3 staff accounts
+├── messages*.properties          email texts in English, Tamil, Hindi
+├── db/migration/                 Flyway: V1 schema, V2 centres + crops, V3 staff accounts, V4 email instead of SMS
 └── static/                       HTML pages, css/, js/, i18n/ (en, ta, hi)
-src/test/java/                    unit tests (JwtServiceTest, EtaCalculatorTest, RazorpayGatewayTest)
+src/test/java/                    unit tests (JwtServiceTest, EtaCalculatorTest, RazorpayGatewayTest, EmailTemplatesTest)
 ```
 
 ### How login works (for the viva)
 
-1. **Farmer OTP.** The server makes a random 6-digit code, stores only its BCrypt hash, and sends it by SMS in the farmer's language.
+1. **Farmer OTP.** The server makes a random 6-digit code, stores only its BCrypt hash, and emails it in the farmer's language. Email addresses are stored in lower case, so `Ravi@Gmail.com` and `ravi@gmail.com` are the same farmer.
 2. **Verify.** The code is checked against the hash. There are 3 attempts, and each wrong try is saved even though the request fails (`noRollbackFor`).
 3. **New farmer.** The server returns a 15-minute *registration token* (a JWT marked `purpose=register`). This token can only be used to submit the registration form.
 4. **Login token.** A JWT signed with `JWT_SECRET` that holds the user id, role and centre. The browser keeps it in `localStorage` and sends it as `Authorization: Bearer …`.

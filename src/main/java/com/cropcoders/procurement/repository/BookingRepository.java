@@ -1,6 +1,7 @@
 package com.cropcoders.procurement.repository;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -59,6 +60,27 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             where b.centre.id = :centreId and b.bookingDate = :date and b.token = :token""")
     Optional<Booking> findDetailedByToken(@Param("centreId") Long centreId, @Param("date") LocalDate date,
                                           @Param("token") String token);
+
+    // ---------- Automation jobs ----------
+
+    /** Booked (not yet arrived) slots of one day that start after :from and no later than :until, not reminded yet. */
+    @Query("""
+            select b from Booking b
+            join fetch b.slot s join fetch b.centre join fetch b.crop join fetch b.farmer
+            where b.status = com.cropcoders.procurement.enums.BookingStatus.BOOKED
+              and b.reminderSent = false
+              and b.bookingDate = :date and s.startTime > :from and s.startTime <= :until""")
+    List<Booking> findDueForReminder(@Param("date") LocalDate date, @Param("from") LocalTime from,
+                                     @Param("until") LocalTime until);
+
+    /** Bookings whose slot ended before the cutoff moment and the farmer never checked in. */
+    @Query("""
+            select b from Booking b
+            join fetch b.slot s join fetch b.centre join fetch b.crop join fetch b.farmer
+            where b.status = com.cropcoders.procurement.enums.BookingStatus.BOOKED
+              and (b.bookingDate < :cutoffDate or (b.bookingDate = :cutoffDate and s.endTime < :cutoffTime))""")
+    List<Booking> findNotArrivedBefore(@Param("cutoffDate") LocalDate cutoffDate,
+                                       @Param("cutoffTime") LocalTime cutoffTime);
 
     boolean existsByCentreIdAndBookingDateAndStatusAndCounterNo(Long centreId, LocalDate date, BookingStatus status,
                                                                 Integer counterNo);

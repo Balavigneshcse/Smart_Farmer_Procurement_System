@@ -15,7 +15,7 @@
     <artifactId>smart-farmer-procurement</artifactId>
     <version>1.0.0</version>
     <name>Smart Farmer Procurement System</name>
-    <description>Slot booking, live queue, SMS alerts and payment tracking for farmer procurement centres</description>
+    <description>Slot booking, live queue, email alerts and payment tracking for farmer procurement centres</description>
 
     <properties>
         <java.version>21</java.version>
@@ -56,6 +56,12 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
+        </dependency>
+
+        <!-- Sending email (Gmail SMTP on the PC) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
         <!-- Login, roles and password hashing -->

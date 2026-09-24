@@ -33,18 +33,16 @@
     <div class="card auth-card">
         <div id="alert" class="alert hidden" role="alert"></div>
 
-        <!-- Step 1: mobile number -->
-        <form id="mobile-form" novalidate>
+        <!-- Step 1: email address -->
+        <form id="email-form" novalidate>
             <h1 class="auth-title" data-i18n="login.title">Farmer login</h1>
-            <p class="muted" data-i18n="login.subtitle">Enter your mobile number. We will send you a one-time password (OTP) by SMS.</p>
+            <p class="muted" data-i18n="login.subtitle">Enter your email address. We will email you a one-time password (OTP).</p>
             <div class="field">
-                <label for="mobile" data-i18n="login.mobile">Mobile number</label>
-                <div class="input-group">
-                    <span class="input-prefix">+91</span>
-                    <input id="mobile" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10"
-                           data-i18n-placeholder="login.mobile.placeholder" aria-describedby="mobile-error">
-                </div>
-                <p class="field-error" id="mobile-error"></p>
+                <label for="email" data-i18n="login.email">Email address</label>
+                <input id="email" type="email" inputmode="email" autocomplete="email" maxlength="254"
+                       autocapitalize="off" spellcheck="false"
+                       data-i18n-placeholder="login.email.placeholder" aria-describedby="email-error">
+                <p class="field-error" id="email-error"></p>
             </div>
             <button class="btn btn-primary btn-lg btn-block" type="submit" id="send-btn" data-i18n="login.sendOtp">Send OTP</button>
         </form>
@@ -53,6 +51,7 @@
         <form id="otp-form" class="hidden" novalidate>
             <h1 class="auth-title" data-i18n="login.otpTitle">Enter OTP</h1>
             <p class="muted" id="otp-sent-to"></p>
+            <p class="small muted" data-i18n="login.checkSpam">Not in your inbox? Check the Spam or Promotions folder.</p>
             <div class="field">
                 <label for="otp" data-i18n="login.otp">OTP</label>
                 <input id="otp" class="otp-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
@@ -62,7 +61,7 @@
             <button class="btn btn-primary btn-lg btn-block" type="submit" id="verify-btn" data-i18n="login.verify">Verify and continue</button>
             <div class="auth-links">
                 <button type="button" class="link-button" id="resend-btn" disabled></button>
-                <button type="button" class="link-button" id="change-btn" data-i18n="login.changeNumber">Change number</button>
+                <button type="button" class="link-button" id="change-btn" data-i18n="login.changeEmail">Change email</button>
             </div>
         </form>
     </div>
@@ -79,7 +78,8 @@
     const nextPage = NEXT_PAGES[params.get('next')] || NEXT_PAGES.dashboard;
 
     const $ = id => document.getElementById(id);
-    let mobile = '';
+    const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+    let email = '';
     let resendLeft = 0;
     let resendTimer = null;
 
@@ -114,7 +114,7 @@
     }
 
     function renderOtpStepText() {
-        $('otp-sent-to').textContent = I18N.t('login.otpSentTo', { mobile });
+        $('otp-sent-to').textContent = I18N.t('login.otpSentTo', { email });
         $('resend-btn').disabled = resendLeft > 0;
         $('resend-btn').textContent = resendLeft > 0
             ? I18N.t('login.resendIn', { seconds: resendLeft })
@@ -133,7 +133,7 @@
     }
 
     function showOtpStep() {
-        $('mobile-form').classList.add('hidden');
+        $('email-form').classList.add('hidden');
         $('otp-form').classList.remove('hidden');
         $('otp').value = '';
         clearFieldError('otp');
@@ -141,30 +141,30 @@
         $('otp').focus();
     }
 
-    function showMobileStep() {
+    function showEmailStep() {
         clearInterval(resendTimer);
         resendLeft = 0;
         hideAlert();
         $('otp-form').classList.add('hidden');
-        $('mobile-form').classList.remove('hidden');
-        $('mobile').focus();
+        $('email-form').classList.remove('hidden');
+        $('email').focus();
     }
 
     async function requestOtp() {
-        const result = await Api.post('/api/auth/otp/send', { mobile, language: I18N.lang });
+        const result = await Api.post('/api/auth/otp/send', { email, language: I18N.lang });
         startResendCountdown(result.resendAfterSeconds);
     }
 
-    $('mobile-form').addEventListener('submit', async event => {
+    $('email-form').addEventListener('submit', async event => {
         event.preventDefault();
         hideAlert();
-        const value = $('mobile').value.replace(/\D/g, '');
-        if (!/^[6-9]\d{9}$/.test(value)) {
-            setFieldError('mobile', 'validation.mobile');
+        const value = $('email').value.trim().toLowerCase();
+        if (!EMAIL_PATTERN.test(value) || value.length > 254) {
+            setFieldError('email', 'validation.email');
             return;
         }
-        clearFieldError('mobile');
-        mobile = value;
+        clearFieldError('email');
+        email = value;
 
         const button = $('send-btn');
         setBusy(button, 'login.sending', true);
@@ -196,14 +196,14 @@
         const button = $('verify-btn');
         setBusy(button, 'login.verifying', true);
         try {
-            const result = await Api.post('/api/auth/otp/verify', { mobile, otp: code });
+            const result = await Api.post('/api/auth/otp/verify', { email, otp: code });
             if (result.registered) {
                 Auth.save(result.token, result.user);
                 await I18N.setLang(result.user.language);   // show the farmer's own language from now on
                 location.replace(nextPage);
                 return;
             }
-            Auth.setPendingRegistration({ token: result.registrationToken, mobile, next: nextPage });
+            Auth.setPendingRegistration({ token: result.registrationToken, email, next: nextPage });
             location.href = '/farmer/register.html';
         } catch (error) {
             showAlert(Api.errorMessage(error));
@@ -227,16 +227,16 @@
         }
     });
 
-    $('change-btn').addEventListener('click', showMobileStep);
+    $('change-btn').addEventListener('click', showEmailStep);
 
-    // Only digits in the number fields.
-    ['mobile', 'otp'].forEach(id => $(id).addEventListener('input', event => {
+    // Only digits in the OTP field.
+    $('otp').addEventListener('input', event => {
         event.target.value = event.target.value.replace(/\D/g, '');
-    }));
+    });
 
     document.addEventListener('langchange', () => {
         hideAlert();
-        if (mobile) renderOtpStepText();
+        if (email) renderOtpStepText();
     });
 
     I18N.init().then(() => {

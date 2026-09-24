@@ -48,9 +48,24 @@
         <div id="bookings"><p class="muted" data-i18n="common.loading">Loading…</p></div>
     </section>
 
+    <section class="card dash-section" aria-labelledby="notif-title">
+        <div class="head-row notif-head">
+            <h2 id="notif-title">
+                <span data-i18n="notifications.title">Notifications</span>
+                <span class="badge badge-amber hidden" id="unread-count"></span>
+            </h2>
+            <button type="button" class="btn btn-outline btn-sm hidden" id="read-all-btn"
+                    data-i18n="notifications.markAllRead">Mark all as read</button>
+        </div>
+        <ul class="notif-list" id="notifications"></ul>
+        <button type="button" class="link-button hidden" id="more-btn" data-i18n="notifications.showAll">Show all</button>
+    </section>
+
     <section class="card dash-section" aria-labelledby="profile-title">
         <h2 id="profile-title" data-i18n="dashboard.profile.title">My details</h2>
         <dl class="details">
+            <dt data-i18n="dashboard.profile.email">Email</dt>
+            <dd id="p-email">–</dd>
             <dt data-i18n="dashboard.profile.mobile">Mobile</dt>
             <dd id="p-mobile">–</dd>
             <dt data-i18n="dashboard.profile.address">Address</dt>
@@ -76,7 +91,10 @@
     let me = null;
     let profile = null;
     let bookings = null;
+    let notifications = null;
+    let showAllNotifications = false;
     let noticeTimer = null;
+    const NOTIFICATIONS_SHOWN = 3;
 
     function showNotice(text, type = 'success') {
         $('notice').textContent = text;
@@ -88,6 +106,7 @@
     function renderProfile() {
         $('welcome').textContent = I18N.t('dashboard.welcome', { name: profile?.name ?? me.name });
         if (!profile) return;
+        $('p-email').textContent = profile.email;
         $('p-mobile').textContent = `+91 ${profile.mobile}`;
         $('p-address').textContent = profile.address;
         $('p-district').textContent = profile.district;
@@ -133,10 +152,60 @@
                 <div class="booking-list">${earlier.map(bookingItem).join('')}</div>` : ''}`;
     }
 
+    // Subject and message are saved in the farmer's language when the notification is created.
+    function notificationItem(n) {
+        const href = n.bookingId ? `/farmer/booking.html?id=${n.bookingId}` : '/farmer/dashboard.html';
+        const emailed = n.emailed ? ` · ✉ ${esc(I18N.t('notifications.emailed'))}` : '';
+        return `
+            <li class="notif-item${n.read ? '' : ' unread'}">
+                <a href="${href}">
+                    <strong>${esc(n.subject)}</strong>
+                    <span>${esc(n.message)}</span>
+                    <span class="notif-meta">${esc(I18N.formatDateTime(n.createdAt))}${emailed}</span>
+                </a>
+            </li>`;
+    }
+
+    function renderNotifications() {
+        if (!notifications) return;
+        const { items, unread } = notifications;
+        $('unread-count').textContent = I18N.t('notifications.unread', { n: unread });
+        $('unread-count').classList.toggle('hidden', unread === 0);
+        $('read-all-btn').classList.toggle('hidden', unread === 0);
+        if (!items.length) {
+            $('notifications').innerHTML = `<li class="muted">${esc(I18N.t('notifications.empty'))}</li>`;
+            $('more-btn').classList.add('hidden');
+            return;
+        }
+        const shown = showAllNotifications ? items : items.slice(0, NOTIFICATIONS_SHOWN);
+        $('notifications').innerHTML = shown.map(notificationItem).join('');
+        $('more-btn').classList.toggle('hidden', shown.length === items.length);
+    }
+
     function renderAll() {
         renderProfile();
         renderBookings();
+        renderNotifications();
     }
+
+    $('more-btn').addEventListener('click', () => {
+        showAllNotifications = true;
+        renderNotifications();
+    });
+
+    $('read-all-btn').addEventListener('click', async () => {
+        $('read-all-btn').disabled = true;
+        try {
+            await Api.post('/api/notifications/read-all');
+            notifications.items.forEach(n => { n.read = true; });
+            notifications.unread = 0;
+            renderNotifications();
+        } catch (error) {
+            showNotice(Api.errorMessage(error), 'error');
+        } finally {
+            $('read-all-btn').disabled = false;
+        }
+    });
 
     document.addEventListener('langchange', renderAll);
     document.addEventListener('languagesaved', event => {
@@ -151,7 +220,9 @@
         if (!me) return;
         renderProfile();
         try {
-            [profile, bookings] = await Promise.all([Api.get('/api/farmers/me'), Api.get('/api/bookings/my')]);
+            [profile, bookings, notifications] = await Promise.all([
+                Api.get('/api/farmers/me'), Api.get('/api/bookings/my'), Api.get('/api/notifications/my'),
+            ]);
             if (profile.language !== I18N.lang) await I18N.setLang(profile.language);
             renderAll();
         } catch (error) {

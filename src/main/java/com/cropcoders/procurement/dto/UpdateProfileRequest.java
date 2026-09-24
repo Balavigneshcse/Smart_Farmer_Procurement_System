@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-/** Mobile and Aadhaar digits cannot be changed after registration. */
+/** Email, mobile and Aadhaar digits cannot be changed after registration. */
 public record UpdateProfileRequest(
         @NotBlank(message = "Enter your name") @Size(min = 2, max = 100) String name,
         @NotBlank(message = "Enter your address") @Size(max = 255) String address,

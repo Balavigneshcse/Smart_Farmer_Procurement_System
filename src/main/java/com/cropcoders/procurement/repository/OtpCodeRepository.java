@@ -9,7 +9,7 @@ import com.cropcoders.procurement.entity.OtpCode;
 
 public interface OtpCodeRepository extends JpaRepository<OtpCode, Long> {
 
-    Optional<OtpCode> findFirstByMobileOrderByCreatedAtDesc(String mobile);
+    Optional<OtpCode> findFirstByEmailOrderByCreatedAtDesc(String email);
 
-    long countByMobileAndCreatedAtAfter(String mobile, LocalDateTime since);
+    long countByEmailAndCreatedAtAfter(String email, LocalDateTime since);
 }
