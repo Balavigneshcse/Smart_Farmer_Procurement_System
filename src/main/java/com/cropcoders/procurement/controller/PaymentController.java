@@ -18,7 +18,7 @@ import com.cropcoders.procurement.service.PaymentService;
 
 import jakarta.validation.Valid;
 
-/** Farmer payments. Only role ADMIN can call these (see SecurityConfig). */
+/** Farmer payments. A centre admin pays the farmers of their own centre; the super admin sees every centre. */
 @RestController
 public class PaymentController {
 
@@ -30,13 +30,14 @@ public class PaymentController {
 
     /** status = PENDING, PAID or FAILED; leave it out for all payments. */
     @GetMapping("/api/admin/payments")
-    public PaymentListResponse list(@RequestParam(name = "status", required = false) PaymentStatus status) {
-        return paymentService.list(status);
+    public PaymentListResponse list(@AuthenticationPrincipal AuthUser admin,
+                                    @RequestParam(name = "status", required = false) PaymentStatus status) {
+        return paymentService.list(status, admin);
     }
 
     @PostMapping("/api/payments/{id}/order")
-    public PaymentOrderResponse createOrder(@PathVariable("id") Long paymentId) {
-        return paymentService.createOrder(paymentId);
+    public PaymentOrderResponse createOrder(@AuthenticationPrincipal AuthUser admin, @PathVariable("id") Long paymentId) {
+        return paymentService.createOrder(paymentId, admin);
     }
 
     @PostMapping("/api/payments/verify")

@@ -39,7 +39,8 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers("/api/farmers/**", "/api/bookings/**", "/api/notifications/**").hasRole("FARMER")
                         .requestMatchers("/api/operator/**").hasRole("OPERATOR")
-                        .requestMatchers("/api/admin/**", "/api/payments/**").hasRole("ADMIN")
+                        // what an admin may see inside these is narrowed to their centre in the controllers (AccessScope)
+                        .requestMatchers("/api/admin/**", "/api/payments/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll())
 

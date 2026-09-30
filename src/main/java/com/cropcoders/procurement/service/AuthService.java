@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.cropcoders.procurement.config.AppProperties;
 import com.cropcoders.procurement.dto.AuthResponse;
 import com.cropcoders.procurement.dto.LoginRequest;
+import com.cropcoders.procurement.dto.PayoutRequest;
 import com.cropcoders.procurement.dto.RegisterRequest;
 import com.cropcoders.procurement.dto.SendOtpRequest;
 import com.cropcoders.procurement.dto.SendOtpResponse;
@@ -83,14 +84,17 @@ public class AuthService {
         String email = jwtService.parseRegistrationToken(request.registrationToken())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "REGISTRATION_EXPIRED",
                         "Your verification has expired. Please verify your email again."));
+        PayoutRequest payout = request.payout().checked();
         if (userRepository.existsByEmail(email)) {
             throw new ApiException(HttpStatus.CONFLICT, "ALREADY_REGISTERED",
                     "This email address is already registered. Please log in.");
         }
 
         User user = userRepository.save(User.newFarmer(request.name().trim(), email, request.mobile()));
-        profileRepository.save(new FarmerProfile(user, request.address().trim(), request.district().trim(),
-                request.aadhaarLast4(), request.language()));
+        FarmerProfile profile = new FarmerProfile(user, request.address().trim(), request.district().trim(),
+                request.aadhaarLast4(), request.language());
+        FarmerService.applyPayout(profile, payout);
+        profileRepository.save(profile);
 
         return new AuthResponse(jwtService.createLoginToken(AuthUser.from(user)),
                 UserResponse.farmer(user, request.language()));

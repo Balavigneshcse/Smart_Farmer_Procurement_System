@@ -18,6 +18,7 @@ public record PaymentView(
         LocalDate bookingDate,
         String farmerName,
         String farmerMobile,
+        String payTo,
         String centreName,
         String cropName,
         BigDecimal weightQtl,
@@ -27,7 +28,8 @@ public record PaymentView(
         LocalDateTime createdAt,
         LocalDateTime paidAt) {
 
-    public static PaymentView from(Payment payment) {
+    /** payTo = where the farmer wants the money (bank or UPI), or null if they have not said yet. */
+    public static PaymentView from(Payment payment, String payTo) {
         Procurement procurement = payment.getProcurement();
         Booking booking = procurement.getBooking();
         return new PaymentView(
@@ -38,6 +40,7 @@ public record PaymentView(
                 booking.getBookingDate(),
                 booking.getFarmer().getName(),
                 booking.getFarmer().getMobile(),
+                payTo,
                 booking.getCentre().getName(),
                 booking.getCrop().getNameEn(),
                 procurement.getWeightQtl(),

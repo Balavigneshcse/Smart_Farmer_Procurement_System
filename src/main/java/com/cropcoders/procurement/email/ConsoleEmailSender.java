@@ -20,7 +20,8 @@ public class ConsoleEmailSender implements EmailSender {
                 Subject: {}
 
                 {}
-                ===========================================""", message.to(), message.subject(), message.text());
+                {}===========================================""", message.to(), message.subject(), message.text(),
+                message.qrPng() == null ? "" : "[QR code picture attached, " + message.qrPng().length + " bytes]\n");
         return "console";
     }
 }

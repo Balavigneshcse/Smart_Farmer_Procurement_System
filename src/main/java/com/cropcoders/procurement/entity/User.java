@@ -18,7 +18,7 @@ import jakarta.persistence.Table;
 
 /**
  * Anyone who can log in. Farmers log in with their email address (OTP sent by email) and also
- * give a mobile number for the centre; operators and admins have a username and password.
+ * give a mobile number for the centre; staff, centre admins and the super admin have a username and password.
  */
 @Entity
 @Table(name = "users")
@@ -38,7 +38,7 @@ public class User {
     private String username;
     private String passwordHash;
 
-    /** The centre an operator works at (null for farmers and admins). */
+    /** The centre a staff member or centre admin belongs to (null for farmers and the super admin). */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "centre_id")
     private Centre centre;
@@ -56,6 +56,16 @@ public class User {
         user.email = email;
         user.mobile = mobile;
         user.role = Role.FARMER;
+        return user;
+    }
+
+    public static User newStaff(String name, Role role, String username, String passwordHash, Centre centre) {
+        User user = new User();
+        user.name = name;
+        user.role = role;
+        user.username = username;
+        user.passwordHash = passwordHash;
+        user.centre = centre;
         return user;
     }
 
@@ -96,6 +106,10 @@ public class User {
 
     public String getPasswordHash() {
         return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
 
     public Centre getCentre() {

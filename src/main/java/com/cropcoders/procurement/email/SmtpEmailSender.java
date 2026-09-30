@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
@@ -86,6 +87,10 @@ public class SmtpEmailSender implements EmailSender {
             helper.setTo(message.to());
             helper.setSubject(message.subject());
             helper.setText(message.text(), message.html());
+            if (message.qrPng() != null) {
+                // Sent inside the email itself, so it shows even when the mail app blocks pictures from the web.
+                helper.addInline(EmailMessage.QR_CONTENT_ID, new ByteArrayResource(message.qrPng()), "image/png");
+            }
             mime.saveChanges();
         } catch (MessagingException e) {
             throw new EmailSendException("Could not build email: " + e.getMessage(), e);

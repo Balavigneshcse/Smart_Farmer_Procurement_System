@@ -52,14 +52,17 @@ Subject: 123456 is your login OTP
 
 A new email address goes to the registration form: name, mobile number (for the centre to call), address, district, last 4 digits of Aadhaar, and language. That language is then used for the farmer's pages and emails.
 
-**Staff** demo accounts (created by `V3__staff_accounts.sql`):
+**Staff, centre admins and the super admin** all log in on one page, `/staff/login.html`, with a username and password. The server finds the role and the browser opens the right screen.
 
-| Username | Password | Role |
-|---|---|---|
-| `admin` | `Admin@123` | Admin |
-| `operator.tnj` | `Operator@123` | Operator, Thanjavur |
-| `operator.tvr` | `Operator@123` | Operator, Tiruvarur |
-| `operator.ngt` | `Operator@123` | Operator, Nagapattinam |
+| Role | Belongs to | Can do | Created by |
+|---|---|---|---|
+| Super admin | All centres | Adds centres and centre admins, sets crop rates, loads demo data, sees every centre | The app at start-up, from `SUPERADMIN_USERNAME` and `SUPERADMIN_PASSWORD` in `.env` |
+| Centre admin | One centre | Dashboard, payments and settings of that centre; adds its staff | Super admin, under "Admins & staff" |
+| Staff | One centre | Operator desk: check-in, call next, weighment | Centre admin (or super admin) |
+
+`V5__roles_and_staff.sql` creates one admin (`admin.tnj`, `admin.tvr`, `admin.ngt`) and one staff account (`staff.tnj`, `staff.tvr`, `staff.ngt`) per centre with random starting passwords. The passwords are in `staff-accounts.xlsx` in the project folder, which is git-ignored. Accounts are switched off rather than deleted, because weighments and payments point to them.
+
+**Payment details.** At registration the farmer chooses how to be paid: a **bank account** (account holder, account number typed twice, IFSC code, bank name) or a **UPI ID**. The form and the server check the same rules (account number 9 to 18 digits, IFSC like `SBIN0001234`, UPI like `name@okaxis`). The browser only ever gets the last 4 digits of the account number back. Farmers can change the details on their dashboard, and the admin's payments page shows where each farmer wants to be paid.
 
 OTP rules: valid for 5 minutes, 3 wrong tries, a new OTP only after 60 seconds, at most 5 per hour per email address.
 
@@ -160,13 +163,16 @@ How it works (for the viva):
 - **Fast OTP.** The OTP email is also sent in the background, so "Send OTP" answers in about 0.2 seconds and the farmer can type the code as soon as it arrives.
 - **One kept-open Gmail connection.** Connecting to Gmail (TCP + TLS + login) takes about 2-3 seconds from here, so `SmtpEmailSender` opens the connection once at startup and reuses it for every email, like a connection pool with one connection. An email then leaves in about 2 seconds instead of 5-8. If Gmail has closed the connection, the sender reconnects and tries once more.
 
+**QR code in the confirmation email.** The booking confirmation email carries the same QR code as the booking page, so the farmer can show it at the desk without opening the app. `QrCode` draws it with ZXing and it is sent inside the email (an inline picture), so mail apps that block web pictures still show it.
+
 ### Admin pages
 
-| Page | What the admin does there |
+| Page | What the admin does there (a centre admin sees only their own centre) |
 |---|---|
 | **Dashboard** (`/admin/dashboard.html`) | Today at a glance: farmers booked, waiting, served, average wait, crop procured, payments pending. A live table per centre (refreshes every 30 seconds) with a link to each TV screen. Charts of farmers and quintals per day for the last 7 days, and the crops bought this week. |
 | **Payments** (`/admin/payments.html`) | Pays farmers through Razorpay test mode (see above). |
-| **Centres & crops** (`/admin/settings.html`) | Changes crop rates and moisture limits, adds crops (with Tamil and Hindi names), switches crops or centres off, and changes a centre's counters, opening hours and minutes per farmer. |
+| **Centres & crops** (`/admin/settings.html`) | Super admin: adds centres, changes crop rates and moisture limits, adds crops (with Tamil and Hindi names), switches crops or centres off. Any admin: changes their centre's counters, opening hours and minutes per farmer. |
+| **Admins & staff** (`/admin/staff.html`) | Super admin: adds centre admins and staff for any centre. Centre admin: adds staff for their own centre. Both can rename an account, set a new password or switch it off. |
 
 How it works (for the viva):
 - **Numbers from SQL.** `DashboardRepository` lets PostgreSQL do the counting with `COUNT(*) FILTER (WHERE status = …)`, `SUM` and `AVG`, so the dashboard needs a handful of queries instead of loading every booking. `generate_series` makes one row per day, so a day without bookings still shows as 0 in the chart. The charts use Chart.js.
@@ -195,13 +201,15 @@ How it works (for the viva):
 
 ### Look and feel
 
-The pages use the same dark and light greens throughout, with paddy fields drawn as SVG pictures in `static/img/`:
-- `hero-field.svg`: fields at dusk with ripe paddy, used on the home page, page banners, login cards and the footer,
-- `field-band.svg`: a light field along the bottom of the screen,
-- `crop-pattern.svg`: a faint wallpaper of crop sprigs,
-- `sprig.svg`: the small paddy icon next to headings and crop names.
-
-They are hand-made vector drawings (a few KB each), so they stay sharp on any screen, load fast on a slow phone connection and need no photo licences.
+The design follows `docs/REDESIGN_PLAN.md` (built with the design skills in `.claude/skills/`):
+- **One accent colour (green).** Amber, red and blue only mean a status and always come with a label and an icon.
+- **Light and dark theme.** The button next to the language switch changes it; until someone chooses, the device setting is used (`js/theme.js`). All colours are CSS variables at the top of `css/app.css`.
+- **Fonts.** Anek (one family for English and Tamil) and Geist Mono for tokens and the OTP, self-hosted in `static/fonts/` and cut down to the characters used (about 110 KB together). Hindi uses the device's own font, because the matching Hindi font alone is over 200 KB.
+- **Icons.** Phosphor icons (MIT) in one file, `img/icons.svg`.
+- **Photos.** Four photos from Unsplash (free licence) as small WebP files in `img/photos/`: Nandhu Kumar (hero and login), Helena Pfisterer (grain), Declan Sun (paddy).
+- **The token is a ticket.** The token card has notches and a tear line like a paper token.
+- **Loading and asking.** Grey skeleton shapes show while data loads, and a styled dialog replaces the browser's confirm box (`js/ui.js`).
+- **Motion.** Only `transform` and `opacity` are animated, and everything stops when the device asks for reduced motion.
 
 ### Testing the queue outside centre hours
 

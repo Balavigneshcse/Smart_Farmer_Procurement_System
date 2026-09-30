@@ -17,3 +17,7 @@ application-local.yml
 
 # Logs
 *.log
+
+# Staff account list with starting passwords - never commit
+staff-accounts.xlsx
+~$*.xlsx

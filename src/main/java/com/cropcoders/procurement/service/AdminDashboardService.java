@@ -25,12 +25,13 @@ public class AdminDashboardService {
     }
 
     @Transactional(readOnly = true)
-    public AdminDashboardResponse dashboard() {
+    /** centreId = null: all centres (super admin); otherwise the numbers of that one centre. */
+    public AdminDashboardResponse dashboard(Long centreId) {
         LocalDate today = LocalDate.now();
         LocalDate firstChartDay = today.minusDays(CHART_DAYS - 1L);
 
-        List<CentreToday> centres = dashboardRepository.centresToday(today);
-        DashboardRepository.TodayTotals totals = dashboardRepository.todayTotals(today);
+        List<CentreToday> centres = dashboardRepository.centresToday(today, centreId);
+        DashboardRepository.TodayTotals totals = dashboardRepository.todayTotals(today, centreId);
 
         var todaySummary = new AdminDashboardResponse.Today(
                 centres.stream().mapToInt(CentreToday::booked).sum(),
@@ -45,9 +46,9 @@ public class AdminDashboardService {
                 totals.value(),
                 totals.avgWaitMinutes());
 
-        return new AdminDashboardResponse(today, todaySummary, centres, dashboardRepository.payments(today),
-                dashboardRepository.dayTotals(firstChartDay, today),
-                dashboardRepository.cropTotals(firstChartDay, today),
+        return new AdminDashboardResponse(today, todaySummary, centres, dashboardRepository.payments(today, centreId),
+                dashboardRepository.dayTotals(firstChartDay, today, centreId),
+                dashboardRepository.cropTotals(firstChartDay, today, centreId),
                 LocalDateTime.now());
     }
 }

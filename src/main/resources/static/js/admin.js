@@ -1,17 +1,43 @@
 /*
- * Shared helpers for the admin pages (English only). Load after auth.js and api.js.
+ * Shared helpers for the admin pages (English only). Load after ui.js, auth.js and api.js.
+ * The same pages serve the super admin (every centre) and a centre admin (their own centre).
  */
 const Admin = (() => {
     const moneyFormat = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
     let noticeTimer = null;
 
-    /** Checks the admin is logged in, shows their name and wires the logout button. */
+    let me = null;
+
+    /** Checks an admin is logged in, builds the menu for their role and wires the logout button. */
     function initPage() {
-        const me = Auth.require('ADMIN');
+        me = Auth.require(['ADMIN', 'SUPER_ADMIN']);
         if (!me) return null;
         document.getElementById('user-name').textContent = me.name;
         document.getElementById('logout-btn').addEventListener('click', Auth.logout);
+        renderHeader();
         return me;
+    }
+
+    function isSuper() {
+        return me?.role === 'SUPER_ADMIN';
+    }
+
+    /** "Super admin" or the centre's name under the logo, and the menu with the current page marked. */
+    function renderHeader() {
+        const label = document.querySelector('.brand-text small');
+        if (label) label.textContent = isSuper() ? 'Super admin' : (me.centreName || 'Centre admin');
+
+        const items = [
+            ['/admin/dashboard.html', 'chart-bar', 'Dashboard'],
+            ['/admin/payments.html', 'credit-card', 'Payments'],
+            ['/admin/settings.html', 'gear', isSuper() ? 'Centres & crops' : 'My centre'],
+            ['/admin/staff.html', 'users-three', isSuper() ? 'Admins & staff' : 'Staff'],
+        ];
+        const nav = document.querySelector('.header-nav');
+        if (nav) {
+            nav.innerHTML = items.map(([href, icon, text]) =>
+                `<a href="${href}"${location.pathname === href ? ' aria-current="page"' : ''}>${UI.icon(icon)}${esc(text)}</a>`).join('');
+        }
     }
 
     /** Escapes text before putting it into HTML. */
@@ -46,5 +72,5 @@ const Admin = (() => {
         box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
 
-    return { initPage, esc, money, number, time, notice };
+    return { initPage, isSuper, esc, money, number, time, notice };
 })();

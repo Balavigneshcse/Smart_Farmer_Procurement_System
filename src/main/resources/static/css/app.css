@@ -966,10 +966,15 @@ tbody tr:hover { background: color-mix(in srgb, var(--sunken) 45%, transparent);
 }
 .auth-icon .icon { width: 26px; height: 26px; }
 .verified-badge { margin: 4px 0 20px; padding: 6px 12px; }
+.payout-hint { display: block; margin: -2px 0 8px; }
+.mono-input { font-family: var(--font-mono); letter-spacing: .04em; }
+.form-divider { border: 0; border-top: 1px solid var(--line); margin: 8px 0 20px; }
+.payout-lines { display: grid; gap: 2px; }
+.payout-lines span:first-child { font-weight: 700; }
 .auth-links { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
 .auth-footer { text-align: center; margin-top: 16px; }
 .auth-photo { display: none; margin: 0; }
-.auth-photo img { width: 100%; height: 100%; min-height: 520px; object-fit: cover; border-radius: var(--radius-lg); background: #474c46; }
+.auth-photo img { width: 100%; height: 100%; min-height: 520px; object-fit: cover; border-radius: var(--radius-lg); background: #53702d; }
 @media (min-width: 900px) {
     .auth-layout { grid-template-columns: 1fr 1fr; gap: 48px; align-items: stretch; padding-top: 48px; }
     .auth-panel { margin: 0; align-self: center; }
@@ -1234,6 +1239,9 @@ tbody tr:hover { background: color-mix(in srgb, var(--sunken) 45%, transparent);
 .segmented button:hover { color: var(--ink); }
 .segmented button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
 
+.section-head { align-items: center; margin-bottom: 12px; }
+.section-head h2 { margin: 0; }
+.new-centre-form { margin-bottom: 16px; border-color: var(--accent); }
 .centre-form .field { margin-bottom: 12px; }
 .centre-form-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .centre-form-head h3 { margin: 0; }

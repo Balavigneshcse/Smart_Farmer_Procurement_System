@@ -32,6 +32,14 @@ public class FarmerProfile {
     /** "en", "ta" or "hi" - used for the farmer's pages and emails. */
     private String language;
 
+    /** "BANK" or "UPI"; null until the farmer gives payment details. */
+    private String payoutMethod;
+    private String accountHolder;
+    private String accountNumber;
+    private String ifsc;
+    private String bankName;
+    private String upiId;
+
     private LocalDateTime updatedAt;
 
     protected FarmerProfile() {
@@ -86,6 +94,62 @@ public class FarmerProfile {
 
     public void setLanguage(String language) {
         this.language = language;
+    }
+
+    /** Bank account: the UPI ID is cleared. */
+    public void payToBank(String accountHolder, String accountNumber, String ifsc, String bankName) {
+        this.payoutMethod = "BANK";
+        this.accountHolder = accountHolder;
+        this.accountNumber = accountNumber;
+        this.ifsc = ifsc;
+        this.bankName = bankName;
+        this.upiId = null;
+    }
+
+    /** UPI: the bank details are cleared. */
+    public void payToUpi(String upiId) {
+        this.payoutMethod = "UPI";
+        this.upiId = upiId;
+        this.accountHolder = null;
+        this.accountNumber = null;
+        this.ifsc = null;
+        this.bankName = null;
+    }
+
+    public String getPayoutMethod() {
+        return payoutMethod;
+    }
+
+    public String getAccountHolder() {
+        return accountHolder;
+    }
+
+    public String getAccountNumber() {
+        return accountNumber;
+    }
+
+    public String getIfsc() {
+        return ifsc;
+    }
+
+    public String getBankName() {
+        return bankName;
+    }
+
+    public String getUpiId() {
+        return upiId;
+    }
+
+    /** "UPI ravi@okaxis" or "State Bank of India, account ending 4321, IFSC SBIN0001234"; null if not given. */
+    public String payoutSummary() {
+        if ("UPI".equals(payoutMethod)) {
+            return "UPI " + upiId;
+        }
+        if ("BANK".equals(payoutMethod)) {
+            return bankName + ", account ending " + accountNumber.substring(accountNumber.length() - 4)
+                    + ", IFSC " + ifsc + " (" + accountHolder + ")";
+        }
+        return null;
     }
 
     public LocalDateTime getUpdatedAt() {

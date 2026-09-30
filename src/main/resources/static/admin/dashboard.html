@@ -34,7 +34,7 @@
 <main id="main" class="container">
     <div class="page-head head-row">
         <div>
-            <h1>Today at the centres</h1>
+            <h1 id="page-title">Today at the centres</h1>
             <p class="muted" id="today-label">&nbsp;</p>
         </div>
         <span class="live-status" id="refresh-status" aria-live="polite"><span class="live-dot"></span> Loading</span>
@@ -103,7 +103,7 @@
         </section>
     </div>
 
-    <section class="card dash-section demo-card" aria-labelledby="demo-title">
+    <section class="card dash-section demo-card hidden" id="demo-card" aria-labelledby="demo-title">
         <h2 id="demo-title">Demo data</h2>
         <p class="muted">For presentations: adds 40 demo farmers with a busy day in progress at every centre
             (served, at the counters, waiting, still to come) and the last 6 days of history.
@@ -335,9 +335,17 @@
         renderCharts(lastData);
     });
 
-    if (Admin.initPage()) {
+    const me = Admin.initPage();
+    if (me) {
         load();
-        Api.get('/api/admin/demo').then(renderDemo).catch(() => { $('demo-status').textContent = 'Could not check demo data.'; });
+        if (Admin.isSuper()) {
+            // Demo data fills every centre at once, so only the super admin gets it.
+            $('demo-card').classList.remove('hidden');
+            Api.get('/api/admin/demo').then(renderDemo).catch(() => { $('demo-status').textContent = 'Could not check demo data.'; });
+        } else {
+            $('page-title').textContent = 'Today at your centre';
+            $('centres-title').textContent = me.centreName || 'Your centre';
+        }
         setInterval(() => {
             if (document.visibilityState === 'visible') load();
         }, REFRESH_MS);

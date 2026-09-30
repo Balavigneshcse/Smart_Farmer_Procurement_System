@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.cropcoders.procurement.dto.FarmerProfileResponse;
+import com.cropcoders.procurement.dto.PayoutRequest;
 import com.cropcoders.procurement.dto.UpdateLanguageRequest;
 import com.cropcoders.procurement.dto.UpdateProfileRequest;
 import com.cropcoders.procurement.security.AuthUser;
@@ -35,6 +36,12 @@ public class FarmerController {
     public FarmerProfileResponse updateProfile(@AuthenticationPrincipal AuthUser farmer,
                                                @Valid @RequestBody UpdateProfileRequest request) {
         return farmerService.updateProfile(farmer.id(), request);
+    }
+
+    @PutMapping("/payout")
+    public FarmerProfileResponse updatePayout(@AuthenticationPrincipal AuthUser farmer,
+                                              @Valid @RequestBody PayoutRequest request) {
+        return farmerService.updatePayout(farmer.id(), request);
     }
 
     @PutMapping("/language")

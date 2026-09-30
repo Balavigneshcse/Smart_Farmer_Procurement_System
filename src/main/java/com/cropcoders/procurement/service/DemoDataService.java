@@ -514,9 +514,9 @@ public class DemoDataService {
 
     /** The admin "pays" the demo payments. */
     private long adminId() {
-        Long id = jdbc.queryForObject("SELECT min(id) FROM users WHERE role = 'ADMIN'", Long.class);
+        Long id = jdbc.queryForObject("SELECT min(id) FROM users WHERE role IN ('ADMIN', 'SUPER_ADMIN')", Long.class);
         if (id == null) {
-            throw new IllegalStateException("Demo data needs an admin account (see V3__staff_accounts.sql)");
+            throw new IllegalStateException("Demo data needs an admin account (see V5__roles_and_staff.sql)");
         }
         return id;
     }

@@ -16,6 +16,9 @@ import com.cropcoders.procurement.config.AppProperties;
 @Component
 public class EmailTemplates {
 
+    /** Size of the QR code in the email, in CSS pixels. */
+    private static final int QR_SIZE = 180;
+
     private final MessageSource messages;
     private final String appUrl;
 
@@ -35,7 +38,9 @@ public class EmailTemplates {
                 code,
                 null,
                 null,
-                text("notify.otp.footer", locale)));
+                text("notify.otp.footer", locale),
+                null,
+                null));
     }
 
     /**
@@ -44,6 +49,12 @@ public class EmailTemplates {
      */
     public EmailMessage notification(String to, String language, String farmerName, String subject, String message,
                                      String path) {
+        return notification(to, language, farmerName, subject, message, path, null);
+    }
+
+    /** The same, with the booking's QR code shown in the email (qrText = what the operator's scanner reads). */
+    public EmailMessage notification(String to, String language, String farmerName, String subject, String message,
+                                     String path, String qrText) {
         Locale locale = Locale.forLanguageTag(language);
         return render(new Content(to, locale,
                 subject,
@@ -52,12 +63,15 @@ public class EmailTemplates {
                 null,
                 text("notify.button", locale),
                 appUrl + path,
-                text("notify.footer", locale)));
+                text("notify.footer", locale),
+                qrText == null ? null : QrCode.png(qrText, QR_SIZE * 2),   // double size: sharp on phone screens
+                qrText == null ? null : text("notify.qr", locale)));
     }
 
     /** Everything one email shows. greeting, highlight and button are optional (null). */
     private record Content(String to, Locale locale, String subject, String greeting, String message,
-                           String highlight, String buttonLabel, String buttonUrl, String footer) {
+                           String highlight, String buttonLabel, String buttonUrl, String footer,
+                           byte[] qrPng, String qrCaption) {
     }
 
     private EmailMessage render(Content c) {
@@ -88,6 +102,14 @@ public class EmailTemplates {
                     .append("text-align:center;font-size:32px;font-weight:bold;letter-spacing:8px;color:#12351f;\">")
                     .append(esc(c.highlight())).append("</p>");
         }
+        if (c.qrPng() != null) {
+            html.append("<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:8px 0 4px;\"><tr>")
+                    .append("<td style=\"padding:10px;background:#ffffff;border:1px solid #d5e6d9;border-radius:8px;\">")
+                    .append("<img src=\"cid:").append(EmailMessage.QR_CONTENT_ID).append("\" width=\"").append(QR_SIZE)
+                    .append("\" height=\"").append(QR_SIZE).append("\" alt=\"").append(esc(c.qrCaption()))
+                    .append("\" style=\"display:block;border:0;\"></td></tr></table>")
+                    .append("<p style=\"margin:0 0 8px;font-size:13px;color:#5a6b5f;\">").append(esc(c.qrCaption())).append("</p>");
+        }
         if (c.buttonUrl() != null) {
             html.append("<p style=\"margin:24px 0 0;\"><a href=\"").append(esc(c.buttonUrl())).append("\" ")
                     .append("style=\"display:inline-block;background:#1e6b3a;color:#ffffff;text-decoration:none;")
@@ -112,7 +134,7 @@ public class EmailTemplates {
         }
         text.append("--\n").append(c.footer()).append('\n');
 
-        return new EmailMessage(c.to(), c.subject(), html.toString(), text.toString());
+        return new EmailMessage(c.to(), c.subject(), html.toString(), text.toString(), c.qrPng());
     }
 
     private static String paragraph(String value) {

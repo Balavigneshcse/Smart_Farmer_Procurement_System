@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.cropcoders.procurement.config.AppProperties;
+import com.cropcoders.procurement.dto.BookingResponse;
 import com.cropcoders.procurement.dto.NotificationListResponse;
 import com.cropcoders.procurement.dto.NotificationResponse;
 import com.cropcoders.procurement.email.EmailQueuedEvent;
@@ -85,8 +86,10 @@ public class NotificationService {
                 booking.getId(), event, subject, text, status));
 
         if (status == EmailStatus.PENDING) {
+            // The confirmation email carries the QR code, so the farmer can show it without opening the app.
+            String qrText = event == NotificationEvent.BOOKING_CONFIRMED ? BookingResponse.qrText(booking) : null;
             events.publishEvent(new EmailQueuedEvent(notification.getId(), templates.notification(farmer.getEmail(),
-                    language, farmer.getName(), subject, text, "/farmer/booking.html?id=" + booking.getId())));
+                    language, farmer.getName(), subject, text, "/farmer/booking.html?id=" + booking.getId(), qrText)));
         }
     }
 

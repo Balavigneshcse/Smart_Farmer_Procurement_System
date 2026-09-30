@@ -16,6 +16,7 @@ import com.cropcoders.procurement.dto.AdminCentreView;
 import com.cropcoders.procurement.dto.AdminCropView;
 import com.cropcoders.procurement.dto.CentreRequest;
 import com.cropcoders.procurement.dto.CropRequest;
+import com.cropcoders.procurement.dto.NewCentreRequest;
 import com.cropcoders.procurement.entity.Centre;
 import com.cropcoders.procurement.entity.Crop;
 import com.cropcoders.procurement.exception.ApiException;
@@ -30,6 +31,8 @@ import com.cropcoders.procurement.repository.CropRepository;
 @Service
 @Transactional
 public class AdminCatalogueService {
+
+    private static final int NEW_CENTRE_SLOT_MINUTES = 30;
 
     private final CropRepository cropRepository;
     private final CentreRepository centreRepository;
@@ -89,12 +92,42 @@ public class AdminCatalogueService {
 
     // ---------- Centres ----------
 
+    /** centreId = null lists every centre (super admin); otherwise only that centre (its admin). */
     @Transactional(readOnly = true)
-    public List<AdminCentreView> centres() {
+    public List<AdminCentreView> centres(Long centreId) {
         return centreRepository.findAll().stream()
+                .filter(c -> centreId == null || c.getId().equals(centreId))
                 .sorted(Comparator.comparing(Centre::getName))
                 .map(AdminCentreView::from)
                 .toList();
+    }
+
+    /** A new centre gets 30-minute slots for the coming days straight away, so farmers can book it. */
+    public AdminCentreView addCentre(NewCentreRequest request) {
+        String code = request.code().trim().toUpperCase();
+        boolean taken = centreRepository.findAll().stream().anyMatch(c -> c.getCode().equalsIgnoreCase(code));
+        if (taken) {
+            throw new ApiException(HttpStatus.CONFLICT, "CENTRE_CODE_TAKEN",
+                    "The code " + code + " is already used by another centre.");
+        }
+        Centre centre = new Centre();
+        centre.setCode(code);
+        centre.setSlotMinutes(NEW_CENTRE_SLOT_MINUTES);
+        validateHours(centre, request.openTime(), request.closeTime());
+        if (request.counters() * NEW_CENTRE_SLOT_MINUTES / request.avgServiceMin() < 1) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "NO_CAPACITY",
+                    "With these numbers a slot would hold no farmers. Add counters or lower the service time.");
+        }
+        centre.setName(request.name().trim());
+        centre.setDistrict(request.district().trim());
+        centre.setAddress(request.address().trim());
+        centre.setOpenTime(request.openTime());
+        centre.setCloseTime(request.closeTime());
+        centre.setCounters(request.counters());
+        centre.setAvgServiceMin(request.avgServiceMin());
+        centreRepository.saveAndFlush(centre);   // the slot SQL below must see the new centre
+        slotService.generateUpcomingSlots();
+        return AdminCentreView.from(centre);
     }
 
     /**

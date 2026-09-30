@@ -33,8 +33,8 @@
 
 <main id="main" class="container">
     <div class="page-head">
-        <h1>Centres &amp; crops</h1>
-        <p class="muted">Rates, moisture limits, counters and opening hours. Changes apply straight away.</p>
+        <h1 id="page-title">Centres &amp; crops</h1>
+        <p class="muted" id="page-intro">Rates, moisture limits, counters and opening hours. Changes apply straight away.</p>
     </div>
 
     <div id="notice" class="alert hidden" role="status"></div>
@@ -43,7 +43,7 @@
     <section class="card table-wrap dash-section" aria-labelledby="crops-title">
         <div class="table-tools">
             <h2 id="crops-title">Crops and rates</h2>
-            <button type="button" class="btn btn-primary btn-sm" id="add-crop-btn">Add crop</button>
+            <button type="button" class="btn btn-primary btn-sm hidden" id="add-crop-btn"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#plus"></use></svg>Add crop</button>
         </div>
 
         <form id="crop-form" class="crop-form hidden" novalidate>
@@ -93,7 +93,38 @@
 
     <!-- Centres -->
     <section class="dash-section" aria-labelledby="centres-title">
-        <h2 id="centres-title">Procurement centres</h2>
+        <div class="head-row section-head">
+            <h2 id="centres-title">Procurement centres</h2>
+            <button type="button" class="btn btn-primary btn-sm hidden" id="add-centre-btn"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#plus"></use></svg>Add centre</button>
+        </div>
+
+        <form id="centre-add-form" class="card new-centre-form hidden" novalidate>
+            <h3>Add a procurement centre</h3>
+            <div class="form-row">
+                <div class="field">
+                    <label for="n-code">Code</label>
+                    <input id="n-code" maxlength="5" autocapitalize="characters" spellcheck="false" aria-describedby="n-code-hint">
+                    <span class="hint" id="n-code-hint">2 to 5 letters. Tokens start with it, for example KMB-017. It cannot be changed later.</span>
+                </div>
+                <div class="field"><label for="n-name">Name</label><input id="n-name" maxlength="100"></div>
+            </div>
+            <div class="form-row">
+                <div class="field"><label for="n-district">District</label><input id="n-district" maxlength="60"></div>
+                <div class="field"><label for="n-address">Address</label><input id="n-address" maxlength="255"></div>
+            </div>
+            <div class="form-row">
+                <div class="field"><label for="n-open">Opens at</label><select id="n-open"></select></div>
+                <div class="field"><label for="n-close">Closes at</label><select id="n-close"></select></div>
+                <div class="field"><label for="n-counters">Counters</label><input id="n-counters" type="number" min="1" max="20" value="2"></div>
+                <div class="field"><label for="n-service">Minutes per farmer</label><input id="n-service" type="number" min="1" max="60" value="10"></div>
+            </div>
+            <p class="small muted">Slots are 30 minutes long. After saving, add an admin for this centre under Admins &amp; staff.</p>
+            <div class="card-actions">
+                <button type="submit" class="btn btn-primary" id="centre-add-save">Save centre</button>
+                <button type="button" class="btn btn-quiet" id="centre-add-cancel">Cancel</button>
+            </div>
+        </form>
+
         <p class="muted small">Farmers per slot = counters × slot minutes ÷ minutes per farmer. Farmers who already
             booked always keep their place; new or changed hours create or remove empty slots automatically.</p>
         <div class="grid grid-2" id="centres"><p class="muted">Loading…</p></div>
@@ -121,7 +152,8 @@
                 <td class="num"><strong>${esc(money(c.ratePerQtl))}</strong></td>
                 <td class="num">${esc(c.maxMoisturePct)}%</td>
                 <td>${c.active ? '<span class="badge">Bookable</span>' : '<span class="badge badge-grey">Switched off</span>'}</td>
-                <td class="num"><button type="button" class="btn btn-outline btn-sm" data-edit-crop="${c.id}">Edit</button></td>
+                <td class="num">${Admin.isSuper()
+                    ? `<button type="button" class="btn btn-outline btn-sm" data-edit-crop="${c.id}">Edit</button>` : ''}</td>
             </tr>`).join('') || '<tr class="empty-row"><td colspan="5">No crops yet.</td></tr>';
     }
 
@@ -273,6 +305,53 @@
         }
     });
 
+    // ---------- Add centre (super admin) ----------
+
+    function openCentreForm() {
+        $('n-open').innerHTML = timeOptions('08:00', 30);
+        $('n-close').innerHTML = timeOptions('17:00', 30);
+        $('centre-add-form').classList.remove('hidden');
+        $('n-code').focus();
+    }
+
+    $('add-centre-btn').addEventListener('click', openCentreForm);
+    $('centre-add-cancel').addEventListener('click', () => $('centre-add-form').classList.add('hidden'));
+    $('n-code').addEventListener('input', event => {
+        event.target.value = event.target.value.replace(/[^A-Za-z]/g, '').toUpperCase();
+    });
+
+    $('centre-add-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        const body = {
+            code: $('n-code').value.trim(),
+            name: $('n-name').value.trim(),
+            district: $('n-district').value.trim(),
+            address: $('n-address').value.trim(),
+            openTime: $('n-open').value,
+            closeTime: $('n-close').value,
+            counters: Number($('n-counters').value),
+            avgServiceMin: Number($('n-service').value),
+        };
+        if (!body.code || !body.name || !body.district || !body.address) {
+            Admin.notice('Fill in the code, name, district and address.', 'error');
+            return;
+        }
+        $('centre-add-save').disabled = true;
+        try {
+            const saved = await Api.post('/api/admin/centres', body);
+            centres = [...centres, saved].sort((a, b) => a.name.localeCompare(b.name));
+            renderCentres();
+            event.target.reset();
+            event.target.classList.add('hidden');
+            Admin.notice(`${saved.name} (${saved.code}) added. Farmers can book it now. Next, add its admin under Admins & staff.`);
+        } catch (error) {
+            const fields = Object.values(error.fieldErrors || {});
+            Admin.notice(fields.length ? fields.join(' ') : Api.errorMessage(error), 'error', true);
+        } finally {
+            $('centre-add-save').disabled = false;
+        }
+    });
+
     async function load() {
         try {
             [crops, centres] = await Promise.all([Api.get('/api/admin/crops'), Api.get('/api/admin/centres')]);
@@ -284,6 +363,16 @@
     }
 
     if (Admin.initPage()) {
+        if (Admin.isSuper()) {
+            $('add-crop-btn').classList.remove('hidden');
+            $('add-centre-btn').classList.remove('hidden');
+        } else {
+            // A centre admin changes their own centre; crop rates are set by the super admin for all centres.
+            document.title = 'My centre | Smart Farmer Procurement System';
+            $('page-title').textContent = 'My centre';
+            $('page-intro').textContent = 'Counters and opening hours of your centre. Crop rates are set by the super admin.';
+            $('centres-title').textContent = 'Centre settings';
+        }
         load();
     }
 </script>

@@ -34,7 +34,7 @@
 <main id="main" class="container">
     <div class="page-head">
         <h1>Farmer payments</h1>
-        <p class="muted">Accepted crops waiting to be paid. Payments run in <strong>Razorpay test mode</strong>. No real money moves.</p>
+        <p class="muted" id="page-intro">Accepted crops waiting to be paid. Payments run in <strong>Razorpay test mode</strong>. No real money moves.</p>
     </div>
 
     <div id="config-warning" class="alert alert-error hidden">
@@ -71,9 +71,10 @@
 <script src="/js/ui.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
+<script src="/js/admin.js"></script>
 <script>
     const $ = id => document.getElementById(id);
-    const me = Auth.require('ADMIN');
+    const me = Admin.initPage();
     let filter = 'PENDING';
     let data = null;
     let noticeTimer = null;
@@ -108,7 +109,8 @@
             <tr>
                 <td>${esc(date(p.bookingDate))}</td>
                 <td><strong class="mono">${esc(p.token)}</strong></td>
-                <td>${esc(p.farmerName)}<br><span class="small muted">+91 ${esc(p.farmerMobile)}</span></td>
+                <td>${esc(p.farmerName)}<br><span class="small muted">+91 ${esc(p.farmerMobile)}</span><br>
+                    ${p.payTo ? `<span class="small">${esc(p.payTo)}</span>` : '<span class="badge badge-amber">No payment details yet</span>'}</td>
                 <td>${esc(p.cropName)}<br><span class="small muted">${esc(p.weightQtl)} qtl, grade ${esc(p.grade)}<br>${esc(p.centreName)}</span></td>
                 <td class="num"><strong>${esc(money(p.amount))}</strong></td>
                 <td>${p.status === 'PAID'
@@ -193,10 +195,7 @@
         load();
     }));
 
-    $('logout-btn').addEventListener('click', Auth.logout);
-
     if (me) {
-        $('user-name').textContent = me.name;
         load();
     }
 </script>

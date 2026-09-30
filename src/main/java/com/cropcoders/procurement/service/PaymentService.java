@@ -2,6 +2,7 @@ package com.cropcoders.procurement.service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -23,8 +24,11 @@ import com.cropcoders.procurement.enums.NotificationEvent;
 import com.cropcoders.procurement.enums.PaymentStatus;
 import com.cropcoders.procurement.exception.ApiException;
 import com.cropcoders.procurement.payment.RazorpayGateway;
+import com.cropcoders.procurement.entity.FarmerProfile;
 import com.cropcoders.procurement.repository.BookingEventRepository;
+import com.cropcoders.procurement.repository.FarmerProfileRepository;
 import com.cropcoders.procurement.repository.PaymentRepository;
+import com.cropcoders.procurement.security.AccessScope;
 import com.cropcoders.procurement.security.AuthUser;
 
 /**
@@ -40,9 +44,12 @@ public class PaymentService {
     private final BookingEventRepository eventRepository;
     private final RazorpayGateway razorpay;
     private final NotificationService notificationService;
+    private final FarmerProfileRepository profileRepository;
 
     public PaymentService(PaymentRepository paymentRepository, BookingEventRepository eventRepository,
-                          RazorpayGateway razorpay, NotificationService notificationService) {
+                          RazorpayGateway razorpay, NotificationService notificationService,
+                          FarmerProfileRepository profileRepository) {
+        this.profileRepository = profileRepository;
         this.paymentRepository = paymentRepository;
         this.eventRepository = eventRepository;
         this.razorpay = razorpay;
@@ -50,8 +57,11 @@ public class PaymentService {
     }
 
     @Transactional(readOnly = true)
-    public PaymentListResponse list(PaymentStatus status) {
-        List<Payment> all = paymentRepository.findAllForAdmin();
+    public PaymentListResponse list(PaymentStatus status, AuthUser admin) {
+        Long centreId = AccessScope.centreOf(admin);     // null = every centre (super admin)
+        List<Payment> all = paymentRepository.findAllForAdmin().stream()
+                .filter(p -> centreId == null || centreOf(p).equals(centreId))
+                .toList();
         LocalDate today = LocalDate.now();
 
         List<Payment> pending = all.stream().filter(p -> p.getStatus() == PaymentStatus.PENDING).toList();
@@ -62,10 +72,12 @@ public class PaymentService {
 
         var summary = new PaymentListResponse.Summary(pending.size(), sum(pending), paidToday.size(), sum(paidToday),
                 sum(paid));
-        List<PaymentView> rows = all.stream()
-                .filter(p -> status == null || p.getStatus() == status)
-                .map(PaymentView::from)
-                .toList();
+        List<Payment> shown = all.stream().filter(p -> status == null || p.getStatus() == status).toList();
+        // Where each farmer wants to be paid, fetched in one query.
+        Map<Long, String> payTo = new HashMap<>();
+        profileRepository.findAllById(shown.stream().map(PaymentService::farmerId).distinct().toList())
+                .forEach(profile -> payTo.put(profile.getUserId(), profile.payoutSummary()));
+        List<PaymentView> rows = shown.stream().map(p -> PaymentView.from(p, payTo.get(farmerId(p)))).toList();
         return new PaymentListResponse(rows, summary, razorpay.isConfigured());
     }
 
@@ -74,9 +86,10 @@ public class PaymentService {
      * The amount always comes from our database, never from the browser.
      */
     @Transactional
-    public PaymentOrderResponse createOrder(Long paymentId) {
+    public PaymentOrderResponse createOrder(Long paymentId, AuthUser admin) {
         Payment payment = paymentRepository.findDetailedById(paymentId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "PAYMENT_NOT_FOUND", "Payment not found."));
+        AccessScope.requireCentre(admin, centreOf(payment));
         if (payment.getStatus() == PaymentStatus.PAID) {
             throw new ApiException(HttpStatus.CONFLICT, "ALREADY_PAID", "This payment is already done.");
         }
@@ -104,6 +117,7 @@ public class PaymentService {
         Payment payment = paymentRepository.findDetailedByRzpOrderId(request.razorpayOrderId())
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "PAYMENT_NOT_FOUND",
                         "No payment found for this Razorpay order."));
+        AccessScope.requireCentre(admin, centreOf(payment));
 
         if (!razorpay.isValidSignature(request.razorpayOrderId(), request.razorpayPaymentId(),
                 request.razorpaySignature())) {
@@ -120,7 +134,16 @@ public class PaymentService {
             notificationService.notifyBooking(booking, NotificationEvent.PAID,
                     NotificationService.money(payment.amountRupees()), request.razorpayPaymentId());
         }
-        return PaymentView.from(payment);
+        String payTo = profileRepository.findById(farmerId(payment)).map(FarmerProfile::payoutSummary).orElse(null);
+        return PaymentView.from(payment, payTo);
+    }
+
+    private static Long farmerId(Payment payment) {
+        return payment.getProcurement().getBooking().getFarmer().getId();
+    }
+
+    private static Long centreOf(Payment payment) {
+        return payment.getProcurement().getBooking().getCentre().getId();
     }
 
     private static BigDecimal sum(List<Payment> payments) {

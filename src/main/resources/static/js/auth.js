@@ -7,8 +7,11 @@
 const Auth = (() => {
     const SESSION_KEY = 'sfps.session';
     const REGISTRATION_KEY = 'sfps.registration';
-    const LOGIN_PAGES = { FARMER: '/farmer/login.html', OPERATOR: '/staff/login.html', ADMIN: '/staff/login.html' };
-    const HOME_PAGES = { FARMER: '/farmer/dashboard.html', OPERATOR: '/operator/desk.html', ADMIN: '/admin/dashboard.html' };
+    const LOGIN_PAGES = { FARMER: '/farmer/login.html' };   // every staff role uses /staff/login.html
+    const HOME_PAGES = {
+        FARMER: '/farmer/dashboard.html', OPERATOR: '/operator/desk.html',
+        ADMIN: '/admin/dashboard.html', SUPER_ADMIN: '/admin/dashboard.html',
+    };
 
     function readJson(storage, key) {
         try {
@@ -79,10 +82,12 @@ const Auth = (() => {
         remove(localStorage, SESSION_KEY);
     }
 
-    /** Returns the logged-in user if they have this role; otherwise redirects and returns null. */
-    function require(role) {
+    /** Returns the logged-in user if they have this role (or one of these roles); otherwise redirects and returns null. */
+    function require(roles) {
+        const allowed = [].concat(roles);
+        const role = allowed[0];
         const current = user();
-        if (current?.role === role) return current;
+        if (current && allowed.includes(current.role)) return current;
 
         if (current) {
             location.replace(homeFor(current.role));        // logged in, but with another role

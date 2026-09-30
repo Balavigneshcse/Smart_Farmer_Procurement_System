@@ -1,6 +1,8 @@
 package com.cropcoders.procurement.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
@@ -12,5 +14,6 @@ public record RegisterRequest(
         @NotBlank(message = "Enter your address") @Size(max = 255) String address,
         @NotBlank(message = "Enter your district") @Size(max = 60) String district,
         @NotBlank @Pattern(regexp = ValidationPatterns.AADHAAR_LAST4, message = "Enter exactly 4 digits") String aadhaarLast4,
-        @NotBlank @Pattern(regexp = ValidationPatterns.LANGUAGE, message = "Language must be en, ta or hi") String language) {
+        @NotBlank @Pattern(regexp = ValidationPatterns.LANGUAGE, message = "Language must be en, ta or hi") String language,
+        @NotNull(message = "Choose how you want to be paid") @Valid PayoutRequest payout) {
 }

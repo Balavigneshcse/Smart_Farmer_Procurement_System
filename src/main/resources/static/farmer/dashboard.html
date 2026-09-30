@@ -74,7 +74,20 @@
             <dd id="p-aadhaar"></dd>
             <dt data-i18n="dashboard.profile.language">Language</dt>
             <dd id="p-language"></dd>
+            <dt data-i18n="dashboard.payout.title">Payment details</dt>
+            <dd id="p-payout"></dd>
         </dl>
+        <div class="card-actions">
+            <button type="button" class="btn btn-outline" id="payout-btn"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#bank"></use></svg><span id="payout-btn-text"></span></button>
+        </div>
+        <form id="payout-form" class="hidden payout-form" novalidate>
+            <hr class="form-divider">
+            <div id="payout"></div>
+            <div class="card-actions">
+                <button type="submit" class="btn btn-primary" id="payout-save" data-i18n="dashboard.payout.save">Save payment details</button>
+                <button type="button" class="btn btn-quiet" id="payout-cancel" data-i18n="common.cancel">Cancel</button>
+            </div>
+        </form>
     </section>
 </main>
 
@@ -83,6 +96,7 @@
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/farmer.js"></script>
+<script src="/js/payout.js"></script>
 <script>
     const LANGUAGE_NAMES = { en: 'English', ta: 'தமிழ்', hi: 'हिन्दी' };
     const $ = id => document.getElementById(id);
@@ -112,6 +126,11 @@
         $('p-district').textContent = profile.district;
         $('p-aadhaar').textContent = `XXXX XXXX ${profile.aadhaarLast4}`;
         $('p-language').textContent = LANGUAGE_NAMES[profile.language];
+        const lines = Payout.summaryLines(profile);
+        $('p-payout').innerHTML = lines
+            ? `<span class="payout-lines">${lines.map(line => `<span>${esc(line)}</span>`).join('')}</span>`
+            : `<span class="badge badge-amber">${UI.icon('warning-circle')}${esc(I18N.t('dashboard.payout.none'))}</span>`;
+        $('payout-btn-text').textContent = I18N.t(lines ? 'dashboard.payout.change' : 'dashboard.payout.add');
     }
 
     function bookingItem(b, featured = false) {
@@ -207,6 +226,41 @@
             showNotice(Api.errorMessage(error), 'error');
         } finally {
             $('read-all-btn').disabled = false;
+        }
+    });
+
+    // ---------- Payment details (bank account or UPI) ----------
+
+    $('payout-btn').addEventListener('click', () => {
+        if (!profile) return;
+        if (!$('payout').children.length) Payout.render($('payout'));
+        Payout.fill(profile);
+        $('payout-form').classList.remove('hidden');
+        $('payout-btn').classList.add('hidden');
+        $('payout-form').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+
+    function closePayoutForm() {
+        $('payout-form').classList.add('hidden');
+        $('payout-btn').classList.remove('hidden');
+    }
+
+    $('payout-cancel').addEventListener('click', closePayoutForm);
+
+    $('payout-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        const payout = Payout.read();
+        if (!payout) return;
+        $('payout-save').disabled = true;
+        try {
+            profile = await Api.put('/api/farmers/me/payout', payout);
+            closePayoutForm();
+            renderProfile();
+            showNotice(I18N.t('dashboard.payout.saved'));
+        } catch (error) {
+            showNotice(Api.errorMessage(error), 'error');
+        } finally {
+            $('payout-save').disabled = false;
         }
     });
 
