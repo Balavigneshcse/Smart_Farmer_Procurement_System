@@ -2,7 +2,7 @@
  * Translations for farmer-facing pages (English, Tamil, Hindi).
  *
  * In HTML:  <h1 data-i18n="landing.hero.title">English fallback</h1>
- *           <input data-i18n-placeholder="login.mobile.placeholder">
+ *           <input data-i18n-placeholder="login.mobile.placeholder">   <img data-i18n-alt="landing.photo.hero">
  * In JS:    I18N.t('centres.counters', { n: 3 })
  *
  * The chosen language is remembered in the browser. After a farmer logs in,
@@ -46,6 +46,9 @@ const I18N = (() => {
         });
         root.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
             el.placeholder = t(el.dataset.i18nPlaceholder);
+        });
+        root.querySelectorAll('[data-i18n-alt]').forEach(el => {
+            el.alt = t(el.dataset.i18nAlt);
         });
         document.documentElement.lang = lang;
         document.querySelectorAll('.lang-switch [data-lang]').forEach(btn => {

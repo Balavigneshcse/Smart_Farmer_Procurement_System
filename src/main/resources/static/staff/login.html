@@ -3,31 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Staff login · Smart Farmer Procurement System</title>
+    <title>Staff login | Smart Farmer Procurement System</title>
+    <meta name="theme-color" content="#1d6a40">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="preload" href="/fonts/anek-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <script src="/js/theme.js"></script>
     <link rel="stylesheet" href="/css/app.css">
 </head>
-<body class="field-bg">
+<body class="staff">
 
 <header class="site-header">
     <div class="container header-row">
         <a class="brand" href="/">
-            <span class="brand-mark">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 21V11"/>
-                    <path d="M12 11C12 7 9 4 4 4c0 4 3 7 8 7z"/>
-                    <path d="M12 14c0-4 3-7 8-7 0 4-3 7-8 7z"/>
-                </svg>
-            </span>
-            <span class="brand-text">Smart Farmer Procurement System</span>
+            <span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#grains"></use></svg></span>
+            <span class="brand-text">Smart Farmer <small>Staff login</small></span>
         </a>
+        <div class="header-tools"><button type="button" class="theme-toggle" aria-label="Switch to dark theme"><svg class="icon icon-moon" aria-hidden="true"><use href="/img/icons.svg#moon"></use></svg><svg class="icon icon-sun" aria-hidden="true"><use href="/img/icons.svg#sun"></use></svg></button></div>
     </div>
 </header>
 
-<main class="container auth-wrap">
+<main id="main" class="container auth-layout">
+    <div class="auth-panel">
     <form id="login-form" class="card auth-card" novalidate>
+        <span class="auth-icon"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#identification-card"></use></svg></span>
         <h1 class="auth-title">Staff login</h1>
-        <p class="muted">For procurement centre operators and administrators.</p>
+        <p class="muted">For super admins, centre admins and counter staff. You are taken to your own screen after logging in.</p>
 
         <div id="alert" class="alert hidden" role="alert"></div>
 
@@ -49,8 +49,13 @@
         <button class="btn btn-primary btn-lg btn-block" type="submit" id="login-btn">Log in</button>
     </form>
     <p class="auth-footer small muted">Farmer? <a href="/farmer/login.html">Log in with your email</a></p>
+    </div>
+    <figure class="auth-photo">
+        <img src="/img/photos/paddy-gold.webp" width="720" height="900" loading="lazy" decoding="async" alt="Ripe golden paddy in a field">
+    </figure>
 </main>
 
+<script src="/js/ui.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
 <script>

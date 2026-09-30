@@ -1,6 +1,6 @@
 /*
  * Shared helpers for logged-in farmer pages (dashboard, book, booking).
- * Load after i18n.js, auth.js and api.js.
+ * Load after ui.js, i18n.js, auth.js and api.js.
  */
 const Farmer = (() => {
     const ACTIVE_STATUSES = ['BOOKED', 'CHECKED_IN', 'CALLED'];
@@ -8,6 +8,11 @@ const Farmer = (() => {
         BOOKED: 'badge-blue', CHECKED_IN: 'badge-amber', CALLED: 'badge-amber',
         COMPLETED: '', REJECTED: 'badge-red', CANCELLED: 'badge-grey', NO_SHOW: 'badge-grey',
     };
+    const STATUS_ICON = {
+        BOOKED: 'calendar-check', CHECKED_IN: 'map-pin', CALLED: 'bell-ringing',
+        COMPLETED: 'check-circle', REJECTED: 'x-circle', CANCELLED: 'x', NO_SHOW: 'warning-circle',
+    };
+    const PAYMENT_ICON = { PAID: 'hand-coins', PENDING: 'hourglass', FAILED: 'warning-circle' };
 
     /**
      * Checks the farmer is logged in, shows the page in their language and wires
@@ -51,12 +56,12 @@ const Farmer = (() => {
     }
 
     function statusBadge(status) {
-        return `<span class="badge ${STATUS_BADGE[status] ?? ''}">${esc(I18N.t(`status.${status}`))}</span>`;
+        return `<span class="badge ${STATUS_BADGE[status] ?? ''}">${UI.icon(STATUS_ICON[status] ?? 'info')}${esc(I18N.t(`status.${status}`))}</span>`;
     }
 
-    /** "08:00:00", "08:30:00" -> "8:00 am – 8:30 am" */
+    /** "08:00:00", "08:30:00" -> "8:00 am to 8:30 am" (worded per language) */
     function slotTime(start, end) {
-        return `${I18N.formatTime(start)} – ${I18N.formatTime(end)}`;
+        return I18N.t('common.timeRange', { start: I18N.formatTime(start), end: I18N.formatTime(end) });
     }
 
     function isoDate(date) {
@@ -97,10 +102,11 @@ const Farmer = (() => {
         return isoDate(new Date());
     }
 
-    /** "Paid ₹58,040" (green) or "Payment pending ₹58,040" (amber). */
+    /** "Paid · ₹58,040" (green) or "Payment pending · ₹58,040" (amber). */
     function paymentBadge(payment) {
         const style = payment.status === 'PAID' ? '' : payment.status === 'FAILED' ? 'badge-red' : 'badge-amber';
-        return `<span class="badge ${style}">${esc(I18N.t(`payment.${payment.status}`))} · ${esc(I18N.formatMoney(payment.amount))}</span>`;
+        return `<span class="badge ${style}">${UI.icon(PAYMENT_ICON[payment.status] ?? 'info')}`
+            + `${esc(I18N.t(`payment.${payment.status}`))} · ${esc(I18N.formatMoney(payment.amount))}</span>`;
     }
 
     return {

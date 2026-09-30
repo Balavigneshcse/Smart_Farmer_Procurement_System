@@ -3,37 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Centres &amp; crops · Smart Farmer Procurement System</title>
+    <title>Centres &amp; crops | Smart Farmer Procurement System</title>
+    <meta name="theme-color" content="#1d6a40">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="preload" href="/fonts/anek-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <script src="/js/theme.js"></script>
     <link rel="stylesheet" href="/css/app.css">
 </head>
-<body class="field-bg">
+<body class="staff">
 
 <header class="site-header">
     <div class="container header-row">
         <a class="brand" href="/admin/dashboard.html">
-            <span class="brand-mark">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 21V11"/>
-                    <path d="M12 11C12 7 9 4 4 4c0 4 3 7 8 7z"/>
-                    <path d="M12 14c0-4 3-7 8-7 0 4-3 7-8 7z"/>
-                </svg>
-            </span>
-            <span class="brand-text">Admin</span>
+            <span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#grains"></use></svg></span>
+            <span class="brand-text">Smart Farmer <small>Admin</small></span>
         </a>
         <nav class="header-nav" aria-label="Admin">
-            <a href="/admin/dashboard.html">Dashboard</a>
-            <a href="/admin/payments.html">Payments</a>
-            <a href="/admin/settings.html" aria-current="page">Centres &amp; crops</a>
+            <a href="/admin/dashboard.html"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#chart-bar"></use></svg>Dashboard</a>
+            <a href="/admin/payments.html"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#credit-card"></use></svg>Payments</a>
+            <a href="/admin/settings.html" aria-current="page"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#gear"></use></svg>Centres &amp; crops</a>
         </nav>
         <div class="header-actions">
-            <span class="user-chip" id="user-name"></span>
-            <button type="button" class="btn btn-outline btn-sm" id="logout-btn">Log out</button>
+            <span class="user-chip"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#user"></use></svg><span id="user-name"></span></span>
+            <button type="button" class="theme-toggle" aria-label="Switch to dark theme"><svg class="icon icon-moon" aria-hidden="true"><use href="/img/icons.svg#moon"></use></svg><svg class="icon icon-sun" aria-hidden="true"><use href="/img/icons.svg#sun"></use></svg></button>
+            <button type="button" class="btn btn-quiet btn-sm" id="logout-btn"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#sign-out"></use></svg><span class="btn-label-wide">Log out</span></button>
         </div>
     </div>
 </header>
 
-<main class="container">
+<main id="main" class="container">
     <div class="page-head">
         <h1>Centres &amp; crops</h1>
         <p class="muted">Rates, moisture limits, counters and opening hours. Changes apply straight away.</p>
@@ -74,12 +72,12 @@
                     <input id="c-moisture" type="number" min="1" max="40" step="0.1" inputmode="decimal" required>
                     <span class="hint">Crop above this is rejected at the counter.</span>
                 </div>
-                <div class="field" style="justify-content: center">
+                <div class="field switch-field">
                     <label class="switch"><input type="checkbox" id="c-active" checked> Farmers can book it</label>
                 </div>
             </div>
             <p class="small muted">A new rate is used for weighments from now on. Weighments already saved keep their rate.</p>
-            <div class="actions" style="margin-top: 0">
+            <div class="card-actions">
                 <button type="submit" class="btn btn-primary" id="crop-save-btn">Save crop</button>
                 <button type="button" class="btn btn-outline" id="crop-cancel-btn">Cancel</button>
             </div>
@@ -95,13 +93,14 @@
 
     <!-- Centres -->
     <section class="dash-section" aria-labelledby="centres-title">
-        <h2 class="section-title" id="centres-title">Procurement centres</h2>
+        <h2 id="centres-title">Procurement centres</h2>
         <p class="muted small">Farmers per slot = counters × slot minutes ÷ minutes per farmer. Farmers who already
             booked always keep their place; new or changed hours create or remove empty slots automatically.</p>
         <div class="grid grid-2" id="centres"><p class="muted">Loading…</p></div>
     </section>
 </main>
 
+<script src="/js/ui.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/admin.js"></script>
@@ -118,7 +117,7 @@
         $('crop-rows').innerHTML = crops.map(c => `
             <tr>
                 <td><span class="crop-name">${esc(c.nameEn)}</span>
-                    <span class="small muted">${esc(c.nameTa)} · ${esc(c.nameHi)}</span></td>
+                    <span class="crop-names"><span lang="ta">${esc(c.nameTa)}</span>, <span lang="hi">${esc(c.nameHi)}</span></span></td>
                 <td class="num"><strong>${esc(money(c.ratePerQtl))}</strong></td>
                 <td class="num">${esc(c.maxMoisturePct)}%</td>
                 <td>${c.active ? '<span class="badge">Bookable</span>' : '<span class="badge badge-grey">Switched off</span>'}</td>
@@ -232,7 +231,7 @@
         const perSlot = service ? Math.floor(counters * centre.slotMinutes / service) : 0;
         form.querySelector('[data-capacity]').innerHTML = perSlot > 0
             ? `<strong>${perSlot} farmers</strong> per ${centre.slotMinutes}-minute slot`
-            : '<strong>0 farmers</strong> per slot – add counters or lower the minutes per farmer';
+            : '<strong>0 farmers</strong> per slot. Add counters or lower the minutes per farmer.';
     }
 
     function renderCentres() {
@@ -264,7 +263,7 @@
         try {
             const saved = await Api.put(`/api/admin/centres/${id}`, body);
             centres = centres.map(c => c.id === id ? saved : c);
-            Admin.notice(`${saved.name} saved: ${saved.counters} counters, ${Admin.time(saved.openTime)} – ${Admin.time(saved.closeTime)}, `
+            Admin.notice(`${saved.name} saved: ${saved.counters} counters, ${Admin.time(saved.openTime)} to ${Admin.time(saved.closeTime)}, `
                 + `${saved.slotCapacity} farmers per slot. Slots were updated.`);
         } catch (error) {
             const fields = Object.values(error.fieldErrors || {});

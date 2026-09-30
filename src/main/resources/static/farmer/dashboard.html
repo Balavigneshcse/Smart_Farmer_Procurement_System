@@ -3,23 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>My dashboard · Smart Farmer Procurement System</title>
+    <title>My dashboard | Smart Farmer Procurement System</title>
+    <meta name="theme-color" content="#1d6a40">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="preload" href="/fonts/anek-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <script src="/js/theme.js"></script>
     <link rel="stylesheet" href="/css/app.css">
 </head>
-<body class="field-bg">
+<body>
 
 <header class="site-header">
     <div class="container header-row">
         <a class="brand" href="/farmer/dashboard.html">
-            <span class="brand-mark">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 21V11"/>
-                    <path d="M12 11C12 7 9 4 4 4c0 4 3 7 8 7z"/>
-                    <path d="M12 14c0-4 3-7 8-7 0 4-3 7-8 7z"/>
-                </svg>
-            </span>
-            <span class="brand-text">Smart Farmer Procurement System</span>
+            <span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#grains"></use></svg></span>
+            <span class="brand-text">Smart Farmer <small>Procurement System</small></span>
         </a>
         <div class="header-actions">
             <div class="lang-switch" role="group" aria-label="Language">
@@ -27,29 +24,30 @@
                 <button type="button" data-lang="ta" aria-pressed="false">தமிழ்</button>
                 <button type="button" data-lang="hi" aria-pressed="false">हिन्दी</button>
             </div>
-            <button type="button" class="btn btn-outline btn-sm" id="logout-btn" data-i18n="common.logout">Log out</button>
+            <button type="button" class="theme-toggle" aria-label="Switch to dark theme"><svg class="icon icon-moon" aria-hidden="true"><use href="/img/icons.svg#moon"></use></svg><svg class="icon icon-sun" aria-hidden="true"><use href="/img/icons.svg#sun"></use></svg></button>
+            <button type="button" class="btn btn-quiet btn-sm" id="logout-btn"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#sign-out"></use></svg><span class="btn-label-wide" data-i18n="common.logout">Log out</span></button>
         </div>
     </div>
 </header>
 
-<main class="container">
+<main id="main" class="container">
     <div class="page-head head-row">
         <div>
             <h1 id="welcome"></h1>
             <p class="muted" data-i18n="dashboard.subtitle">Book slots and track your crop and payment here.</p>
         </div>
-        <a class="btn btn-primary btn-lg" href="/farmer/book.html" data-i18n="dashboard.bookSlot">Book a slot</a>
+        <a class="btn btn-primary btn-lg" href="/farmer/book.html"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#calendar-check"></use></svg><span data-i18n="dashboard.bookSlot">Book a slot</span></a>
     </div>
 
     <div id="notice" class="alert hidden" role="status"></div>
 
     <section class="dash-section" aria-labelledby="bookings-title">
         <h2 id="bookings-title" data-i18n="dashboard.bookings.title">My bookings</h2>
-        <div id="bookings"><p class="muted" data-i18n="common.loading">Loading…</p></div>
+        <div id="bookings" aria-busy="true"><span class="skeleton skeleton-block"></span><span class="sr-only" data-i18n="common.loading">Loading…</span></div>
     </section>
 
     <section class="card dash-section" aria-labelledby="notif-title">
-        <div class="head-row notif-head">
+        <div class="notif-head">
             <h2 id="notif-title">
                 <span data-i18n="notifications.title">Notifications</span>
                 <span class="badge badge-amber hidden" id="unread-count"></span>
@@ -65,21 +63,22 @@
         <h2 id="profile-title" data-i18n="dashboard.profile.title">My details</h2>
         <dl class="details">
             <dt data-i18n="dashboard.profile.email">Email</dt>
-            <dd id="p-email">–</dd>
+            <dd id="p-email"><span class="skeleton skeleton-line"></span></dd>
             <dt data-i18n="dashboard.profile.mobile">Mobile</dt>
-            <dd id="p-mobile">–</dd>
+            <dd id="p-mobile"></dd>
             <dt data-i18n="dashboard.profile.address">Address</dt>
-            <dd id="p-address">–</dd>
+            <dd id="p-address"></dd>
             <dt data-i18n="dashboard.profile.district">District</dt>
-            <dd id="p-district">–</dd>
+            <dd id="p-district"></dd>
             <dt data-i18n="dashboard.profile.aadhaar">Aadhaar</dt>
-            <dd id="p-aadhaar">–</dd>
+            <dd id="p-aadhaar"></dd>
             <dt data-i18n="dashboard.profile.language">Language</dt>
-            <dd id="p-language">–</dd>
+            <dd id="p-language"></dd>
         </dl>
     </section>
 </main>
 
+<script src="/js/ui.js"></script>
 <script src="/js/i18n.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
@@ -115,29 +114,32 @@
         $('p-language').textContent = LANGUAGE_NAMES[profile.language];
     }
 
-    function bookingItem(b) {
+    function bookingItem(b, featured = false) {
         return `
-            <a class="card booking-item" href="/farmer/booking.html?id=${b.id}">
-                <div>
+            <a class="card booking-item${featured ? ' featured' : ''}" href="/farmer/booking.html?id=${b.id}">
+                <div class="booking-token">
                     <div class="token-sm">${esc(b.token)}</div>
                     ${Farmer.statusBadge(b.status)}
-                    ${b.payment ? `<div style="margin-top: 4px">${Farmer.paymentBadge(b.payment)}</div>` : ''}
+                    ${b.payment ? Farmer.paymentBadge(b.payment) : ''}
                 </div>
-                <div>
-                    <strong>${esc(Farmer.dayLabel(b.date))} · ${esc(Farmer.slotTime(b.startTime, b.endTime))}</strong><br>
-                    <span class="muted small">${esc(b.centre.name)} · ${esc(Farmer.cropName(b.crop))} · ${esc(Farmer.quantity(b.estQtyQtl))}</span>
+                <div class="booking-info">
+                    <strong>${esc(Farmer.dayLabel(b.date))}</strong>
+                    <span>${esc(Farmer.slotTime(b.startTime, b.endTime))}</span>
+                    <span class="muted">${esc(b.centre.name)}</span>
+                    <span class="muted">${esc(Farmer.cropName(b.crop))}, ${esc(Farmer.quantity(b.estQtyQtl))}</span>
                 </div>
-                <span class="booking-item-go" aria-hidden="true">›</span>
+                <span class="booking-item-go">${UI.icon('caret-right')}</span>
             </a>`;
     }
 
     function renderBookings() {
         if (!bookings) return;
+        $('bookings').removeAttribute('aria-busy');
         if (!bookings.length) {
             $('bookings').innerHTML = `
-                <div class="card">
+                <div class="empty">
+                    <span class="empty-icon">${UI.icon('tractor')}</span>
                     <p>${esc(I18N.t('dashboard.bookings.empty'))}</p>
-                    <a class="btn btn-primary" href="/farmer/book.html">${esc(I18N.t('dashboard.bookSlot'))}</a>
                 </div>`;
             return;
         }
@@ -147,22 +149,22 @@
         const earlier = bookings.filter(b => !Farmer.isActive(b.status));
 
         $('bookings').innerHTML = `
-            <div class="booking-list">${current.map(bookingItem).join('')}</div>
+            <div class="booking-list">${current.map((b, i) => bookingItem(b, i === 0)).join('')}</div>
             ${earlier.length ? `
                 <h3 class="list-heading">${esc(I18N.t('dashboard.bookings.past'))}</h3>
-                <div class="booking-list">${earlier.map(bookingItem).join('')}</div>` : ''}`;
+                <div class="booking-list">${earlier.map(b => bookingItem(b)).join('')}</div>` : ''}`;
     }
 
     // Subject and message are saved in the farmer's language when the notification is created.
     function notificationItem(n) {
         const href = n.bookingId ? `/farmer/booking.html?id=${n.bookingId}` : '/farmer/dashboard.html';
-        const emailed = n.emailed ? ` · ✉ ${esc(I18N.t('notifications.emailed'))}` : '';
+        const emailed = n.emailed ? `<span>${UI.icon('envelope-simple')}${esc(I18N.t('notifications.emailed'))}</span>` : '';
         return `
             <li class="notif-item${n.read ? '' : ' unread'}">
                 <a href="${href}">
                     <strong>${esc(n.subject)}</strong>
                     <span>${esc(n.message)}</span>
-                    <span class="notif-meta">${esc(I18N.formatDateTime(n.createdAt))}${emailed}</span>
+                    <span class="notif-meta"><span>${esc(I18N.formatDateTime(n.createdAt))}</span>${emailed}</span>
                 </a>
             </li>`;
     }

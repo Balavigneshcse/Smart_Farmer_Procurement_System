@@ -3,51 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Operator desk · Smart Farmer Procurement System</title>
+    <title>Operator desk | Smart Farmer Procurement System</title>
+    <meta name="theme-color" content="#1d6a40">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="preload" href="/fonts/anek-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <script src="/js/theme.js"></script>
     <link rel="stylesheet" href="/css/app.css">
 </head>
-<body class="field-bg">
+<body class="staff">
 
 <header class="site-header">
     <div class="container header-row">
         <a class="brand" href="/operator/desk.html">
-            <span class="brand-mark">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 21V11"/>
-                    <path d="M12 11C12 7 9 4 4 4c0 4 3 7 8 7z"/>
-                    <path d="M12 14c0-4 3-7 8-7 0 4-3 7-8 7z"/>
-                </svg>
-            </span>
-            <span class="brand-text">Operator desk</span>
+            <span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#grains"></use></svg></span>
+            <span class="brand-text">Smart Farmer <small>Operator desk</small></span>
         </a>
         <div class="header-actions">
-            <span class="user-chip" id="user-name"></span>
-            <button type="button" class="btn btn-outline btn-sm" id="logout-btn">Log out</button>
+            <span class="user-chip"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#user"></use></svg><span id="user-name"></span></span>
+            <button type="button" class="theme-toggle" aria-label="Switch to dark theme"><svg class="icon icon-moon" aria-hidden="true"><use href="/img/icons.svg#moon"></use></svg><svg class="icon icon-sun" aria-hidden="true"><use href="/img/icons.svg#sun"></use></svg></button>
+            <button type="button" class="btn btn-quiet btn-sm" id="logout-btn"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#sign-out"></use></svg><span class="btn-label-wide">Log out</span></button>
         </div>
     </div>
 </header>
 
-<main class="container">
+<main id="main" class="container">
     <div class="page-head head-row compact">
         <div>
-            <span class="eyebrow" id="centre-name">Loading…</span>
             <h1>Operator desk</h1>
+            <p class="muted"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#map-pin"></use></svg> <span id="centre-name">Loading…</span></p>
         </div>
         <div class="header-actions">
             <span class="live-status offline" id="live-status"><span class="live-dot"></span><span id="live-text">Connecting…</span></span>
-            <a class="btn btn-outline btn-sm" id="tv-link" href="/display.html" target="_blank" rel="noopener">Open TV display</a>
+            <a class="btn btn-outline btn-sm" id="tv-link" href="/display.html" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#television"></use></svg>Open TV display</a>
         </div>
     </div>
 
     <div id="notice" class="alert hidden" role="status"></div>
 
-    <div class="stat-row">
-        <div class="stat-tile"><div class="stat-label">Expected today</div><div class="stat-value" id="s-expected">–</div></div>
-        <div class="stat-tile"><div class="stat-label">Waiting</div><div class="stat-value" id="s-waiting">–</div></div>
-        <div class="stat-tile"><div class="stat-label">At counters</div><div class="stat-value" id="s-counters">–</div></div>
-        <div class="stat-tile"><div class="stat-label">Served today</div><div class="stat-value" id="s-served">–</div></div>
-        <div class="stat-tile"><div class="stat-label">Average wait</div><div class="stat-value" id="s-wait">–</div></div>
+    <div class="desk-stats">
+        <div class="stat-tile"><div class="stat-label">Expected today</div><div class="stat-value" id="s-expected">0</div></div>
+        <div class="stat-tile"><div class="stat-label">Waiting</div><div class="stat-value" id="s-waiting">0</div></div>
+        <div class="stat-tile"><div class="stat-label">At counters</div><div class="stat-value" id="s-counters">0</div></div>
+        <div class="stat-tile"><div class="stat-label">Served today</div><div class="stat-value" id="s-served">0</div></div>
+        <div class="stat-tile"><div class="stat-label">Average wait</div><div class="stat-value" id="s-wait">0 min</div></div>
     </div>
 
     <div class="desk-grid">
@@ -57,22 +55,22 @@
                 <form id="checkin-form" class="checkin-row" novalidate>
                     <input id="code" aria-label="Token or QR code" autocomplete="off" autocapitalize="characters" spellcheck="false"
                            placeholder="Token (e.g. TNJ-005) or scan QR">
-                    <button class="btn btn-primary" type="submit" id="checkin-btn">Check in</button>
+                    <button class="btn btn-primary" type="submit" id="checkin-btn"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#check"></use></svg>Check in</button>
                 </form>
-                <p class="hint small muted" style="margin: 8px 0 0">A USB QR scanner can type straight into this box.</p>
-                <button type="button" class="btn btn-outline btn-sm hidden" id="scan-btn" style="margin-top: 12px">Scan QR with camera</button>
+                <p class="small muted checkin-hint">A USB QR scanner can type straight into this box.</p>
+                <button type="button" class="btn btn-outline btn-sm hidden" id="scan-btn">Scan QR with camera</button>
                 <div id="reader" class="scan-area hidden"></div>
                 <div id="checkin-result" class="checkin-result"></div>
             </section>
 
             <section aria-labelledby="counters-title">
-                <h2 id="counters-title">Counters</h2>
+                <h2 id="counters-title" class="section-heading">Counters</h2>
                 <div id="counters" class="counter-grid"></div>
             </section>
 
             <!-- Weighment form: opened from a counter with "Record weighment" -->
             <section class="card hidden" id="weigh-panel" aria-labelledby="weigh-title">
-                <h2 id="weigh-title">Weighment · <span id="w-token"></span></h2>
+                <h2 id="weigh-title">Weighment for <span id="w-token" class="mono"></span></h2>
                 <p class="muted" id="w-info"></p>
                 <form id="weigh-form" novalidate>
                     <div class="form-row">
@@ -145,6 +143,7 @@
     </div>
 </main>
 
+<script src="/js/ui.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/live.js"></script>
@@ -171,7 +170,7 @@
 
     /** "2026-09-24T09:05:12" -> "9:05 am" */
     function clock(iso) {
-        return iso ? new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }) : '–';
+        return iso ? new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }) : '';
     }
 
     function qty(n) {
@@ -196,7 +195,7 @@
         $('s-waiting').textContent = stats.waiting;
         $('s-counters').textContent = `${stats.atCounters}/${centre.counters}`;
         $('s-served').textContent = stats.served;
-        $('s-wait').textContent = stats.avgWaitMinutes == null ? '–' : `${stats.avgWaitMinutes} min`;
+        $('s-wait').textContent = stats.avgWaitMinutes == null ? 'No data' : `${stats.avgWaitMinutes} min`;
         renderCounters();
         renderWaiting();
         renderExpected();
@@ -208,21 +207,28 @@
         const anyoneWaiting = queue.waiting.length > 0;
         $('counters').innerHTML = queue.counters.map(({ counterNo, booking: b }) => b ? `
             <div class="card counter-card busy">
-                <div class="counter-no">Counter ${counterNo}</div>
+                <div class="counter-head">
+                    <span class="counter-no">Counter ${counterNo}</span>
+                    <span class="badge badge-amber">${UI.icon('bell-ringing')}Serving</span>
+                </div>
                 <div class="token-sm">${esc(b.token)}</div>
-                <div><strong>${esc(b.farmerName)}</strong> · Aadhaar ••••${esc(b.aadhaarLast4 ?? '')}</div>
-                <div class="muted small">${esc(b.cropName)} · ${esc(qty(b.estQtyQtl))} · called ${esc(clock(b.calledAt))}</div>
+                <div><strong>${esc(b.farmerName)}</strong></div>
+                <div class="small">Aadhaar ends ${esc(b.aadhaarLast4 ?? '')}</div>
+                <div class="muted small">${esc(b.cropName)}, ${esc(qty(b.estQtyQtl))}</div>
+                <div class="muted small">Called ${esc(clock(b.calledAt))}</div>
                 <div class="counter-actions">
-                    <button type="button" class="btn btn-primary btn-sm" data-weigh="${b.id}">Record weighment</button>
+                    <button type="button" class="btn btn-primary btn-sm" data-weigh="${b.id}">${UI.icon('scales')}Record weighment</button>
                     <button type="button" class="btn btn-outline btn-sm" data-recall="${b.id}">Call again</button>
                     <button type="button" class="btn btn-danger btn-sm" data-skip="${b.id}" data-token="${esc(b.token)}">Not present</button>
                 </div>
             </div>` : `
             <div class="card counter-card free">
-                <div class="counter-no">Counter ${counterNo}</div>
-                <p class="muted" style="margin: 4px 0 12px">Free</p>
+                <div class="counter-head">
+                    <span class="counter-no">Counter ${counterNo}</span>
+                    <span class="badge badge-grey">Free</span>
+                </div>
                 <button type="button" class="btn btn-primary btn-block" data-call="${counterNo}" ${anyoneWaiting ? '' : 'disabled'}>
-                    Call next
+                    ${UI.icon('megaphone')}Call next
                 </button>
             </div>`).join('');
     }
@@ -232,9 +238,9 @@
         $('waiting').innerHTML = queue.waiting.length ? queue.waiting.map(b => `
             <tr>
                 <td>${b.position}</td>
-                <td><strong>${esc(b.token)}</strong></td>
+                <td><strong class="mono">${esc(b.token)}</strong></td>
                 <td>${esc(b.farmerName)}${b.late ? ' <span class="badge badge-red">Late</span>' : ''}</td>
-                <td>${esc(b.cropName)} · ${esc(qty(b.estQtyQtl))}</td>
+                <td>${esc(b.cropName)}, ${esc(qty(b.estQtyQtl))}</td>
                 <td>${esc(slotTime(b.slotStart))}</td>
                 <td>${esc(clock(b.checkedInAt))}</td>
                 <td class="num">${b.etaMinutes === 0 ? 'Now' : `${b.etaMinutes} min`}</td>
@@ -249,10 +255,10 @@
         $('expected-count').textContent = queue.expected.length;
         $('expected').innerHTML = rows.length ? rows.map(b => `
             <tr>
-                <td><strong>${esc(b.token)}</strong></td>
+                <td><strong class="mono">${esc(b.token)}</strong></td>
                 <td>${esc(b.farmerName)}</td>
-                <td>${esc(slotTime(b.slotStart))} – ${esc(slotTime(b.slotEnd))}</td>
-                <td>${esc(b.cropName)} · ${esc(qty(b.estQtyQtl))}</td>
+                <td>${esc(slotTime(b.slotStart))} to ${esc(slotTime(b.slotEnd))}</td>
+                <td>${esc(b.cropName)}, ${esc(qty(b.estQtyQtl))}</td>
                 <td class="num"><button type="button" class="btn btn-outline btn-sm" data-checkin="${esc(b.token)}">Check in</button></td>
             </tr>`).join('')
             : `<tr class="empty-row"><td colspan="5">${filter ? 'No match.' : 'No more farmers expected today.'}</td></tr>`;
@@ -261,11 +267,12 @@
     function showCheckInResult(result) {
         const b = result.booking;
         $('checkin-result').innerHTML = `
-            <div class="alert alert-success">
-                <strong>✓ ${esc(b.token)} checked in${b.late ? ' <span class="badge badge-red">Late</span>' : ''}</strong><br>
-                ${esc(b.farmerName)} · Aadhaar ••••${esc(b.aadhaarLast4 ?? '')} · +91 ${esc(b.mobile ?? '')}<br>
-                ${esc(b.cropName)} · ${esc(qty(b.estQtyQtl))} · slot ${esc(slotTime(b.slotStart))}<br>
-                Position <strong>${b.position}</strong> in the line · ETA ${b.etaMinutes === 0 ? 'now' : `${b.etaMinutes} min`}
+            <div class="alert alert-success checkin-lines">
+                <strong><span class="mono">${esc(b.token)}</span> checked in${b.late ? ' <span class="badge badge-red">Late</span>' : ''}</strong>
+                <span>${esc(b.farmerName)}, Aadhaar ends <strong>${esc(b.aadhaarLast4 ?? '')}</strong></span>
+                <span>+91 ${esc(b.mobile ?? '')}</span>
+                <span>${esc(b.cropName)}, ${esc(qty(b.estQtyQtl))}, slot ${esc(slotTime(b.slotStart))}</span>
+                <span>Position <strong>${b.position}</strong> in the line, ETA ${b.etaMinutes === 0 ? 'now' : `${b.etaMinutes} min`}</span>
             </div>`;
     }
 
@@ -327,9 +334,12 @@
         } else if (button.dataset.recall) {
             await act(`/api/operator/bookings/${button.dataset.recall}/recall`);
         } else if (button.dataset.skip) {
-            if (confirm(`${button.dataset.token} did not come to the counter? They will go to the back of the line.`)) {
-                await act(`/api/operator/bookings/${button.dataset.skip}/skip`);
-            }
+            const sure = await UI.confirm({
+                title: `${button.dataset.token} not present?`,
+                message: 'The farmer did not come to the counter. They will go to the back of the line.',
+                confirmText: 'Move to back of line', cancelText: 'Keep at counter', danger: true,
+            });
+            if (sure) await act(`/api/operator/bookings/${button.dataset.skip}/skip`);
         }
         button.disabled = false;
     });
@@ -344,8 +354,8 @@
         weighing = queue.counters.map(c => c.booking).find(b => b && b.id === bookingId);
         if (!weighing) return;
         $('w-token').textContent = weighing.token;
-        $('w-info').textContent = `${weighing.farmerName} · ${weighing.cropName} · booked ${qty(weighing.estQtyQtl)} · `
-            + `rate ${money(weighing.cropRatePerQtl)}/qtl`;
+        $('w-info').textContent = `${weighing.farmerName}, ${weighing.cropName}, booked ${qty(weighing.estQtyQtl)}. `
+            + `Rate ${money(weighing.cropRatePerQtl)} per quintal.`;
         $('w-limit').textContent = `Limit for ${weighing.cropName}: ${weighing.cropMaxMoisturePct}%`;
         $('weigh-form').reset();
         $('w-error').textContent = '';
@@ -369,13 +379,13 @@
         accept.disabled = tooWet;
         if (tooWet) document.querySelector('input[name="decision"][value="reject"]').checked = true;
         $('w-moisture-warning').textContent = tooWet
-            ? `Moisture ${moisture}% is above the ${weighing.cropMaxMoisturePct}% limit – the crop must be rejected.` : '';
+            ? `Moisture ${moisture}% is above the ${weighing.cropMaxMoisturePct}% limit. The crop must be rejected.` : '';
 
         const weight = parseFloat($('w-weight').value);
         const accepted = document.querySelector('input[name="decision"]:checked').value === 'accept';
         $('w-amount').textContent = !(weight > 0) ? 'Enter the weight to see the amount.'
             : accepted ? `Amount to pay: ${money(Math.round(weight * weighing.cropRatePerQtl * 100) / 100)}`
-            : 'Rejected – no payment.';
+            : 'Rejected. No payment.';
     }
 
     $('weigh-form').addEventListener('input', updateWeighment);

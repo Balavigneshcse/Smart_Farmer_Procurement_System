@@ -3,23 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Book a slot · Smart Farmer Procurement System</title>
+    <title>Book a slot | Smart Farmer Procurement System</title>
+    <meta name="theme-color" content="#1d6a40">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="preload" href="/fonts/anek-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <script src="/js/theme.js"></script>
     <link rel="stylesheet" href="/css/app.css">
 </head>
-<body class="field-bg">
+<body>
 
 <header class="site-header">
     <div class="container header-row">
         <a class="brand" href="/farmer/dashboard.html">
-            <span class="brand-mark">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 21V11"/>
-                    <path d="M12 11C12 7 9 4 4 4c0 4 3 7 8 7z"/>
-                    <path d="M12 14c0-4 3-7 8-7 0 4-3 7-8 7z"/>
-                </svg>
-            </span>
-            <span class="brand-text">Smart Farmer Procurement System</span>
+            <span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#grains"></use></svg></span>
+            <span class="brand-text">Smart Farmer <small>Procurement System</small></span>
         </a>
         <div class="header-actions">
             <div class="lang-switch" role="group" aria-label="Language">
@@ -27,13 +24,14 @@
                 <button type="button" data-lang="ta" aria-pressed="false">தமிழ்</button>
                 <button type="button" data-lang="hi" aria-pressed="false">हिन्दी</button>
             </div>
-            <button type="button" class="btn btn-outline btn-sm" id="logout-btn" data-i18n="common.logout">Log out</button>
+            <button type="button" class="theme-toggle" aria-label="Switch to dark theme"><svg class="icon icon-moon" aria-hidden="true"><use href="/img/icons.svg#moon"></use></svg><svg class="icon icon-sun" aria-hidden="true"><use href="/img/icons.svg#sun"></use></svg></button>
+            <button type="button" class="btn btn-quiet btn-sm" id="logout-btn"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#sign-out"></use></svg><span class="btn-label-wide" data-i18n="common.logout">Log out</span></button>
         </div>
     </div>
 </header>
 
-<main class="container">
-    <a class="back-link" href="/farmer/dashboard.html">← <span data-i18n="booking.back">My bookings</span></a>
+<main id="main" class="container">
+    <a class="back-link" href="/farmer/dashboard.html"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#arrow-left"></use></svg><span data-i18n="booking.back">My bookings</span></a>
 
     <div id="booking-steps">
         <div class="page-head">
@@ -41,11 +39,18 @@
             <p class="muted" data-i18n="book.subtitle">Choose a centre, day and time. Less crowded times mean less waiting.</p>
         </div>
 
+        <ol class="stepper" id="stepper" aria-hidden="true">
+            <li data-i18n="book.stepShort.centre">Centre</li>
+            <li data-i18n="book.stepShort.date">Day</li>
+            <li data-i18n="book.stepShort.slot">Time</li>
+            <li data-i18n="book.stepShort.details">Crop</li>
+        </ol>
+
         <div id="alert" class="alert hidden" role="alert"></div>
 
         <section class="step" id="step-centre">
             <h2><span class="step-no">1</span><span data-i18n="book.step.centre">Choose a centre</span></h2>
-            <div id="centres" class="grid grid-3"><p class="muted" data-i18n="common.loading">Loading…</p></div>
+            <div id="centres" class="grid grid-3"><span class="skeleton skeleton-block"></span><span class="skeleton skeleton-block"></span><span class="sr-only" data-i18n="common.loading">Loading…</span></div>
         </section>
 
         <section class="step hidden" id="step-date">
@@ -55,10 +60,10 @@
 
         <section class="step hidden" id="step-slot">
             <h2><span class="step-no">3</span><span data-i18n="book.step.slot">Choose a time</span></h2>
-            <div class="legend" aria-hidden="true">
-                <span><i class="legend-dot" style="background: var(--green-600)"></i><span data-i18n="book.legend.low">Less crowded</span></span>
-                <span><i class="legend-dot" style="background: var(--amber-500)"></i><span data-i18n="book.legend.medium">Filling up</span></span>
-                <span><i class="legend-dot" style="background: var(--red-600)"></i><span data-i18n="book.legend.high">Almost full</span></span>
+            <div class="legend">
+                <span><i class="legend-dot"></i><span data-i18n="book.legend.low">Less crowded</span></span>
+                <span><i class="legend-dot medium"></i><span data-i18n="book.legend.medium">Filling up</span></span>
+                <span><i class="legend-dot high"></i><span data-i18n="book.legend.high">Almost full</span></span>
             </div>
             <div id="slots" class="slot-grid"></div>
         </section>
@@ -76,8 +81,8 @@
 
                 <div class="field">
                     <label for="quantity" data-i18n="book.quantity">Approximate quantity (quintals)</label>
-                    <input id="quantity" type="number" inputmode="decimal" min="0.5" max="500" step="0.5"
-                           aria-describedby="quantity-hint quantity-error" style="max-width: 220px">
+                    <input id="quantity" class="quantity-input" type="number" inputmode="decimal" min="0.5" max="500" step="0.5"
+                           aria-describedby="quantity-hint quantity-error">
                     <span class="hint" id="quantity-hint" data-i18n="book.quantity.hint">1 quintal = 100 kg. The exact weight is measured at the centre.</span>
                     <p class="field-error" id="quantity-error"></p>
                 </div>
@@ -90,23 +95,28 @@
     </div>
 
     <!-- Shown after a successful booking -->
-    <section id="success" class="section hidden">
-        <div class="token-card success-card">
-            <div class="alert alert-success" data-i18n="book.success.title">Your slot is booked!</div>
-            <div class="muted small" data-i18n="booking.token">Token</div>
-            <div class="token" id="s-token"></div>
-            <div class="qr" id="s-qr"></div>
-            <dl class="details" id="s-details"></dl>
-            <p class="small muted" style="margin-top: 16px" data-i18n="book.success.text">Show this token or QR code at the centre. Please come 10 minutes before your time.</p>
-            <div class="grid">
-                <a class="btn btn-primary btn-block" id="s-view" href="#" data-i18n="book.success.view">View booking</a>
-                <a class="btn btn-outline btn-block" href="/farmer/dashboard.html" data-i18n="book.success.home">Go to my bookings</a>
+    <section id="success" class="success-wrap hidden">
+        <h1 class="success-title"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#check-circle"></use></svg><span data-i18n="book.success.title">Your slot is booked.</span></h1>
+        <div class="ticket">
+            <div class="ticket-top">
+                <div class="ticket-label"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#ticket"></use></svg><span data-i18n="booking.token">Token</span></div>
+                <div class="token" id="s-token"></div>
             </div>
+            <div class="ticket-body">
+                <div class="qr" id="s-qr"></div>
+                <dl class="details" id="s-details"></dl>
+            </div>
+        </div>
+        <p class="note"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#clock"></use></svg><span data-i18n="book.success.text">Show this token or QR code at the centre. Please come 10 minutes before your time.</span></p>
+        <div class="success-actions">
+            <a class="btn btn-primary btn-lg btn-block" id="s-view" href="#" data-i18n="book.success.view">View booking</a>
+            <a class="btn btn-outline btn-block" href="/farmer/dashboard.html" data-i18n="book.success.home">Go to my bookings</a>
         </div>
     </section>
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="/js/ui.js"></script>
 <script src="/js/i18n.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
@@ -139,6 +149,16 @@
 
     function show(id, visible) {
         $(id).classList.toggle('hidden', !visible);
+        updateStepper();
+    }
+
+    /** The bar at the top: steps already chosen are filled, the step being chosen is highlighted. */
+    function updateStepper() {
+        const current = !state.centre ? 0 : !state.date ? 1 : !state.slot ? 2 : 3;
+        [...$('stepper').children].forEach((li, i) => {
+            li.classList.toggle('done', i < current);
+            li.classList.toggle('current', i === current);
+        });
     }
 
     /** low / medium / high crowd level from how full something is. */
@@ -159,8 +179,8 @@
                 <span class="option-title">${esc(c.name)}</span>
                 <span class="muted small">${esc(c.address)}</span>
                 <span class="centre-meta">
-                    ${nearYou ? `<span class="badge">${esc(t('book.nearYou'))}</span>` : ''}
-                    <span class="badge badge-grey">${esc(t('landing.centres.hours', {
+                    ${nearYou ? `<span class="badge">${UI.icon('map-pin')}${esc(t('book.nearYou'))}</span>` : ''}
+                    <span class="badge badge-grey">${UI.icon('clock')}${esc(t('landing.centres.hours', {
                         open: I18N.formatTime(c.openTime), close: I18N.formatTime(c.closeTime),
                     }))}</span>
                 </span>
@@ -177,7 +197,7 @@
         show('step-date', true);
         show('step-slot', false);
         show('step-details', false);
-        $('dates').innerHTML = `<p class="muted">${esc(t('common.loading'))}</p>`;
+        $('dates').innerHTML = UI.skeleton(2, esc(t('common.loading')));
 
         try {
             state.days = await Api.get(`/api/centres/${centreId}/slots`);
@@ -272,8 +292,8 @@
 
     function renderSummary() {
         if (!state.slot) return;
-        $('summary').textContent = `${state.centre.name} · ${Farmer.dayLabel(state.date)} · `
-            + Farmer.slotTime(state.slot.startTime, state.slot.endTime);
+        $('summary').innerHTML = `${UI.icon('calendar-check')}<span>${esc(state.centre.name)}<br>`
+            + `${esc(Farmer.dayLabel(state.date))}, ${esc(Farmer.slotTime(state.slot.startTime, state.slot.endTime))}</span>`;
     }
 
     function renderEstimate() {
@@ -342,7 +362,7 @@
             <dt>${esc(t('booking.centre'))}</dt><dd>${esc(b.centre.name)}</dd>
             <dt>${esc(t('booking.date'))}</dt><dd>${esc(Farmer.dayLabel(b.date))}</dd>
             <dt>${esc(t('booking.time'))}</dt><dd>${esc(Farmer.slotTime(b.startTime, b.endTime))}</dd>
-            <dt>${esc(t('booking.crop'))}</dt><dd>${esc(Farmer.cropName(b.crop))} · ${esc(Farmer.quantity(b.estQtyQtl))}</dd>`;
+            <dt>${esc(t('booking.crop'))}</dt><dd>${esc(Farmer.cropName(b.crop))}, ${esc(Farmer.quantity(b.estQtyQtl))}</dd>`;
     }
 
     function showSuccess() {
@@ -398,6 +418,7 @@
         state.centres.sort((a, b) => (b.district.toLowerCase() === home) - (a.district.toLowerCase() === home));
         renderCentres();
         renderCrops();
+        updateStepper();
     }
 
     init();

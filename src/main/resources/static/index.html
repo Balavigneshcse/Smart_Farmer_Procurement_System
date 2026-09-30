@@ -5,114 +5,149 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Smart Farmer Procurement System</title>
     <meta name="description" content="Book a procurement slot, track your queue position live, and follow your payment until it is credited.">
+    <meta name="theme-color" content="#1d6a40">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="preload" href="/fonts/anek-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/img/photos/hero-farmer-sm.webp" as="image" media="(max-width: 767px)">
+    <link rel="preload" href="/img/photos/hero-farmer.webp" as="image" media="(min-width: 768px)">
+    <script src="/js/theme.js"></script>
     <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
+<a class="skip-link" href="#main" data-i18n="common.skip">Skip to content</a>
 
 <header class="site-header">
     <div class="container header-row">
         <a class="brand" href="/">
-            <span class="brand-mark">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 21V11"/>
-                    <path d="M12 11C12 7 9 4 4 4c0 4 3 7 8 7z"/>
-                    <path d="M12 14c0-4 3-7 8-7 0 4-3 7-8 7z"/>
-                </svg>
-            </span>
-            <span class="brand-text">Smart Farmer Procurement System</span>
+            <span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#grains"></use></svg></span>
+            <span class="brand-text">Smart Farmer <small>Procurement System</small></span>
         </a>
-        <div class="lang-switch" role="group" aria-label="Language">
-            <button type="button" data-lang="en" aria-pressed="true">English</button>
-            <button type="button" data-lang="ta" aria-pressed="false">தமிழ்</button>
-            <button type="button" data-lang="hi" aria-pressed="false">हिन्दी</button>
+        <div class="header-tools">
+            <div class="lang-switch" role="group" aria-label="Language">
+                <button type="button" data-lang="en" aria-pressed="true">English</button>
+                <button type="button" data-lang="ta" aria-pressed="false">தமிழ்</button>
+                <button type="button" data-lang="hi" aria-pressed="false">हिन्दी</button>
+            </div>
+            <button type="button" class="theme-toggle" aria-label="Switch to dark theme"><svg class="icon icon-moon" aria-hidden="true"><use href="/img/icons.svg#moon"></use></svg><svg class="icon icon-sun" aria-hidden="true"><use href="/img/icons.svg#sun"></use></svg></button>
         </div>
     </div>
 </header>
 
-<main>
+<main id="main">
     <section class="hero">
         <div class="container hero-grid">
-            <div>
-                <span class="eyebrow" data-i18n="landing.tagline">Book your slot. Skip the queue. Track your payment.</span>
+            <div class="hero-copy">
+                <p class="eyebrow"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#grains"></use></svg><span data-i18n="landing.tagline">Book your slot. Skip the queue. Track your payment.</span></p>
                 <h1 data-i18n="landing.hero.title">No more waiting all day at the procurement centre</h1>
-                <p class="lead" data-i18n="landing.hero.text">Book a time slot to sell your crop, watch your turn live on your phone, and get an email at every step until the money reaches you.</p>
+                <p class="lead" data-i18n="landing.hero.text">Book a time to sell your crop, follow your turn live on your phone, and track your payment.</p>
                 <div class="actions">
-                    <a class="btn btn-accent btn-lg" href="/farmer/login.html?next=book" data-i18n="landing.hero.book">Book a slot</a>
-                    <a class="btn btn-ghost-light btn-lg" href="/farmer/login.html?next=dashboard" data-i18n="landing.hero.track">Track my booking</a>
+                    <a class="btn btn-primary btn-lg" href="/farmer/login.html?next=book">
+                        <span data-i18n="landing.hero.book">Book a slot</span>
+                        <svg class="icon" aria-hidden="true"><use href="/img/icons.svg#arrow-right"></use></svg>
+                    </a>
+                    <a class="btn btn-outline btn-lg" href="/farmer/login.html?next=dashboard" data-i18n="landing.hero.track">Track my booking</a>
                 </div>
-                <ul class="hero-facts">
-                    <li data-i18n="landing.fact.slot">Your own time slot</li>
-                    <li data-i18n="landing.fact.live">Live token on your phone</li>
-                    <li data-i18n="landing.fact.paid">Payment tracked till credited</li>
-                </ul>
             </div>
 
-            <!-- Example of what a farmer sees on their phone -->
-            <div class="phone" aria-hidden="true">
-                <div class="token-card">
-                    <div class="muted small" data-i18n="landing.demo.label">Your token</div>
-                    <div class="token">TNJ-017</div>
-                    <div class="token-stats">
-                        <div class="stat">
-                            <div class="stat-label" data-i18n="landing.demo.position">Position</div>
-                            <div class="stat-value">3</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-label" data-i18n="landing.demo.wait">Wait</div>
-                            <div class="stat-value" id="demo-wait">20 min</div>
-                        </div>
+            <div class="hero-visual">
+                <picture>
+                    <source media="(max-width: 767px)" srcset="/img/photos/hero-farmer-sm.webp" width="760" height="485">
+                    <img class="hero-photo" src="/img/photos/hero-farmer.webp" width="1200" height="766" fetchpriority="high"
+                         alt="A farmer resting on his spade beside green paddy fields" data-i18n-alt="landing.photo.hero">
+                </picture>
+
+                <!-- The real token ticket a farmer sees on their phone, with example values -->
+                <div class="ticket hero-ticket" aria-hidden="true">
+                    <div class="ticket-top">
+                        <div class="ticket-label"><svg class="icon"><use href="/img/icons.svg#ticket"></use></svg><span data-i18n="landing.demo.label">Your token</span></div>
+                        <div class="token">TNJ-017</div>
                     </div>
-                    <div class="alert alert-success small" data-i18n="landing.demo.status">Your turn is near. Please come to the centre.</div>
+                    <div class="ticket-body">
+                        <div class="token-stats">
+                            <div class="stat">
+                                <div class="stat-label" data-i18n="landing.demo.position">Position</div>
+                                <div class="stat-value">3</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-label" data-i18n="landing.demo.wait">Wait</div>
+                                <div class="stat-value" id="demo-wait">20 min</div>
+                            </div>
+                        </div>
+                        <div class="alert alert-success" data-i18n="landing.demo.status">Your turn is near. Please come to the centre.</div>
+                    </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <section class="container section">
-        <h2 class="section-title" data-i18n="landing.how.title">How it works</h2>
-        <ol class="steps">
-            <li class="card">
-                <span class="step-icon" aria-hidden="true">
-                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
-                </span>
-                <h3 data-i18n="landing.how.step1.title">Register with your email</h3>
-                <p data-i18n="landing.how.step1.text">Log in with an OTP sent to your email. No password to remember.</p>
-            </li>
-            <li class="card">
-                <span class="step-icon" aria-hidden="true">
-                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m9 15 2 2 4-4"/></svg>
-                </span>
-                <h3 data-i18n="landing.how.step2.title">Book a time slot</h3>
-                <p data-i18n="landing.how.step2.text">Choose your centre, date, time and crop. You get a token number.</p>
-            </li>
-            <li class="card">
-                <span class="step-icon" aria-hidden="true">
-                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-                </span>
-                <h3 data-i18n="landing.how.step3.title">Come at your time</h3>
-                <p data-i18n="landing.how.step3.text">See your queue position and waiting time live. We email you when your turn is near.</p>
-            </li>
-            <li class="card">
-                <span class="step-icon" aria-hidden="true">
-                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5h10M7 9h10M13 5c3 0 3 8 0 8H7l8 7"/></svg>
-                </span>
-                <h3 data-i18n="landing.how.step4.title">Get paid</h3>
-                <p data-i18n="landing.how.step4.text">Your crop is weighed and checked, and you can track the payment until it is credited.</p>
-            </li>
-        </ol>
+    <section class="benefits" aria-label="Benefits">
+        <ul class="container benefit-list">
+            <li><span class="benefit-icon"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#calendar-check"></use></svg></span><span data-i18n="landing.fact.slot">Your own time slot</span></li>
+            <li><span class="benefit-icon"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#ticket"></use></svg></span><span data-i18n="landing.fact.live">Live token on your phone</span></li>
+            <li><span class="benefit-icon"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#hand-coins"></use></svg></span><span data-i18n="landing.fact.paid">Payment tracked till credited</span></li>
+        </ul>
     </section>
 
     <section class="container section">
-        <h2 class="section-title" data-i18n="landing.centres.title">Procurement centres</h2>
-        <div id="centres" class="grid grid-3">
-            <p class="muted" data-i18n="common.loading">Loading…</p>
+        <div class="how-grid">
+            <figure class="how-photo">
+                <img src="/img/photos/grain-check.webp" width="680" height="854" loading="lazy" decoding="async"
+                     alt="Hands checking grain in a winnowing basket" data-i18n-alt="landing.photo.grain">
+            </figure>
+            <div>
+                <h2 data-i18n="landing.how.title">How it works</h2>
+                <ol class="how-steps">
+                    <li data-reveal>
+                        <span class="step-icon"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#envelope-simple"></use></svg></span>
+                        <div>
+                            <h3 data-i18n="landing.how.step1.title">Register with your email</h3>
+                            <p data-i18n="landing.how.step1.text">Log in with an OTP sent to your email. No password to remember.</p>
+                        </div>
+                    </li>
+                    <li data-reveal>
+                        <span class="step-icon"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#calendar-dots"></use></svg></span>
+                        <div>
+                            <h3 data-i18n="landing.how.step2.title">Book a time slot</h3>
+                            <p data-i18n="landing.how.step2.text">Choose your centre, date, time and crop. You get a token number.</p>
+                        </div>
+                    </li>
+                    <li data-reveal>
+                        <span class="step-icon"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#clock"></use></svg></span>
+                        <div>
+                            <h3 data-i18n="landing.how.step3.title">Come at your time</h3>
+                            <p data-i18n="landing.how.step3.text">See your queue position and waiting time live. We email you when your turn is near.</p>
+                        </div>
+                    </li>
+                    <li data-reveal>
+                        <span class="step-icon"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#scales"></use></svg></span>
+                        <div>
+                            <h3 data-i18n="landing.how.step4.title">Get paid</h3>
+                            <p data-i18n="landing.how.step4.text">Your crop is weighed and checked, and you can track the payment until it is credited.</p>
+                        </div>
+                    </li>
+                </ol>
+            </div>
         </div>
     </section>
 
-    <section class="container section">
-        <h2 class="section-title" data-i18n="landing.rates.title">Procurement rates</h2>
-        <div class="card table-wrap">
+    <section class="container section" data-reveal>
+        <h2 data-i18n="landing.centres.title">Procurement centres</h2>
+        <div id="centres" class="centre-list">
+            <div class="centre-row" aria-busy="true">
+                <span class="skeleton centre-code"></span>
+                <div><span class="skeleton skeleton-title"></span><span class="skeleton skeleton-line"></span></div>
+            </div>
+            <div class="centre-row">
+                <span class="skeleton centre-code"></span>
+                <div><span class="skeleton skeleton-title"></span><span class="skeleton skeleton-line"></span></div>
+            </div>
+            <p class="sr-only" data-i18n="common.loading">Loading…</p>
+        </div>
+    </section>
+
+    <section class="container section" data-reveal>
+        <h2 data-i18n="landing.rates.title">Procurement rates</h2>
+        <div class="card table-wrap rates">
             <table>
                 <thead>
                 <tr>
@@ -122,30 +157,38 @@
                 </tr>
                 </thead>
                 <tbody id="rates">
-                <tr><td colspan="3" class="muted" data-i18n="common.loading">Loading…</td></tr>
+                <tr><td colspan="3"><span class="skeleton skeleton-line"></span><span class="skeleton skeleton-line"></span><span class="sr-only" data-i18n="common.loading">Loading…</span></td></tr>
                 </tbody>
             </table>
         </div>
-        <p class="muted small" style="margin-top: 12px" data-i18n="landing.rates.note">Crop with moisture above the limit may be rejected. Dry your crop well before coming.</p>
+        <p class="note">
+            <svg class="icon" aria-hidden="true"><use href="/img/icons.svg#drop"></use></svg>
+            <span data-i18n="landing.rates.note">Crop with moisture above the limit may be rejected. Dry your crop well before coming.</span>
+        </p>
     </section>
 </main>
 
 <footer class="site-footer">
     <div class="container footer-row">
-        <span>© 2026 Smart Farmer Procurement System</span>
-        <nav>
-            <a href="/staff/login.html">Staff login</a>
-            <a href="/display.html">Queue display screen</a>
+        <span class="footer-brand">
+            <span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#grains"></use></svg></span>
+            <span>© 2026 Smart Farmer Procurement System</span>
+        </span>
+        <nav aria-label="Staff">
+            <a href="/staff/login.html"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#identification-card"></use></svg>Staff login</a>
+            <a href="/display.html"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#television"></use></svg>Queue display screen</a>
         </nav>
     </div>
 </footer>
 
+<script src="/js/ui.js"></script>
 <script src="/js/i18n.js"></script>
 <script src="/js/api.js"></script>
 <script>
     let centres = null;
     let crops = null;
     let loadFailed = false;
+    const { icon } = UI;
 
     function esc(value) {
         const div = document.createElement('div');
@@ -166,25 +209,27 @@
         if (!centres) return;
 
         box.innerHTML = centres.map(c => `
-            <article class="card centre-card">
+            <article class="centre-row">
                 <span class="centre-code">${esc(c.code)}</span>
-                <h3>${esc(c.name)}</h3>
-                <p class="muted small">${esc(c.address)}</p>
-                <p>${esc(I18N.t('landing.centres.hours', {
-                    open: I18N.formatTime(c.openTime),
-                    close: I18N.formatTime(c.closeTime),
-                }))}</p>
-                <div class="centre-meta">
-                    <span class="badge">${esc(I18N.t('landing.centres.counters', { n: c.counters }))}</span>
-                    <span class="badge badge-amber">${esc(I18N.t('landing.centres.perSlot', { n: c.slotCapacity, mins: c.slotMinutes }))}</span>
+                <div>
+                    <h3>${esc(c.name)}</h3>
+                    <p class="address">${esc(c.address)}</p>
                 </div>
+                <ul class="centre-meta">
+                    <li>${icon('clock')}${esc(I18N.t('landing.centres.hours', {
+                        open: I18N.formatTime(c.openTime),
+                        close: I18N.formatTime(c.closeTime),
+                    }))}</li>
+                    <li>${icon('users-three')}${esc(I18N.t('landing.centres.counters', { n: c.counters }))}</li>
+                    <li>${icon('calendar-check')}${esc(I18N.t('landing.centres.perSlot', { n: c.slotCapacity, mins: c.slotMinutes }))}</li>
+                </ul>
             </article>`).join('');
     }
 
     function renderRates() {
         const body = document.getElementById('rates');
         if (loadFailed) {
-            body.innerHTML = `<tr><td colspan="3" class="muted">${esc(I18N.t('common.loadError'))}</td></tr>`;
+            body.innerHTML = `<tr class="empty-row"><td colspan="3">${esc(I18N.t('common.loadError'))}</td></tr>`;
             return;
         }
         if (!crops) return;
@@ -192,7 +237,7 @@
         const percent = new Intl.NumberFormat(I18N.locale(), { maximumFractionDigits: 1 });
         body.innerHTML = crops.map(c => `
             <tr>
-                <td><span class="crop-name">${esc(cropName(c))}</span></td>
+                <td class="crop-name">${esc(cropName(c))}</td>
                 <td class="num">${esc(I18N.formatMoney(c.ratePerQtl))}</td>
                 <td class="num">${esc(percent.format(c.maxMoisturePct))}%</td>
             </tr>`).join('');
@@ -218,6 +263,7 @@
     }
 
     document.addEventListener('langchange', render);
+    UI.revealOnScroll();
     I18N.init().then(loadData);
 </script>
 </body>

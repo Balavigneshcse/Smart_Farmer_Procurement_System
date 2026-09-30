@@ -1,62 +1,48 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Queue display · Smart Farmer Procurement System</title>
+    <title>Queue display | Smart Farmer Procurement System</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="preload" href="/fonts/geist-mono.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="/css/app.css">
     <style>
-        /* TV screen: dark, high contrast, readable from across the room */
-        /* dark screen with the paddy field faintly along the bottom */
-        body.tv {
-            background: radial-gradient(900px 400px at 90% 0%, rgba(227, 160, 8, .12), transparent 70%), #0f1f16;
-            color: #f4f7f2;
-            min-height: 100vh;
-        }
-        body.tv::before {
-            content: "";
-            position: fixed;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            height: 30vh;
-            background: url("/img/hero-field.svg") bottom center / 100% auto no-repeat;
-            opacity: .35;
-            z-index: -1;
-            pointer-events: none;
-            transform: translateZ(0);   /* own graphics layer, drawn once */
-        }
-        .tv a { color: #9fe0b5; }
-        .tv-wrap { padding: 2vh 3vw; display: flex; flex-direction: column; gap: 2vh; height: 100vh; overflow: hidden; }
-        .tv-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
-        .tv-head-right { display: flex; align-items: center; gap: 2.4vw; flex-wrap: wrap; }
-        .tv-centre { font-size: clamp(1.4rem, 3vw, 2.6rem); font-weight: 800; color: #fff; }
-        .tv-sub { color: #a9bdb0; font-size: clamp(.9rem, 1.3vw, 1.2rem); }
-        .tv-clock { font-size: clamp(1.6rem, 3.4vw, 3rem); font-weight: 700; font-variant-numeric: tabular-nums; }
-        .tv-label { font-size: clamp(1rem, 1.6vw, 1.5rem); color: #f3c969; font-weight: 700; margin: 0 0 1.2vh; letter-spacing: .02em; }
-        .tv-counters { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5vw; }
-        .tv-counter { background: #173323; border: 3px solid #2c5a3d; border-radius: 18px; padding: 1.6vh 1.5vw; text-align: center; }
-        .tv-counter.busy { border-color: #f3c969; background: #22402c; }
+        /* TV board: always dark (the page sets data-theme="dark"), very large type, never scrolls at 16:9 */
+        body.tv { min-height: 100dvh; }
+        .tv-wrap { padding: 2.4vh 3vw; display: flex; flex-direction: column; gap: 2.4vh; height: 100dvh; overflow: hidden; }
+        .tv-head { display: flex; justify-content: space-between; align-items: center; gap: 16px 32px; flex-wrap: wrap; }
+        .tv-head-right { display: flex; align-items: center; gap: 2.6vw; flex-wrap: wrap; }
+        .tv-centre { font-size: clamp(1.4rem, 3vw, 2.8rem); font-weight: 700; line-height: 1.15; }
+        .tv-sub { color: var(--muted); font-size: clamp(.9rem, 1.2vw, 1.2rem); }
+        .tv-clock { font-family: var(--font-mono); font-size: clamp(1.6rem, 3.2vw, 3rem); font-weight: 600; }
+        .tv-tri { display: inline-flex; flex-wrap: wrap; gap: 0 .9em; }
+        .tv-tri span:first-child { color: var(--ink); }
+        .tv-label { font-size: clamp(1rem, 1.5vw, 1.5rem); color: var(--muted); font-weight: 600; margin: 0 0 1.2vh; }
+        .tv-label .tv-tri span:first-child { color: var(--warn-ink); }
+        .tv-counters { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5vw; }
+        .tv-counter { background: var(--surface); border: 2px solid var(--line); border-radius: var(--radius-lg); padding: 1.8vh 1.5vw; text-align: center; }
+        .tv-counter.busy { border-color: var(--warn-line); }
         .tv-counter.flash { animation: tv-flash 1s ease-in-out 4; }
-        @keyframes tv-flash { 50% { background: #f3c969; color: #0f1f16; } }
-        .tv-counter-name { font-size: clamp(1rem, 1.8vw, 1.6rem); color: #a9bdb0; font-weight: 700; }
-        .tv-token { font-size: clamp(2.4rem, 6vw, 5.5rem); font-weight: 900; letter-spacing: .03em; font-variant-numeric: tabular-nums; line-height: 1.15; }
-        .tv-free { font-size: clamp(1.2rem, 2.4vw, 2.2rem); color: #6f8b79; font-weight: 700; padding: 1.4vh 0; }
+        @keyframes tv-flash { 50% { opacity: .35; transform: scale(.985); } }
+        .tv-counter-name { display: flex; justify-content: center; font-size: clamp(.95rem, 1.5vw, 1.5rem); color: var(--muted); font-weight: 600; }
+        .tv-token { font-family: var(--font-mono); font-size: clamp(2.6rem, 7.2vw, 8rem); font-weight: 700; line-height: 1.12; color: var(--warn-ink); }
+        .tv-free { display: flex; justify-content: center; font-size: clamp(1.2rem, 2.4vw, 2.2rem); color: var(--muted); font-weight: 600; padding: 2.4vh 0; }
         .tv-next-section { flex: 1; min-height: 0; overflow: hidden; }
-        .tv-next { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1vw; }
-        .tv-next li { background: #173323; border-radius: 12px; padding: 1.2vh 1.2vw; display: flex; flex-direction: column; gap: 2px; }
-        .tv-next-token { font-size: clamp(1.4rem, 2.6vw, 2.4rem); font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.2; }
-        .tv-next-eta { color: #a9bdb0; font-size: clamp(.9rem, 1.4vw, 1.3rem); white-space: nowrap; }
+        .tv-next { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 1vw; }
+        .tv-next li { background: var(--surface); border-radius: var(--radius); padding: 1.2vh 1.2vw; display: flex; flex-direction: column; gap: 2px; }
+        .tv-next-token { font-family: var(--font-mono); font-size: clamp(1.4rem, 2.5vw, 2.4rem); font-weight: 700; white-space: nowrap; line-height: 1.2; }
+        .tv-next-eta { color: var(--muted); font-size: clamp(.9rem, 1.3vw, 1.3rem); white-space: nowrap; }
         .tv-stat { text-align: right; }
-        .tv-stat-label { color: #a9bdb0; font-size: clamp(.75rem, 1vw, 1rem); }
-        .tv-stat-value { font-size: clamp(1.4rem, 2.4vw, 2.4rem); font-weight: 800; line-height: 1.1; }
-        .tv-empty { color: #6f8b79; font-size: clamp(1rem, 1.6vw, 1.4rem); }
-        .tv-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; color: #a9bdb0; font-size: clamp(.9rem, 1.3vw, 1.2rem); border-top: 1px solid #2c5a3d; padding-top: 1.5vh; }
-        .tv-foot .btn { min-height: 38px; background: transparent; color: #f4f7f2; border-color: #4d7a5d; }
-        .tv .live-status { color: #9fe0b5; }
-        .tv .live-status.offline { color: #ff9b91; }
+        .tv-stat-label { color: var(--muted); font-size: clamp(.75rem, 1vw, 1rem); }
+        .tv-stat .tv-tri { justify-content: flex-end; }
+        .tv-stat-value { font-size: clamp(1.4rem, 2.4vw, 2.4rem); font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+        .tv-next li.tv-empty { background: none; color: var(--muted); font-size: clamp(1rem, 1.6vw, 1.4rem); padding-left: 0; }
+        .tv-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px 24px; flex-wrap: wrap; color: var(--muted); font-size: clamp(.9rem, 1.2vw, 1.2rem); border-top: 1px solid var(--line); padding-top: 1.6vh; }
+        .tv-foot-right { display: flex; gap: 16px; align-items: center; }
         .tv-picker { max-width: 640px; margin: 10vh auto; padding: 0 16px; }
-        .tv-picker a { display: block; background: #173323; border-radius: 12px; padding: 16px 20px; margin-bottom: 12px; font-size: 1.2rem; font-weight: 700; text-decoration: none; }
+        .tv-picker a { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 12px; font-size: 1.2rem; font-weight: 600; text-decoration: none; }
+        .tv-picker a:hover { border-color: var(--accent); }
         @media (max-width: 800px) { .tv-wrap { height: auto; overflow: visible; } }
     </style>
 </head>
@@ -64,7 +50,7 @@
 
 <!-- Shown when no centre is chosen: /display.html -->
 <div id="picker" class="tv-picker hidden">
-    <h1 style="color: #fff">Queue display</h1>
+    <h1>Queue display</h1>
     <p class="tv-sub">Choose the centre for this screen:</p>
     <div id="centre-links"></div>
 </div>
@@ -78,15 +64,15 @@
         </div>
         <div class="tv-head-right">
             <div class="tv-stat">
-                <div class="tv-stat-label">Waiting · காத்திருப்பு · प्रतीक्षा</div>
+                <div class="tv-stat-label"><span class="tv-tri"><span>Waiting</span><span lang="ta">காத்திருப்பு</span><span lang="hi">प्रतीक्षा</span></span></div>
                 <div class="tv-stat-value" id="waiting-count">0</div>
             </div>
             <div class="tv-stat">
-                <div class="tv-stat-label">Avg wait · சராசரி · औसत</div>
-                <div class="tv-stat-value" id="avg-wait">–</div>
+                <div class="tv-stat-label"><span class="tv-tri"><span>Avg wait</span><span lang="ta">சராசரி</span><span lang="hi">औसत</span></span></div>
+                <div class="tv-stat-value" id="avg-wait">0 min</div>
             </div>
             <div class="tv-stat">
-                <div class="tv-stat-label">Served · சேவை · सेवा</div>
+                <div class="tv-stat-label"><span class="tv-tri"><span>Served</span><span lang="ta">சேவை</span><span lang="hi">सेवा</span></span></div>
                 <div class="tv-stat-value" id="served">0</div>
             </div>
             <div class="tv-clock" id="clock"></div>
@@ -94,20 +80,20 @@
     </header>
 
     <section>
-        <h2 class="tv-label">Now serving · இப்போது · अभी</h2>
+        <h2 class="tv-label"><span class="tv-tri"><span>Now serving</span><span lang="ta">இப்போது</span><span lang="hi">अभी</span></span></h2>
         <div class="tv-counters" id="serving"></div>
     </section>
 
     <section class="tv-next-section">
-        <h2 class="tv-label">Next · அடுத்து · अगला</h2>
+        <h2 class="tv-label"><span class="tv-tri"><span>Next</span><span lang="ta">அடுத்து</span><span lang="hi">अगला</span></span></h2>
         <ol class="tv-next" id="next"></ol>
     </section>
 
     <footer class="tv-foot">
-        <span>Show your token at the counter · டோக்கனை கவுண்டரில் காட்டுங்கள் · अपना टोकन काउंटर पर दिखाएँ</span>
-        <span style="display: flex; gap: 16px; align-items: center">
+        <span class="tv-tri"><span>Show your token at the counter</span><span lang="ta">டோக்கனை கவுண்டரில் காட்டுங்கள்</span><span lang="hi">अपना टोकन काउंटर पर दिखाएँ</span></span>
+        <span class="tv-foot-right">
             <span class="live-status offline" id="live-status"><span class="live-dot"></span><span id="live-text">Connecting…</span></span>
-            <button type="button" class="btn btn-outline btn-sm" id="sound-btn">Turn sound on</button>
+            <button type="button" class="btn btn-quiet btn-sm" id="sound-btn">Turn sound on</button>
         </span>
     </footer>
 </div>
@@ -127,13 +113,22 @@
         return div.innerHTML;
     }
 
+    /** A label in English, Tamil and Hindi, side by side. */
+    function tri(en, ta, hi) {
+        return `<span class="tv-tri"><span>${en}</span><span lang="ta">${ta}</span><span lang="hi">${hi}</span></span>`;
+    }
+
+    function counterName(counterNo) {
+        return tri(`Counter ${counterNo}`, 'கவுண்டர்', 'काउंटर');
+    }
+
     function tick() {
         $('clock').textContent = new Date().toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
     }
 
     function render(q) {
         $('centre-name').textContent = q.centreName;
-        document.title = `${q.centreName} · Queue`;
+        document.title = `${q.centreName} | Queue`;
 
         const newlyCalled = [];
         $('serving').innerHTML = q.serving.map(s => {
@@ -142,12 +137,12 @@
             lastCalledAt[s.counterNo] = s.calledAt;
             return s.token ? `
                 <div class="tv-counter busy ${changed && !firstSnapshot ? 'flash' : ''}">
-                    <div class="tv-counter-name">Counter ${s.counterNo} · கவுண்டர் · काउंटर</div>
+                    <div class="tv-counter-name">${counterName(s.counterNo)}</div>
                     <div class="tv-token">${esc(s.token)}</div>
                 </div>` : `
                 <div class="tv-counter">
-                    <div class="tv-counter-name">Counter ${s.counterNo} · கவுண்டர் · काउंटर</div>
-                    <div class="tv-free">Free · காலி · खाली</div>
+                    <div class="tv-counter-name">${counterName(s.counterNo)}</div>
+                    <div class="tv-free">${tri('Free', 'காலி', 'खाली')}</div>
                 </div>`;
         }).join('');
 
@@ -155,12 +150,12 @@
             ? q.waiting.slice(0, 12).map(w => `
                 <li>
                     <span class="tv-next-token">${esc(w.token)}</span>
-                    <span class="tv-next-eta">${w.etaMinutes === 0 ? 'Now' : `~${w.etaMinutes} min`}</span>
+                    <span class="tv-next-eta">${w.etaMinutes === 0 ? 'Now' : `about ${w.etaMinutes} min`}</span>
                 </li>`).join('')
-            : '<li class="tv-empty" style="background: none">Nobody waiting · யாரும் இல்லை · कोई नहीं</li>';
+            : `<li class="tv-empty">${tri('Nobody waiting', 'யாரும் இல்லை', 'कोई नहीं')}</li>`;
 
         $('waiting-count').textContent = q.waiting.length;
-        $('avg-wait').textContent = q.avgWaitMinutes == null ? '–' : `${q.avgWaitMinutes} min`;
+        $('avg-wait').textContent = q.avgWaitMinutes == null ? 'No data' : `${q.avgWaitMinutes} min`;
         $('served').textContent = q.servedToday;
 
         firstSnapshot = false;

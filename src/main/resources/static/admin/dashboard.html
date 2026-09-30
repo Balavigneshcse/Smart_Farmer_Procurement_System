@@ -3,54 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Admin dashboard · Smart Farmer Procurement System</title>
+    <title>Admin dashboard | Smart Farmer Procurement System</title>
+    <meta name="theme-color" content="#1d6a40">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="preload" href="/fonts/anek-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <script src="/js/theme.js"></script>
     <link rel="stylesheet" href="/css/app.css">
 </head>
-<body class="field-bg">
+<body class="staff">
 
 <header class="site-header">
     <div class="container header-row">
         <a class="brand" href="/admin/dashboard.html">
-            <span class="brand-mark">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 21V11"/>
-                    <path d="M12 11C12 7 9 4 4 4c0 4 3 7 8 7z"/>
-                    <path d="M12 14c0-4 3-7 8-7 0 4-3 7-8 7z"/>
-                </svg>
-            </span>
-            <span class="brand-text">Admin</span>
+            <span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#grains"></use></svg></span>
+            <span class="brand-text">Smart Farmer <small>Admin</small></span>
         </a>
         <nav class="header-nav" aria-label="Admin">
-            <a href="/admin/dashboard.html" aria-current="page">Dashboard</a>
-            <a href="/admin/payments.html">Payments</a>
-            <a href="/admin/settings.html">Centres &amp; crops</a>
+            <a href="/admin/dashboard.html" aria-current="page"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#chart-bar"></use></svg>Dashboard</a>
+            <a href="/admin/payments.html"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#credit-card"></use></svg>Payments</a>
+            <a href="/admin/settings.html"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#gear"></use></svg>Centres &amp; crops</a>
         </nav>
         <div class="header-actions">
-            <span class="user-chip" id="user-name"></span>
-            <button type="button" class="btn btn-outline btn-sm" id="logout-btn">Log out</button>
+            <span class="user-chip"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#user"></use></svg><span id="user-name"></span></span>
+            <button type="button" class="theme-toggle" aria-label="Switch to dark theme"><svg class="icon icon-moon" aria-hidden="true"><use href="/img/icons.svg#moon"></use></svg><svg class="icon icon-sun" aria-hidden="true"><use href="/img/icons.svg#sun"></use></svg></button>
+            <button type="button" class="btn btn-quiet btn-sm" id="logout-btn"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#sign-out"></use></svg><span class="btn-label-wide">Log out</span></button>
         </div>
     </div>
 </header>
 
-<main class="container">
+<main id="main" class="container">
     <div class="page-head head-row">
         <div>
             <h1>Today at the centres</h1>
             <p class="muted" id="today-label">&nbsp;</p>
         </div>
-        <span class="live-status" id="refresh-status" aria-live="polite"><span class="live-dot"></span> Loading…</span>
+        <span class="live-status" id="refresh-status" aria-live="polite"><span class="live-dot"></span> Loading</span>
     </div>
 
     <div id="notice" class="alert hidden" role="status"></div>
 
     <div class="stat-row stat-row-wide" id="tiles">
-        <div class="stat-tile"><div class="stat-label">Farmers booked</div><div class="stat-value" id="t-booked">–</div><div class="small muted" id="t-booked-sub"></div></div>
-        <div class="stat-tile"><div class="stat-label">Waiting now</div><div class="stat-value" id="t-waiting">–</div><div class="small muted" id="t-waiting-sub"></div></div>
-        <div class="stat-tile"><div class="stat-label">Served</div><div class="stat-value" id="t-served">–</div><div class="small muted" id="t-served-sub"></div></div>
-        <div class="stat-tile"><div class="stat-label">Average wait</div><div class="stat-value" id="t-wait">–</div><div class="small muted">check-in to counter</div></div>
-        <div class="stat-tile"><div class="stat-label">Procured today</div><div class="stat-value" id="t-qty">–</div><div class="small muted" id="t-value"></div></div>
-        <div class="stat-tile"><div class="stat-label">Payments pending</div><div class="stat-value" id="t-pending">–</div><div class="small muted" id="t-pending-sub"></div></div>
+        <div class="stat-tile"><div class="stat-label">Farmers booked</div><div class="stat-value" id="t-booked">0</div><div class="small muted" id="t-booked-sub"></div></div>
+        <div class="stat-tile"><div class="stat-label">Waiting now</div><div class="stat-value" id="t-waiting">0</div><div class="small muted" id="t-waiting-sub"></div></div>
+        <div class="stat-tile"><div class="stat-label">Served</div><div class="stat-value" id="t-served">0</div><div class="small muted" id="t-served-sub"></div></div>
+        <div class="stat-tile"><div class="stat-label">Average wait</div><div class="stat-value" id="t-wait">0</div><div class="small muted">check-in to counter</div></div>
+        <div class="stat-tile"><div class="stat-label">Procured today</div><div class="stat-value" id="t-qty">0</div><div class="small muted" id="t-value"></div></div>
+        <div class="stat-tile"><div class="stat-label">Payments pending</div><div class="stat-value" id="t-pending">0</div><div class="small muted" id="t-pending-sub"></div></div>
     </div>
 
     <section class="card table-wrap dash-section" aria-labelledby="centres-title">
@@ -93,11 +91,11 @@
         <section class="card" aria-labelledby="pay-title">
             <h2 id="pay-title">Farmer payments</h2>
             <dl class="details" id="pay-details">
-                <dt>Waiting for payment</dt><dd id="p-pending">–</dd>
-                <dt>Paid today</dt><dd id="p-today">–</dd>
-                <dt>Paid in total</dt><dd id="p-total">–</dd>
+                <dt>Waiting for payment</dt><dd id="p-pending"></dd>
+                <dt>Paid today</dt><dd id="p-today"></dd>
+                <dt>Paid in total</dt><dd id="p-total"></dd>
             </dl>
-            <a class="btn btn-primary" href="/admin/payments.html" style="margin-top: 16px">Open payments</a>
+            <div class="card-actions"><a class="btn btn-primary" href="/admin/payments.html"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#credit-card"></use></svg>Open payments</a></div>
         </section>
         <section class="card" aria-labelledby="crops-title">
             <h2 id="crops-title">Crops (last 7 days)</h2>
@@ -110,8 +108,8 @@
         <p class="muted">For presentations: adds 40 demo farmers with a busy day in progress at every centre
             (served, at the counters, waiting, still to come) and the last 6 days of history.
             Demo farmers never get emails. Real farmers and their bookings are not touched.</p>
-        <p id="demo-status" class="summary-box">Checking…</p>
-        <div class="actions" style="margin-top: 0">
+        <p id="demo-status" class="summary-box">Checking</p>
+        <div class="card-actions">
             <button type="button" class="btn btn-primary" id="demo-load">Load demo day</button>
             <button type="button" class="btn btn-danger" id="demo-remove">Remove demo data</button>
         </div>
@@ -120,6 +118,7 @@
 
 <!-- async: the numbers and table show at once; the charts appear when the library has downloaded -->
 <script id="chart-lib" async src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="/js/ui.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/admin.js"></script>
@@ -127,15 +126,25 @@
     const $ = id => document.getElementById(id);
     const { esc, money, number } = Admin;
     const REFRESH_MS = 30_000;
-    const GREEN = '#25804a', DARK_GREEN = '#1e6b3a', AMBER = '#e3a008', GREY = '#b9c3bb';
     let charts = {};
+    let lastData = null;
+
+    /** Chart colours come from the page's design tokens, so the charts follow the light / dark theme. */
+    function palette() {
+        const css = getComputedStyle(document.documentElement);
+        const token = name => css.getPropertyValue(name).trim();
+        return {
+            accent: token('--accent'), warn: token('--warn-line'), quiet: token('--field'),
+            text: token('--muted'), grid: token('--line'),
+        };
+    }
     const chartLibrary = new Promise(resolve => {
         if (typeof Chart !== 'undefined') resolve();
         $('chart-lib').addEventListener('load', resolve);
         $('chart-lib').addEventListener('error', resolve);   // renderCharts shows a message instead
     });
 
-    const minutes = m => m == null ? '–' : `${m} min`;
+    const minutes = m => m == null ? 'No data' : `${m} min`;
     const dayLabel = iso => new Date(iso + 'T00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric' });
 
     function renderTiles(d) {
@@ -143,11 +152,11 @@
         $('today-label').textContent = new Date(d.date + 'T00:00')
             .toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
         $('t-booked').textContent = number(t.booked);
-        $('t-booked-sub').textContent = `${t.arrived} arrived · ${t.cancelled} cancelled`;
+        $('t-booked-sub').textContent = `${t.arrived} arrived, ${t.cancelled} cancelled`;
         $('t-waiting').textContent = number(t.waiting);
         $('t-waiting-sub').textContent = `${t.atCounter} at counters`;
         $('t-served').textContent = number(t.served);
-        $('t-served-sub').textContent = `${t.rejected} rejected · ${t.noShow} no-show`;
+        $('t-served-sub').textContent = `${t.rejected} rejected, ${t.noShow} no-show`;
         $('t-wait').textContent = minutes(t.avgWaitMinutes);
         $('t-qty').textContent = `${number(t.quantityQtl, 1)} qtl`;
         $('t-value').textContent = `worth ${money(t.value)}`;
@@ -163,7 +172,7 @@
             <tr>
                 <td>
                     <strong>${esc(c.name)}</strong>${c.active ? '' : ' <span class="badge badge-grey">Closed</span>'}<br>
-                    <span class="small muted">${esc(c.code)} · ${c.counters} counters ·
+                    <span class="small muted"><span class="mono">${esc(c.code)}</span>, ${c.counters} counters,
                         <a href="/display.html?centre=${c.id}" target="_blank" rel="noopener">TV screen</a></span>
                 </td>
                 <td class="num">${c.expected}</td>
@@ -173,7 +182,7 @@
                 <td class="num">${c.noShow}</td>
                 <td class="num">${esc(minutes(c.avgWaitMinutes))}</td>
                 <td class="num">${esc(number(c.quantityQtl, 1))} qtl</td>
-                <td style="min-width: 150px">
+                <td class="fill-cell">
                     <span class="small">${c.booked} of ${c.capacity} places</span>
                     <div class="fill-bar" data-level="${level}"><span style="width: ${Math.min(filled, 100)}%"></span></div>
                 </td>
@@ -183,8 +192,8 @@
 
     function renderPayments(d) {
         const p = d.payments;
-        $('p-pending').textContent = `${p.pendingCount} farmers · ${money(p.pendingAmount)}`;
-        $('p-today').textContent = `${p.paidTodayCount} farmers · ${money(p.paidTodayAmount)}`;
+        $('p-pending').textContent = `${p.pendingCount} farmers, ${money(p.pendingAmount)}`;
+        $('p-today').textContent = `${p.paidTodayCount} farmers, ${money(p.paidTodayAmount)}`;
         $('p-total').textContent = money(p.paidTotal);
     }
 
@@ -212,6 +221,7 @@
         const pending = d.lastDays.map(day => Math.max(0, day.booked - day.served - day.noShow));
         const qty = d.lastDays.map(day => Number(day.quantityQtl));
 
+        lastData = d;
         if (charts.farmers) {
             Object.assign(charts.farmers.data, { labels });
             charts.farmers.data.datasets[0].data = served;
@@ -223,14 +233,15 @@
             charts.qty.update('none');
             return;
         }
+        const colours = palette();
         Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
-        Chart.defaults.color = '#5b6b60';
+        Chart.defaults.color = colours.text;
         const common = {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
                 x: { stacked: true, grid: { display: false } },
-                y: { stacked: true, beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#e8ece6' } },
+                y: { stacked: true, beginAtZero: true, ticks: { precision: 0 }, grid: { color: colours.grid } },
             },
             plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, boxHeight: 12 } } },
         };
@@ -239,16 +250,16 @@
             data: {
                 labels,
                 datasets: [
-                    { label: 'Served', data: served, backgroundColor: GREEN, borderRadius: 6 },
-                    { label: 'Still to serve', data: pending, backgroundColor: AMBER, borderRadius: 6 },
-                    { label: 'No-show', data: noShow, backgroundColor: GREY, borderRadius: 6 },
+                    { label: 'Served', data: served, backgroundColor: colours.accent, borderRadius: 6 },
+                    { label: 'Still to serve', data: pending, backgroundColor: colours.warn, borderRadius: 6 },
+                    { label: 'No-show', data: noShow, backgroundColor: colours.quiet, borderRadius: 6 },
                 ],
             },
             options: common,
         });
         charts.qty = new Chart($('chart-qty'), {
             type: 'bar',
-            data: { labels, datasets: [{ label: 'Quintals', data: qty, backgroundColor: DARK_GREEN, borderRadius: 6 }] },
+            data: { labels, datasets: [{ label: 'Quintals', data: qty, backgroundColor: colours.accent, borderRadius: 6 }] },
             options: {
                 ...common,
                 plugins: {
@@ -286,8 +297,8 @@
         $('demo-remove').disabled = !status.farmers;
     }
 
-    async function demoAction(button, request, confirmText, doneText) {
-        if (!confirm(confirmText)) return;
+    async function demoAction(button, request, question, doneText) {
+        if (!await UI.confirm(question)) return;
         button.disabled = true;
         try {
             renderDemo(await request());
@@ -302,13 +313,27 @@
 
     $('demo-load').addEventListener('click', event => demoAction(event.currentTarget,
         () => Api.post('/api/admin/demo'),
-        'Load a fresh demo day? Old demo data is replaced. Real farmers are not touched.',
+        {
+            title: 'Load a fresh demo day?', message: 'Old demo data is replaced. Real farmers are not touched.',
+            confirmText: 'Load demo day', cancelText: 'Cancel',
+        },
         'Demo day loaded. Open the operator desk or a TV screen to see the queue.'));
 
     $('demo-remove').addEventListener('click', event => demoAction(event.currentTarget,
         () => Api.delete('/api/admin/demo'),
-        'Remove all demo farmers, bookings and payments?',
+        {
+            title: 'Remove demo data?', message: 'All demo farmers, their bookings and payments are deleted.',
+            confirmText: 'Remove demo data', cancelText: 'Cancel', danger: true,
+        },
         'Demo data removed.'));
+
+    // Theme switched: draw the charts again in the new colours.
+    document.addEventListener('themechange', () => {
+        if (!charts.farmers || !lastData) return;
+        Object.values(charts).forEach(chart => chart.destroy());
+        charts = {};
+        renderCharts(lastData);
+    });
 
     if (Admin.initPage()) {
         load();
