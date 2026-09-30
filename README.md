@@ -62,7 +62,7 @@ A new email address goes to the registration form: name, mobile number (for the 
 
 `V5__roles_and_staff.sql` creates one admin (`admin.tnj`, `admin.tvr`, `admin.ngt`) and one staff account (`staff.tnj`, `staff.tvr`, `staff.ngt`) per centre with random starting passwords. The passwords are in `staff-accounts.xlsx` in the project folder, which is git-ignored. Accounts are switched off rather than deleted, because weighments and payments point to them.
 
-**Payment details.** At registration the farmer chooses how to be paid: a **bank account** (account holder, account number typed twice, IFSC code, bank name) or a **UPI ID**. The form and the server check the same rules (account number 9 to 18 digits, IFSC like `SBIN0001234`, UPI like `name@okaxis`). The browser only ever gets the last 4 digits of the account number back. Farmers can change the details on their dashboard, and the admin's payments page shows where each farmer wants to be paid.
+**Payment details.** At registration the farmer chooses how to be paid: a **bank account** (account holder, account number typed twice, IFSC code, bank name) or a **UPI ID**. The form and the server check the same rules (account number 9 to 18 digits, IFSC like `SBIN0001234`, UPI like `name@okaxis`). The browser only ever gets the last 4 digits of the account number back. The account number and the UPI ID are **encrypted in the database** (AES-256-GCM, `EncryptedText`) with the key `PAYOUT_ENCRYPTION_KEY` from `.env`, so a copy of the database alone does not reveal them. Farmers can change the details on their dashboard, and the admin's payments page shows where each farmer wants to be paid.
 
 OTP rules: valid for 5 minutes, 3 wrong tries, a new OTP only after 60 seconds, at most 5 per hour per email address.
 

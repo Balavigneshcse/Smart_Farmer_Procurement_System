@@ -2,6 +2,9 @@ package com.cropcoders.procurement.entity;
 
 import java.time.LocalDateTime;
 
+import com.cropcoders.procurement.security.EncryptedText;
+
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
@@ -35,9 +38,13 @@ public class FarmerProfile {
     /** "BANK" or "UPI"; null until the farmer gives payment details. */
     private String payoutMethod;
     private String accountHolder;
+    /** Encrypted in the database (see EncryptedText). */
+    @Convert(converter = EncryptedText.class)
     private String accountNumber;
     private String ifsc;
     private String bankName;
+    /** Encrypted in the database (see EncryptedText). */
+    @Convert(converter = EncryptedText.class)
     private String upiId;
 
     private LocalDateTime updatedAt;

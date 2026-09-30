@@ -58,6 +58,11 @@ server:
 app:
   name: Smart Farmer Procurement System
 
+  # Key that encrypts farmers' bank account numbers and UPI IDs in the database.
+  # Set PAYOUT_ENCRYPTION_KEY (32+ random characters) in .env and on Render. The default is for local development only.
+  # Do not change it later: values saved with the old key could not be read any more.
+  payout-encryption-key: ${PAYOUT_ENCRYPTION_KEY:local-dev-payout-key-change-me-0123456789}
+
   jwt:
     # Set JWT_SECRET (32+ random characters) on Render. The default is for local development only.
     secret: ${JWT_SECRET:local-dev-secret-change-me-on-render-0123456789}
