@@ -95,3 +95,6 @@ app:
     key-id: ${RAZORPAY_KEY_ID:}        # must be a TEST key (rzp_test_...); live keys are refused
     key-secret: ${RAZORPAY_KEY_SECRET:}
     api-url: https://api.razorpay.com/v1
+    # Test accounts refuse large payments (UPI: at most Rs 1,00,000). A bigger farmer payment is charged
+    # through Razorpay as this stand-in amount (Rs 50,000) and recorded as paid in full.
+    test-charge-limit-paise: 5000000

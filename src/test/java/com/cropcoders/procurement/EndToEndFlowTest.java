@@ -272,7 +272,9 @@ class EndToEndFlowTest {
             String order = body(orderResult);
             orderId = JsonPath.read(order, "$.orderId");
             assertThat(orderId).startsWith("order_");
-            assertThat(((Number) JsonPath.read(order, "$.amountPaise")).longValue()).isPositive();
+            // 24.5 qtl of maize is Rs 58,800: above the test limit, so Razorpay charges the Rs 50,000 stand-in.
+            assertThat(((Number) JsonPath.read(order, "$.amountPaise")).longValue()).isEqualTo(5_000_000L);
+            assertThat(((Number) JsonPath.read(order, "$.fullAmountPaise")).longValue()).isEqualTo(5_880_000L);
         } else {
             // Razorpay's servers could not be reached (no internet, or a sandbox without network).
             // Put an order id in place, so the signature check and "paid" steps are still tested.

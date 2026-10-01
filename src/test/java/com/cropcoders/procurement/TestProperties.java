@@ -16,6 +16,6 @@ public final class TestProperties {
                         "http://localhost:8080"),
                 new AppProperties.Booking(7, 120),
                 new AppProperties.Queue(15, 120),
-                new AppProperties.Razorpay("", "", "https://api.razorpay.com/v1"));
+                new AppProperties.Razorpay("", "", "https://api.razorpay.com/v1", 5_000_000));
     }
 }

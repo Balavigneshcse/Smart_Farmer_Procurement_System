@@ -95,15 +95,19 @@ public class PaymentService {
         }
         Booking booking = payment.getProcurement().getBooking();
 
+        // Test accounts refuse big amounts, so a large payment is charged as a stand-in amount (test mode only).
+        long chargePaise = Math.min(payment.getAmountPaise(), razorpay.testChargeLimitPaise());
         if (payment.getRzpOrderId() == null) {
-            String orderId = razorpay.createOrder(payment.getAmountPaise(), "PAY-" + payment.getId(),
-                    Map.of("token", booking.getToken(), "farmer", booking.getFarmer().getName()));
+            String orderId = razorpay.createOrder(chargePaise, "PAY-" + payment.getId(),
+                    Map.of("token", booking.getToken(), "farmer", booking.getFarmer().getName(),
+                            "full_amount_paise", String.valueOf(payment.getAmountPaise())));
             payment.setRzpOrderId(orderId);
         }
         return new PaymentOrderResponse(
                 payment.getId(),
                 razorpay.keyId(),
                 payment.getRzpOrderId(),
+                chargePaise,
                 payment.getAmountPaise(),
                 "INR",
                 "Procurement " + booking.getToken() + " - " + booking.getCrop().getNameEn(),

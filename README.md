@@ -165,6 +165,8 @@ How it works (for the viva):
 
 **QR code in the confirmation email.** The booking confirmation email carries the same QR code as the booking page, so the farmer can show it at the desk without opening the app. `QrCode` draws it with ZXing and it is sent inside the email (an inline picture), so mail apps that block web pictures still show it.
 
+**Big amounts in test mode.** Razorpay test accounts refuse large payments (UPI allows at most ₹1,00,000), but a real procurement is often several lakh rupees. So when the amount is above ₹50,000 (`app.razorpay.test-charge-limit-paise`), Razorpay is asked for a ₹50,000 stand-in charge and the farmer's full amount is recorded as paid. The payments page says so before Checkout opens.
+
 ### Admin pages
 
 | Page | What the admin does there (a centre admin sees only their own centre) |

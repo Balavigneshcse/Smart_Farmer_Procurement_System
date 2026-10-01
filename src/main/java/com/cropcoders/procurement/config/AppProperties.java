@@ -7,8 +7,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record AppProperties(String name, Jwt jwt, Otp otp, Email email, Booking booking, Queue queue,
                             Razorpay razorpay) {
 
-    /** Razorpay test-mode keys (from .env locally, environment variables on Render). */
-    public record Razorpay(String keyId, String keySecret, String apiUrl) {
+    /**
+     * Razorpay test-mode keys (from .env). testChargeLimitPaise: the most one test payment charges through
+     * Razorpay (test accounts refuse large amounts; UPI allows at most Rs 1,00,000). A bigger farmer
+     * payment is charged as this stand-in amount and recorded as paid in full.
+     */
+    public record Razorpay(String keyId, String keySecret, String apiUrl, long testChargeLimitPaise) {
     }
 
     /**

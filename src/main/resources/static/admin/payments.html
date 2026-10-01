@@ -34,7 +34,7 @@
 <main id="main" class="container">
     <div class="page-head">
         <h1>Farmer payments</h1>
-        <p class="muted" id="page-intro">Accepted crops waiting to be paid. Payments run in <strong>Razorpay test mode</strong>. No real money moves.</p>
+        <p class="muted" id="page-intro">Accepted crops waiting to be paid. Payments run in <strong>Razorpay test mode</strong>. No real money moves. Amounts above ₹50,000 are charged as a ₹50,000 stand-in and recorded in full.</p>
     </div>
 
     <div id="config-warning" class="alert alert-error hidden">
@@ -150,13 +150,18 @@
             return;
         }
 
+        const standIn = order.amountPaise < order.fullAmountPaise;
+        if (standIn) {
+            showNotice(`Test mode: Razorpay charges ${money(order.amountPaise / 100)} as a stand-in. `
+                + `${order.farmerName} is recorded as paid the full ${money(order.fullAmountPaise / 100)}.`, 'info', true);
+        }
         const checkout = new Razorpay({
             key: order.keyId,
             order_id: order.orderId,
             amount: order.amountPaise,
             currency: order.currency,
             name: 'Smart Farmer Procurement System',
-            description: order.description,
+            description: standIn ? `${order.description} (test stand-in for ${money(order.fullAmountPaise / 100)})` : order.description,
             prefill: { name: order.farmerName, contact: `+91${order.farmerMobile}` },
             notes: { paymentId: String(order.paymentId) },
             theme: { color: '#1d6a40' },

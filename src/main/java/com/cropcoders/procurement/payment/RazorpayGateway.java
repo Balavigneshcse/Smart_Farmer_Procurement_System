@@ -70,6 +70,11 @@ public class RazorpayGateway {
         return config.keyId();
     }
 
+    /** The most one test payment charges through Razorpay (a positive value; default Rs 50,000). */
+    public long testChargeLimitPaise() {
+        return config.testChargeLimitPaise() > 0 ? config.testChargeLimitPaise() : 5_000_000L;
+    }
+
     @EventListener(ApplicationReadyEvent.class)
     void logStatus() {
         if (isConfigured()) {
@@ -104,7 +109,7 @@ public class RazorpayGateway {
             log.warn("Razorpay order failed: {} {}", e.getStatusCode(), e.getResponseBodyAsString());
             String hint = e.getStatusCode().value() == 401 ? " Check RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET." : "";
             throw new ApiException(HttpStatus.BAD_GATEWAY, "RAZORPAY_ERROR",
-                    "Razorpay refused the request (" + e.getStatusCode().value() + ")." + hint);
+                    "Razorpay refused the request (" + e.getStatusCode().value() + ")" + reason(e) + "." + hint);
         } catch (RestClientException e) {
             log.warn("Razorpay unreachable: {}", e.getMessage());
             throw new ApiException(HttpStatus.BAD_GATEWAY, "RAZORPAY_ERROR", "Could not reach Razorpay. Try again.");
@@ -115,6 +120,13 @@ public class RazorpayGateway {
     public boolean isValidSignature(String orderId, String paymentId, String signature) {
         requireConfigured();
         return signatureMatches(orderId, paymentId, signature, config.keySecret());
+    }
+
+    /** Razorpay's own explanation, e.g. ": Amount exceeds maximum amount allowed", or "" if there is none. */
+    private static String reason(RestClientResponseException e) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"description\"\\s*:\\s*\"([^\"]{1,200})\"")
+                .matcher(e.getResponseBodyAsString());
+        return m.find() ? ": " + m.group(1).replaceAll("\\.$", "") : "";
     }
 
     /** HMAC-SHA256 of "orderId|paymentId" with the key secret, compared in constant time. */
