@@ -2,11 +2,12 @@
 
 Farmers often wait all day at procurement centres without knowing the schedule or what happened to their crop and payment. This app fixes that:
 
-- **Slot booking.** Farmers register with their email address (a one-time password is emailed to them) and book a time slot at a procurement centre.
-- **Live queue.** Operators check farmers in and call them to counters. Farmers see their position and waiting time live, and a TV screen at the centre shows who is being served.
+- **Slot booking.** Farmers register with their email address (a one-time password is emailed to them), say how they want to be paid (bank account or UPI, stored encrypted) and book a time slot at a procurement centre. The confirmation email carries the token's QR code.
+- **Live queue.** Counter staff check farmers in and call them to counters. Farmers see their position and waiting time live, and a TV screen at the centre shows who is being served.
 - **Email alerts.** Farmers get an email at key moments (booked, reminder, turn near, weighed, paid), in their chosen language (English, Tamil or Hindi). Every update also appears on their dashboard.
 - **Tracking.** Every booking has a timeline, from booked through weighed to paid, with payment through Razorpay (test mode).
-- **Admin dashboard.** Today's farmers, queue lengths, average wait, crop procured and payments at every centre, with charts for the last 7 days. The admin also sets crop rates, moisture limits, counters and opening hours.
+- **Admin dashboard.** Today's farmers, queue lengths, average wait, crop procured and payments, with charts for the last 7 days.
+- **Three staff levels.** A super admin adds centres and centre admins and sets crop rates; each centre admin sees only their own centre and adds its counter staff; staff work the operator desk.
 
 Theme: Smart Automation · College mini project
 
@@ -14,10 +15,11 @@ Theme: Smart Automation · College mini project
 
 | Layer | Technology |
 |---|---|
-| Frontend | HTML, CSS, JavaScript (served by Spring Boot) |
+| Frontend | HTML, CSS, JavaScript (served by Spring Boot), light and dark theme, English / Tamil / Hindi |
 | Backend | Java 21, Spring Boot 4.1, Maven, Spring Data JPA, Flyway |
 | Database | PostgreSQL |
 | Payments | Razorpay (test mode) |
+| QR codes | qrcodejs in the browser, ZXing on the server (email) |
 | Email | Gmail SMTP (on the PC and on the server); optional Brevo email API |
 | Hosting | AWS EC2 free tier (Mumbai): Java 21 + PostgreSQL + Nginx on one server, no Docker |
 
@@ -38,7 +40,9 @@ Useful URLs:
 - <http://localhost:8080/api/centres>: procurement centres (JSON)
 - <http://localhost:8080/api/crops>: crops and rates (JSON)
 - <http://localhost:8080/farmer/login.html>: farmer login (English / Tamil / Hindi)
-- <http://localhost:8080/staff/login.html>: operator and admin login (English)
+- <http://localhost:8080/staff/login.html>: staff, centre admin and super admin login (English)
+- <http://localhost:8080/display.html?centre=1>: TV queue display
+- <http://localhost:8080/actuator/health>: health of the app and database
 
 ### Logging in
 
@@ -59,6 +63,8 @@ A new email address goes to the registration form: name, mobile number (for the 
 | Super admin | All centres | Adds centres and centre admins, sets crop rates, loads demo data, sees every centre | The app at start-up, from `SUPERADMIN_USERNAME` and `SUPERADMIN_PASSWORD` in `.env` |
 | Centre admin | One centre | Dashboard, payments and settings of that centre; adds its staff | Super admin, under "Admins & staff" |
 | Staff | One centre | Operator desk: check-in, call next, weighment | Centre admin (or super admin) |
+
+Each browser tab keeps its own staff login (in `sessionStorage`), so an admin and a staff member can be logged in side by side in two tabs. Farmer logins are shared by all tabs and last 7 days (`localStorage`).
 
 `V5__roles_and_staff.sql` creates one admin (`admin.tnj`, `admin.tvr`, `admin.ngt`) and one staff account (`staff.tnj`, `staff.tvr`, `staff.ngt`) per centre with random starting passwords. The passwords are in `staff-accounts.xlsx` in the project folder, which is git-ignored. Accounts are switched off rather than deleted, because weighments and payments point to them.
 
@@ -87,7 +93,7 @@ How it works (for the viva):
 
 | Screen | URL | Who |
 |---|---|---|
-| Operator desk | `/operator/desk.html` | Operator: check in by token or QR code (typed, USB scanner or camera), **Call next** per counter, **Call again**, **Not present** |
+| Operator desk | `/operator/desk.html` | Counter staff: check in by token or QR code (typed, USB scanner or camera), **Call next** per counter, **Call again**, **Not present** |
 | TV display | `/display.html?centre=1` | Centre TV: now serving per counter, next tokens with waiting time, labels in 3 languages, optional chime and spoken announcement |
 | Farmer phone | `/farmer/booking.html?id=…` | Farmer: live position and waiting time, then "Please go to Counter 2 now" (the phone vibrates) |
 
@@ -100,7 +106,7 @@ How it works (for the viva):
 
 ### Weighment and payment
 
-**Operator.** On a busy counter, click **Record weighment**, then enter:
+**Counter staff.** On a busy counter, click **Record weighment**, then enter:
 - weight (quintals)
 - moisture (%)
 - grade (A/B/C)
@@ -148,7 +154,7 @@ Use `EMAIL_PROVIDER=console` to print emails in the log instead (handy for testi
 | Booking confirmed / cancelled | Farmer books or cancels |
 | Reminder | About 2 hours before the slot (checked every 15 minutes, 7 am to 10 pm) |
 | Your turn is near | Farmer reaches position 3 or better in the queue |
-| Crop accepted / not accepted | Operator saves the weighment (weight and amount, or the reason) |
+| Crop accepted / not accepted | Staff save the weighment (weight and amount, or the reason) |
 | Payment done | Admin's Razorpay payment is verified |
 | Missed slot | Not checked in by slot end + 2 hours (booking becomes *No show*) |
 
@@ -183,10 +189,11 @@ How it works (for the viva):
 
 ### Demo data (for presentations)
 
-On the admin dashboard, **Load demo day** adds:
+On the super admin's dashboard, **Load demo day** adds:
 - 40 demo farmers (most speaking Tamil, some Hindi and English),
 - a busy day in progress at each centre: farmers already weighed and paid, some at the counters, a waiting line and some still to come,
-- the last 6 days of history, so the charts have something to show.
+- the last 6 days of history, so the charts have something to show,
+- made-up bank or UPI details for every demo farmer (encrypted like real ones), so the payments page shows where each is paid.
 
 **Remove demo data** deletes all of it again. Real farmers, their bookings and payments are never touched.
 
@@ -198,7 +205,8 @@ How it works (for the viva):
 ### Keeping the pages smooth
 
 - **Live pages pause in hidden tabs.** A browser keeps at most 6 connections open to one server, and every live page (operator desk, TV, farmer's booking) holds one. `js/live.js` closes the connection while a tab is hidden and reopens it when the tab is shown; the server then sends the current queue at once.
-- **Cheap animations.** The pulsing "live" dot only changes `transform` and `opacity`, which the graphics card handles without redrawing the page. The header is solid (no blur effect), and the field picture at the bottom of the screen sits on its own layer, so scrolling doesn't redraw it.
+- **Cheap animations.** Only `transform` and `opacity` are animated (the pulsing "live" dot, the queue number, the "go to counter" alert), which the graphics card handles without redrawing the page. The header is solid (no blur effect).
+- **Small files.** Fonts are cut down to the characters used, icons are one sprite file, photos are small WebP files, and the server compresses HTML, CSS, JS and JSON.
 - **Load in parallel.** Farmer pages ask for their data at the same time as the language file, the admin charts library loads in the background (numbers first, charts a moment later), and the operator desk only downloads the camera QR scanner when "Scan QR" is pressed.
 
 ### Look and feel
@@ -230,17 +238,21 @@ DELETE FROM slots WHERE centre_id = (SELECT id FROM centres WHERE code = 'TNJ') 
 
 ### Configuration
 
-Local defaults are in `src/main/resources/application.yml`. To override them, set environment variables in IntelliJ (Run → Edit Configurations → Environment variables):
+Local defaults are in `src/main/resources/application.yml`. Override them in the git-ignored `.env` file in the project folder (`example.env` lists every key), or as environment variables:
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `DB_URL` | `jdbc:postgresql://localhost:5432/farmer_procurement` | Database URL |
-| `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | `postgres` / `postgres` (from `application.yml`) | Database login |
+| `DB_USERNAME` / `DB_PASSWORD` | `postgres` / `postgres` | Database login |
 | `PORT` | `8080` | HTTP port |
-| `JWT_SECRET` | a local development value | Signs login tokens. **Set a random 32+ character value in production** |
-| `EMAIL_PROVIDER` | `console` | `console` prints emails in the log; `smtp` sends them with Gmail |
+| `JWT_SECRET` | a local development value | Signs login tokens (and QR picture links). **Set a random 32+ character value in production** |
+| `PAYOUT_ENCRYPTION_KEY` | a local development value | Encrypts farmers' account numbers and UPI IDs. **Random 32+ characters in production; never change it later** |
+| `SUPERADMIN_USERNAME` / `SUPERADMIN_PASSWORD` | – | The super admin account, created at start-up if there is none |
+| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | – | Razorpay **test** keys (`rzp_test_...`); live keys are refused |
+| `EMAIL_PROVIDER` | `console` | `console` prints emails in the log; `smtp` sends them with Gmail; `brevo` uses the Brevo API |
 | `MAIL_USERNAME` / `MAIL_PASSWORD` | – | Gmail address and App Password (for `smtp`) |
 | `EMAIL_DAILY_LIMIT` | `250` | Notification emails per day before switching to in-app only |
+| `BREVO_API_KEY` / `MAIL_FROM` | – | Only for `brevo` |
 | `APP_URL` | `http://localhost:8080` | Website address used for links inside emails |
 
 Secrets (JWT secret, Razorpay keys, Gmail App Password) live in the git-ignored `.env` file on the PC, or in `/opt/sfps/.env` on the server. They are never committed.
@@ -256,8 +268,9 @@ Email providers (`EMAIL_PROVIDER`): `console` (print in the log), `smtp` (Gmail)
 ```
 src/main/java/com/cropcoders/procurement/
 ├── ProcurementApplication.java   entry point (forces Asia/Kolkata time zone)
-├── config/                       AppProperties (the "app:" settings)
-├── security/                     SecurityConfig (who can call what), JWT service + filter
+├── config/                       AppProperties (the "app:" settings), SuperAdminSeeder
+├── security/                     SecurityConfig (who can call what), JWT service + filter, AccessScope (centre limits),
+│                                 EncryptedText (bank details), QrLinkSigner
 ├── controller/                   REST endpoints
 ├── service/                      business logic (login, booking, queue, weighment, payment, notifications,
 │                                 admin dashboard and settings, demo data, ...)
@@ -268,14 +281,18 @@ src/main/java/com/cropcoders/procurement/
 ├── scheduler/                    timed jobs (slot generation, reminders + no-shows)
 ├── realtime/                     live queue updates (Server-Sent Events)
 ├── payment/                      RazorpayGateway (orders API + signature check)
-├── email/                        EmailSender (console / Gmail SMTP), EmailTemplates, EmailDispatcher (background sending)
+├── email/                        EmailSender (console / Gmail SMTP / Brevo), EmailTemplates, EmailDispatcher (background
+│                                 sending), QrCode (QR picture with ZXing)
 └── exception/                    ApiException + GlobalExceptionHandler (JSON errors)
 src/main/resources/
 ├── application.yml               configuration
 ├── messages*.properties          email texts in English, Tamil, Hindi
-├── db/migration/                 Flyway: V1 schema, V2 centres + crops, V3 staff accounts, V4 email instead of SMS
-└── static/                       HTML pages, css/, js/, i18n/ (en, ta, hi), img/ (paddy field drawings)
-src/test/java/                    unit tests (JwtServiceTest, EtaCalculatorTest, RazorpayGatewayTest, EmailTemplatesTest)
+├── db/migration/                 Flyway: V1 schema, V2 centres + crops, V3 staff accounts, V4 email instead of SMS,
+│                                 V5 roles and staff, V6 farmer payment details, V7 encrypted payment details
+└── static/                       HTML pages, css/, js/, i18n/ (en, ta, hi), fonts/, img/ (icons.svg, photos/)
+src/test/java/                    unit tests + EndToEndFlowTest (see "Tests")
+deploy/                           AWS EC2 setup and update scripts, systemd service, Nginx site
+docs/                             DEPLOY.md (AWS guide), REDESIGN_PLAN.md, DESIGN_BRIEF.md
 ```
 
 ### How login works (for the viva)
@@ -283,7 +300,23 @@ src/test/java/                    unit tests (JwtServiceTest, EtaCalculatorTest,
 1. **Farmer OTP.** The server makes a random 6-digit code, stores only its BCrypt hash, and emails it in the farmer's language. Email addresses are stored in lower case, so `Ravi@Gmail.com` and `ravi@gmail.com` are the same farmer.
 2. **Verify.** The code is checked against the hash. There are 3 attempts, and each wrong try is saved even though the request fails (`noRollbackFor`).
 3. **New farmer.** The server returns a 15-minute *registration token* (a JWT marked `purpose=register`). This token can only be used to submit the registration form.
-4. **Login token.** A JWT signed with `JWT_SECRET` that holds the user id, role and centre. The browser keeps it in `localStorage` and sends it as `Authorization: Bearer …`.
-5. **Access rules.** `JwtAuthFilter` reads the token on every request, and `SecurityConfig` allows `/api/farmers/**` only for FARMER, `/api/operator/**` only for OPERATOR, and `/api/admin/**` only for ADMIN.
+4. **Login token.** A JWT signed with `JWT_SECRET` that holds the user id, role and centre. The browser keeps a farmer's token in `localStorage` (all tabs, 7 days) and a staff token in `sessionStorage` (this tab only, 12 hours), and sends it as `Authorization: Bearer …`.
+5. **Access rules.** `JwtAuthFilter` reads the token on every request. `SecurityConfig` allows `/api/farmers/**` only for FARMER, `/api/operator/**` only for OPERATOR (staff), and `/api/admin/**` for ADMIN and SUPER_ADMIN. Inside the admin APIs, `AccessScope` limits a centre admin to their own centre and keeps centres, crop rates and demo data for the super admin.
+6. **Staff passwords** are stored as BCrypt hashes. The super admin's password comes from `.env` at start-up, so it is never in the code or a migration.
+
+## Tests
+
+Run them in IntelliJ (right-click `src/test/java` → Run 'All Tests') or with Maven (`mvn test`).
+
+| Test | What it checks |
+|---|---|
+| `EndToEndFlowTest` | The whole app, step by step, on its own throw-away database (`farmer_procurement_e2e`, dropped afterwards; skipped without a local PostgreSQL): super admin, centre admin and staff with their access limits, farmer OTP login, registration with bank details (encrypted), UPI change, booking with the QR email, check-in, call next, weighment, Razorpay order and signature check, paid status, demo day |
+| `JwtServiceTest` | Login and registration tokens, expiry, tampering |
+| `EtaCalculatorTest` | Waiting-time estimates in the queue |
+| `RazorpayGatewayTest` | Payment signature check, test keys only |
+| `EmailTemplatesTest` | Emails in three languages, HTML escaping |
+| `QrCodeTest` | The email's QR picture reads back as the booking's QR text |
+| `EncryptedTextTest` | Bank details are unreadable in the database and come back the same |
+| `MoneyFormatTest` | Amounts in emails use Indian grouping (₹6,00,000.00) |
 
 See [PLAN.md](PLAN.md) for the full design and milestone checklist.
