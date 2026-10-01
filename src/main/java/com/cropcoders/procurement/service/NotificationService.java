@@ -1,7 +1,7 @@
 package com.cropcoders.procurement.service;
 
 import java.math.BigDecimal;
-import java.text.NumberFormat;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -43,7 +43,6 @@ import com.cropcoders.procurement.repository.NotificationRepository;
 public class NotificationService {
 
     private static final Set<EmailStatus> COUNTS_TOWARDS_LIMIT = EnumSet.of(EmailStatus.PENDING, EmailStatus.SENT);
-    private static final Locale INDIA = Locale.of("en", "IN");
     private static final int MAX_SUBJECT = 200;
     private static final int MAX_MESSAGE = 500;
 
@@ -114,8 +113,30 @@ public class NotificationService {
     }
 
     /** Amount in Indian format for texts, e.g. ₹58,040.50 */
+    /**
+     * Rupees with Indian digit grouping and paise: 600000 -> "₹6,00,000.00", 58040.5 -> "₹58,040.50".
+     * (Java's own formatter groups in threes, "₹600,000.00", so the grouping is done here.)
+     */
     public static String money(BigDecimal amount) {
-        return NumberFormat.getCurrencyInstance(INDIA).format(amount);
+        BigDecimal value = amount.setScale(2, RoundingMode.HALF_UP);
+        String sign = value.signum() < 0 ? "-" : "";
+        String digits = value.abs().toPlainString();
+        String whole = digits.substring(0, digits.indexOf('.'));
+        String paise = digits.substring(digits.indexOf('.'));
+        StringBuilder grouped = new StringBuilder();
+        int end = whole.length();
+        if (end > 3) {
+            grouped.insert(0, whole.substring(end - 3));
+            end -= 3;
+            while (end > 2) {
+                grouped.insert(0, whole.substring(end - 2, end) + ",");
+                end -= 2;
+            }
+            grouped.insert(0, whole.substring(0, end) + ",");
+        } else {
+            grouped.append(whole);
+        }
+        return sign + "₹" + grouped + paise;
     }
 
     private long emailsSentToday() {
