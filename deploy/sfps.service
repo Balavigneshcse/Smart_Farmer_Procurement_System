@@ -1,0 +1,19 @@
+# systemd service for the app on the EC2 server (installed by setup-ec2.sh).
+#   sudo systemctl status sfps      sudo systemctl restart sfps      sudo journalctl -u sfps -f
+[Unit]
+Description=Smart Farmer Procurement System
+After=network-online.target postgresql.service
+Wants=network-online.target postgresql.service
+
+[Service]
+User=sfps
+# The app reads /opt/sfps/.env from its working folder.
+WorkingDirectory=/opt/sfps
+# A t3.micro has 1 GB of memory, shared with PostgreSQL and Nginx.
+ExecStart=/usr/bin/java -Xms128m -Xmx400m -XX:+UseSerialGC -Djava.awt.headless=true -jar /opt/sfps/app.jar
+Restart=always
+RestartSec=10
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target

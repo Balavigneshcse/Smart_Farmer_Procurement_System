@@ -14,11 +14,11 @@ College mini project · Theme: Smart Automation · Built by you + Claude (no oth
 | Frontend | HTML, CSS, vanilla JS — served by Spring Boot from `src/main/resources/static` (no CORS, one deployable) |
 | Languages | Farmer pages: English / தமிழ் / हिन्दी (farmer picks at registration; landing + login have a switch). Operator desk and admin: **English only** |
 | Backend | Java 21, Spring Boot 4.1.1, Maven (IntelliJ's bundled Maven), Spring Security + JWT (jjwt 0.13.0) |
-| Database | PostgreSQL · Flyway migrations · local = PostgreSQL 18 installed on the PC (**no Docker**), database `farmer_procurement`, user `postgres` / `postgres` · production = Neon |
+| Database | PostgreSQL · Flyway migrations · local = PostgreSQL 18 installed on the PC (**no Docker**), database `farmer_procurement`, user `postgres` / `postgres` · production = PostgreSQL on the EC2 server |
 | Realtime | Server-Sent Events (`SseEmitter` + browser `EventSource`) |
 | Payments | Razorpay **test mode** (Checkout + server-side signature verification) |
-| Notifications | **Email + in-app** (no SMS). On the PC: **Gmail SMTP** with an App Password (500/day). On Render: **Brevo** HTTPS email API (free 300/day), because Render's free plan blocks SMTP ports 25/465/587. `console` provider prints emails in the log during development |
-| Hosting | Render free web service (Docker) + Neon free Postgres |
+| Notifications | **Email + in-app** (no SMS). On the PC: **Gmail SMTP** with an App Password (500/day). On the AWS server: Gmail SMTP too (port 587 is allowed). Brevo HTTPS API sender available for hosts that block SMTP. `console` provider prints emails in the log during development |
+| Hosting | AWS EC2 free tier, Mumbai (Ubuntu, Java 21 systemd service, PostgreSQL, Nginx + Let's Encrypt), no Docker |
 | IDE | IntelliJ IDEA 2026.2, project SDK = JDK 21 (`C:\Program Files\Java\jdk-21.0.12.1`) |
 | Source control | https://github.com/Balavigneshcse/Smart_Farmer_Procurement_System — commit + push after each milestone |
 
@@ -26,7 +26,7 @@ College mini project · Theme: Smart Automation · Built by you + Claude (no oth
 - Farmers log in with **email + OTP** (the OTP is emailed). Registration asks: name, email (OTP-verified), mobile number (shown to the operator, not verified), address + district, Aadhaar last 4 digits, preferred language. The crop is asked **at booking**, not at registration.
 - A farmer's emails are sent in their registered language.
 - Decision 2026-09-23: SMS dropped entirely (first textbee, then the Android SMS gateway). Notifications are email + in-app.
-- Docker is used only by Render in the cloud (Render has no native Java runtime). Nothing Docker runs on the PC.
+- No Docker anywhere: the server runs the jar directly (`deploy/setup-ec2.sh`).
 
 ## 2. Deployment architecture
 
@@ -93,7 +93,7 @@ Admin browser ── checkout.js popup ──► Razorpay (test)  → success �
 - [x] **M5 — Procurement + payment:** weighment form (moisture limit blocks accept, rejection needs a reason), amount calculation, payments page, Razorpay order + checkout + HMAC verify (own `RazorpayGateway`, no SDK; live keys refused). Keys in git-ignored `.env`.
 - [x] **M6 — Email + automation:** farmer login switched to **email + OTP** (Flyway V4: `users.email`, OTP and notifications keyed by email; mobile kept as contact), `EmailSender` with `console` and Gmail `smtp` providers, HTML email templates in en/ta/hi, emails sent in the background after commit, daily cap, in-app notification list on the dashboard, reminder / no-show jobs every 15 min, "turn near" alert. SMS code removed. ✔ Real Gmail send tested (OTP + booking confirmation).
 - [x] **M7 — Dashboard + polish:** admin dashboard (today's numbers, live table per centre, Chart.js charts for 7 days, crops, payments), "Centres & crops" settings (crop rates / moisture / new crops, centre counters / hours / service time with automatic slot updates), demo data button (40 `@demo.invalid` farmers, a live day + 6 days of history, removable), new look with the same greens and hand-drawn paddy-field SVGs on every page, checked at 375 px phone width.
-- [x] **M8 — Deploy:** (code ready; accounts and the live smoke test: see docs/DEPLOY.md) Dockerfile, push to GitHub, Neon DB, **Brevo email provider** (HTTPS API, since Render blocks SMTP), Render web service + env vars, smoke test on the live URL, demo checklist.
+- [x] **M8 — Deploy:** AWS EC2 (Mumbai, free tier) without Docker: `deploy/setup-ec2.sh` installs Java 21, PostgreSQL, Nginx + HTTPS and runs the app as a service; Gmail SMTP for email. Steps and smoke test in `docs/DEPLOY.md`.
 
 ---
 

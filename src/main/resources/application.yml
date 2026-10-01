@@ -13,8 +13,8 @@ spring:
 
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/farmer_procurement}
-    username: postgres
-    password: postgres
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
     hikari:
       maximum-pool-size: 5
 

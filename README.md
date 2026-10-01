@@ -18,8 +18,8 @@ Theme: Smart Automation · College mini project
 | Backend | Java 21, Spring Boot 4.1, Maven, Spring Data JPA, Flyway |
 | Database | PostgreSQL |
 | Payments | Razorpay (test mode) |
-| Email | Gmail SMTP on the PC; Brevo email API on Render (M8) |
-| Hosting | Render (app) + Neon (PostgreSQL), both free tiers |
+| Email | Gmail SMTP (on the PC and on the server); optional Brevo email API |
+| Hosting | AWS EC2 free tier (Mumbai): Java 21 + PostgreSQL + Nginx on one server, no Docker |
 
 ## Run it locally (IntelliJ IDEA)
 
@@ -158,8 +158,8 @@ How it works (for the viva):
 - **Texts in 3 languages.** Email texts live in `messages.properties` (English), `messages_ta.properties` and `messages_hi.properties`, and are picked by the farmer's saved language. Every text is HTML-escaped before it goes into the email.
 - **Sent after commit, in the background.** A notification is saved in the same transaction as the booking change. The email is sent by `EmailDispatcher` only **after** that transaction commits (`@TransactionalEventListener(AFTER_COMMIT)`), on a separate thread (`@Async`), so the operator's click is not slowed down by Gmail and no email goes out for a change that failed. The row is then marked `SENT` (with Gmail's message id) or `FAILED`.
 - **Free quota.** At most `EMAIL_DAILY_LIMIT` (default 250) notification emails per day (Gmail allows 500, Brevo 300). After that, notifications are shown in the app only (`SKIPPED`). OTP emails are never capped, so farmers can always log in.
-- **Scheduled jobs.** `AutomationJob` runs every 15 minutes from 7 am to 10 pm and also at startup (the free Render server sleeps and may miss runs). Nothing runs at night, so the free database can sleep too.
-- **Pluggable sender.** `EmailSender` is an interface; `ConsoleEmailSender` and `SmtpEmailSender` are chosen by `EMAIL_PROVIDER`. On Render, a Brevo sender will be added (M8), because Render's free plan blocks SMTP ports.
+- **Scheduled jobs.** `AutomationJob` runs every 15 minutes from 7 am to 10 pm and also at startup (so nothing is missed after a restart). Nothing runs at night, so the free database can sleep too.
+- **Pluggable sender.** `EmailSender` is an interface; `ConsoleEmailSender` and `SmtpEmailSender` are chosen by `EMAIL_PROVIDER`. `BrevoEmailSender` (HTTPS API) is there for hosts that block SMTP ports.
 - **Fast OTP.** The OTP email is also sent in the background, so "Send OTP" answers in about 0.2 seconds and the farmer can type the code as soon as it arrives.
 - **One kept-open Gmail connection.** Connecting to Gmail (TCP + TLS + login) takes about 2-3 seconds from here, so `SmtpEmailSender` opens the connection once at startup and reuses it for every email, like a connection pool with one connection. An email then leaves in about 2 seconds instead of 5-8. If Gmail has closed the connection, the sender reconnects and tries once more.
 
@@ -241,13 +241,13 @@ Local defaults are in `src/main/resources/application.yml`. To override them, se
 | `EMAIL_DAILY_LIMIT` | `250` | Notification emails per day before switching to in-app only |
 | `APP_URL` | `http://localhost:8080` | Website address used for links inside emails |
 
-Secrets (JWT secret, Razorpay keys, Gmail App Password) live in the git-ignored `.env` file on the PC, or in environment variables on Render. They are never committed.
+Secrets (JWT secret, Razorpay keys, Gmail App Password) live in the git-ignored `.env` file on the PC, or in `/opt/sfps/.env` on the server. They are never committed.
 
 ## Deploying
 
-The app is deployed as a Docker container on Render, with Neon PostgreSQL and Brevo for emails, all on free plans. `Dockerfile` builds the image, `render.yaml` describes the service, and `docs/DEPLOY.md` has the step-by-step guide and the smoke test.
+The live site runs on one free-tier **AWS EC2** server (Mumbai), without Docker: Java 21 runs the app as a systemd service, PostgreSQL is on the same server, and Nginx serves it over HTTPS (free Let's Encrypt certificate on an `sslip.io` name). Emails go through Gmail SMTP, which AWS allows. `deploy/setup-ec2.sh` installs everything in one go; `docs/DEPLOY.md` has the steps and the smoke test, and `deploy/update.sh` puts new code live.
 
-Emails use `EMAIL_PROVIDER`: `console` (print in the log), `smtp` (Gmail, on the PC) or `brevo` (Brevo HTTPS API, on Render, because Render's free plan blocks SMTP). Brevo cannot carry inline pictures, so there the confirmation email shows the QR from a signed link (`/api/qr/{id}.png?sig=...`, `QrLinkSigner`).
+Email providers (`EMAIL_PROVIDER`): `console` (print in the log), `smtp` (Gmail) and `brevo` (Brevo HTTPS API, for hosts that block SMTP). Brevo cannot carry inline pictures, so with it the confirmation email shows the QR from a signed link (`/api/qr/{id}.png?sig=...`, `QrLinkSigner`).
 
 ## Project structure
 
