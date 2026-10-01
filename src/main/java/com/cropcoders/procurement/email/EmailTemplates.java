@@ -86,43 +86,43 @@ public class EmailTemplates {
         html.append("<!DOCTYPE html><html lang=\"").append(c.locale().getLanguage()).append("\"><head>")
                 .append("<meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">")
                 .append("<title>").append(esc(c.subject())).append("</title></head>")
-                .append("<body style=\"margin:0;padding:0;background:#f0f7f1;color:#1b2a20;")
+                .append("<body style=\"margin:0;padding:0;background:#f3f5f1;color:#17231b;")
                 .append("font-family:Arial,'Noto Sans Tamil','Noto Sans Devanagari',sans-serif;\">")
                 .append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" ")
-                .append("style=\"background:#f0f7f1;padding:24px 12px;\"><tr><td align=\"center\">")
+                .append("style=\"background:#f3f5f1;padding:24px 12px;\"><tr><td align=\"center\">")
                 .append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" ")
-                .append("style=\"max-width:520px;background:#ffffff;border:1px solid #d5e6d9;border-radius:12px;\">")
+                .append("style=\"max-width:520px;background:#ffffff;border:1px solid #d5ddd4;border-radius:12px;\">")
                 // header bar with the app name
-                .append("<tr><td style=\"background:#1e6b3a;color:#ffffff;padding:16px 24px;font-size:16px;")
+                .append("<tr><td style=\"background:#1d6a40;color:#ffffff;padding:16px 24px;font-size:16px;")
                 .append("font-weight:bold;border-radius:12px 12px 0 0;\">").append(esc(appName)).append("</td></tr>")
                 .append("<tr><td style=\"padding:24px;\">")
-                .append("<h1 style=\"margin:0 0 16px;font-size:20px;line-height:1.35;color:#12351f;\">")
+                .append("<h1 style=\"margin:0 0 16px;font-size:20px;line-height:1.35;color:#17231b;\">")
                 .append(esc(c.subject())).append("</h1>");
         if (c.greeting() != null) {
             html.append(paragraph(c.greeting()));
         }
         html.append(paragraph(c.message()));
         if (c.highlight() != null) {
-            html.append("<p style=\"margin:8px 0 16px;padding:14px;background:#dff0e3;border-radius:8px;")
-                    .append("text-align:center;font-size:32px;font-weight:bold;letter-spacing:8px;color:#12351f;\">")
+            html.append("<p style=\"margin:8px 0 16px;padding:14px;background:#e1efe5;border-radius:8px;")
+                    .append("text-align:center;font-size:32px;font-weight:bold;letter-spacing:8px;color:#17231b;\">")
                     .append(esc(c.highlight())).append("</p>");
         }
         if (c.qrPng() != null) {
             html.append("<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:8px 0 4px;\"><tr>")
-                    .append("<td style=\"padding:10px;background:#ffffff;border:1px solid #d5e6d9;border-radius:8px;\">")
+                    .append("<td style=\"padding:10px;background:#ffffff;border:1px solid #d5ddd4;border-radius:8px;\">")
                     .append("<img src=\"cid:").append(EmailMessage.QR_CONTENT_ID).append("\" width=\"").append(QR_SIZE)
                     .append("\" height=\"").append(QR_SIZE).append("\" alt=\"").append(esc(c.qrCaption()))
                     .append("\" style=\"display:block;border:0;\"></td></tr></table>")
-                    .append("<p style=\"margin:0 0 8px;font-size:13px;color:#5a6b5f;\">").append(esc(c.qrCaption())).append("</p>");
+                    .append("<p style=\"margin:0 0 8px;font-size:13px;color:#4f5e54;\">").append(esc(c.qrCaption())).append("</p>");
         }
         if (c.buttonUrl() != null) {
             html.append("<p style=\"margin:24px 0 0;\"><a href=\"").append(esc(c.buttonUrl())).append("\" ")
-                    .append("style=\"display:inline-block;background:#1e6b3a;color:#ffffff;text-decoration:none;")
+                    .append("style=\"display:inline-block;background:#1d6a40;color:#ffffff;text-decoration:none;")
                     .append("padding:12px 22px;border-radius:8px;font-weight:bold;font-size:15px;\">")
                     .append(esc(c.buttonLabel())).append("</a></p>");
         }
         html.append("</td></tr>")
-                .append("<tr><td style=\"padding:16px 24px;background:#f7faf7;color:#5a6b5f;font-size:12px;")
+                .append("<tr><td style=\"padding:16px 24px;background:#f7faf7;color:#4f5e54;font-size:12px;")
                 .append("line-height:1.5;border-radius:0 0 12px 12px;\">").append(esc(c.footer())).append("</td></tr>")
                 .append("</table></td></tr></table></body></html>");
 

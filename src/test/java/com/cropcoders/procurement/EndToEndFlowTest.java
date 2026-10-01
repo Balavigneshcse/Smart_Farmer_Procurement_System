@@ -296,6 +296,15 @@ class EndToEndFlowTest {
         assertThat((String) JsonPath.read(finished, "$.status")).isEqualTo("COMPLETED");
         assertThat((String) JsonPath.read(finished, "$.payment.status")).isEqualTo("PAID");
         waitForEmail(email, paymentRef);   // the "paid" email
+
+        // ---------- Demo day: every demo farmer has (encrypted) payment details ----------
+        expect(post("/api/admin/demo", superToken, null), 200);
+        List<Map<String, Object>> demoPayments = JsonPath.read(
+                body(expect(get("/api/admin/payments", superToken), 200)), "$.payments");
+        assertThat(demoPayments).isNotEmpty().allSatisfy(p -> assertThat(p.get("payTo")).isNotNull());
+        assertThat(jdbc.queryForList("SELECT account_number FROM farmer_profiles WHERE account_number IS NOT NULL", String.class))
+                .allSatisfy(saved -> assertThat(saved).startsWith("enc:"));
+        expect(delete("/api/admin/demo", superToken), 200);
     }
 
     // ---------- helpers ----------
@@ -325,6 +334,10 @@ class EndToEndFlowTest {
 
     private MockHttpServletRequestBuilder post(String path, String token, Object body) {
         return withBody(auth(MockMvcRequestBuilders.post(path), token), body);
+    }
+
+    private MockHttpServletRequestBuilder delete(String path, String token) {
+        return auth(MockMvcRequestBuilders.delete(path), token);
     }
 
     private MockHttpServletRequestBuilder put(String path, String token, Object body) {

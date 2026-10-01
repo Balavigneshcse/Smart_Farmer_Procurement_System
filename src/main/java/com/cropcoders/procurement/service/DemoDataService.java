@@ -31,6 +31,7 @@ import com.cropcoders.procurement.enums.BookingEventType;
 import com.cropcoders.procurement.enums.BookingStatus;
 import com.cropcoders.procurement.exception.ApiException;
 import com.cropcoders.procurement.realtime.QueueChangedEvent;
+import com.cropcoders.procurement.security.EncryptedText;
 import com.cropcoders.procurement.repository.CentreRepository;
 import com.cropcoders.procurement.repository.CropRepository;
 
@@ -88,10 +89,19 @@ public class DemoDataService {
     private final int lateGraceMinutes;
     private final int noShowAfterMinutes;
     private final int reminderBeforeMinutes;
+    private final EncryptedText encrypted;
+
+    /** Banks for the demo farmers' (made-up) accounts: name and the first 4 letters of their IFSC codes. */
+    private static final String[][] BANKS = {
+            {"State Bank of India", "SBIN"}, {"Indian Bank", "IDIB"}, {"Canara Bank", "CNRB"},
+            {"Indian Overseas Bank", "IOBA"}, {"Tamil Nadu Grama Bank", "IDIB"},
+    };
+    private static final String[] UPI_HANDLES = {"okaxis", "oksbi", "ybl", "paytm"};
 
     public DemoDataService(JdbcTemplate jdbc, CentreRepository centreRepository, CropRepository cropRepository,
                            SlotService slotService, TokenService tokenService, ApplicationEventPublisher events,
-                           AppProperties properties) {
+                           AppProperties properties, EncryptedText encrypted) {
+        this.encrypted = encrypted;
         this.jdbc = jdbc;
         this.centreRepository = centreRepository;
         this.cropRepository = cropRepository;
@@ -497,9 +507,30 @@ public class DemoDataService {
                     VALUES (?, ?, ?, ?, ?, ?)""",
                     id, (10 + random.nextInt(190)) + ", Main Road, " + VILLAGES[i % VILLAGES.length], district,
                     "%04d".formatted(random.nextInt(10_000)), language, joined);
+            addPayoutDetails(id, name, mobile, i, random);
             farmers.add(new Farmer(id, language));
         }
         return farmers;
+    }
+
+    /**
+     * Made-up payment details, so the admin's payments page shows where each demo farmer is paid:
+     * every third farmer uses UPI, the others a bank account. Stored encrypted, like real details.
+     */
+    private void addPayoutDetails(long farmerId, String name, String mobile, int index, Random random) {
+        if (index % 3 == 2) {
+            String upi = mobile + "@" + UPI_HANDLES[index % UPI_HANDLES.length];
+            jdbc.update("UPDATE farmer_profiles SET payout_method = 'UPI', upi_id = ? WHERE user_id = ?",
+                    encrypted.convertToDatabaseColumn(upi), farmerId);
+            return;
+        }
+        String[] bank = BANKS[index % BANKS.length];
+        String account = "%d%011d".formatted(1 + random.nextInt(9), Math.abs(random.nextLong() % 100_000_000_000L));
+        String ifsc = bank[1] + "0" + "%06d".formatted(random.nextInt(1_000_000));
+        jdbc.update("""
+                UPDATE farmer_profiles SET payout_method = 'BANK', account_holder = ?, account_number = ?, ifsc = ?,
+                       bank_name = ? WHERE user_id = ?""",
+                name, encrypted.convertToDatabaseColumn(account), ifsc, bank[0], farmerId);
     }
 
     /** The operator of each centre records its check-ins and weighments. */

@@ -27,8 +27,13 @@
     <form id="login-form" class="card auth-card" novalidate>
         <span class="auth-icon"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#identification-card"></use></svg></span>
         <h1 class="auth-title">Staff login</h1>
-        <p class="muted">For super admins, centre admins and counter staff. You are taken to your own screen after logging in.</p>
+        <p class="muted">For super admins, centre admins and counter staff. You are taken to your own screen after logging in.
+            Each browser tab keeps its own login, so you can use different accounts in different tabs.</p>
 
+        <div id="signed-in" class="alert alert-info hidden">
+            <span id="signed-in-text"></span>
+            <a id="continue-link" href="/">Continue</a>, or log in below with another account.
+        </div>
         <div id="alert" class="alert hidden" role="alert"></div>
 
         <div class="field">
@@ -61,10 +66,13 @@
 <script>
     const $ = id => document.getElementById(id);
 
-    // Already logged in as staff? Go straight to the right page.
+    // Already logged in as staff in this tab? Offer to continue, but still allow logging in as someone else.
+    const ROLE_NAMES = { SUPER_ADMIN: 'super admin', ADMIN: 'centre admin', OPERATOR: 'staff' };
     const current = Auth.user();
     if (current && current.role !== 'FARMER') {
-        location.replace(Auth.homeFor(current.role));
+        $('signed-in-text').textContent = `This tab is logged in as ${current.name} (${ROLE_NAMES[current.role] ?? current.role}).`;
+        $('continue-link').href = Auth.homeFor(current.role);
+        $('signed-in').classList.remove('hidden');
     }
 
     function showAlert(text, type = 'error') {
