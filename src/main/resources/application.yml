@@ -47,6 +47,13 @@ spring:
       "[mail.smtp.timeout]": 10000
       "[mail.smtp.writetimeout]": 10000
 
+management:
+  health:
+    # /actuator/health should say whether the app and database are up. It must not wait 10+ seconds
+    # trying to reach Gmail (or fail the server's health check when Gmail is slow).
+    mail:
+      enabled: false
+
 server:
   port: ${PORT:8080}
   # Text files are sent compressed: the pages load much faster on slow mobile networks.
