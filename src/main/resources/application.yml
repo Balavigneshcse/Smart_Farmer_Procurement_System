@@ -77,7 +77,7 @@ app:
     max-per-hour: 5
 
   email:
-    provider: ${EMAIL_PROVIDER:console}   # console = print in the log, smtp = Gmail
+    provider: ${EMAIL_PROVIDER:console}   # console = print in the log, smtp = Gmail, brevo = Brevo API (Render)
     from: ${MAIL_FROM:${MAIL_USERNAME:}}
     from-name: Smart Farmer Procurement System
     daily-limit: ${EMAIL_DAILY_LIMIT:250}  # notification emails per day (Gmail allows 500, Brevo 300); OTPs are not capped

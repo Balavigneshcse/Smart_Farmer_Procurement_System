@@ -243,6 +243,12 @@ Local defaults are in `src/main/resources/application.yml`. To override them, se
 
 Secrets (JWT secret, Razorpay keys, Gmail App Password) live in the git-ignored `.env` file on the PC, or in environment variables on Render. They are never committed.
 
+## Deploying
+
+The app is deployed as a Docker container on Render, with Neon PostgreSQL and Brevo for emails, all on free plans. `Dockerfile` builds the image, `render.yaml` describes the service, and `docs/DEPLOY.md` has the step-by-step guide and the smoke test.
+
+Emails use `EMAIL_PROVIDER`: `console` (print in the log), `smtp` (Gmail, on the PC) or `brevo` (Brevo HTTPS API, on Render, because Render's free plan blocks SMTP). Brevo cannot carry inline pictures, so there the confirmation email shows the QR from a signed link (`/api/qr/{id}.png?sig=...`, `QrLinkSigner`).
+
 ## Project structure
 
 ```

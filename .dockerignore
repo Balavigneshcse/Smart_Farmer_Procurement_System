@@ -1,0 +1,11 @@
+# Only pom.xml and src/ are needed to build the image. Secrets never go into it.
+target/
+.idea/
+.claude/
+.git/
+docs/
+*.iml
+.env
+*.env
+staff-accounts.xlsx
+~$*

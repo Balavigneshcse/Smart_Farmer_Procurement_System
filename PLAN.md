@@ -93,7 +93,7 @@ Admin browser ── checkout.js popup ──► Razorpay (test)  → success �
 - [x] **M5 — Procurement + payment:** weighment form (moisture limit blocks accept, rejection needs a reason), amount calculation, payments page, Razorpay order + checkout + HMAC verify (own `RazorpayGateway`, no SDK; live keys refused). Keys in git-ignored `.env`.
 - [x] **M6 — Email + automation:** farmer login switched to **email + OTP** (Flyway V4: `users.email`, OTP and notifications keyed by email; mobile kept as contact), `EmailSender` with `console` and Gmail `smtp` providers, HTML email templates in en/ta/hi, emails sent in the background after commit, daily cap, in-app notification list on the dashboard, reminder / no-show jobs every 15 min, "turn near" alert. SMS code removed. ✔ Real Gmail send tested (OTP + booking confirmation).
 - [x] **M7 — Dashboard + polish:** admin dashboard (today's numbers, live table per centre, Chart.js charts for 7 days, crops, payments), "Centres & crops" settings (crop rates / moisture / new crops, centre counters / hours / service time with automatic slot updates), demo data button (40 `@demo.invalid` farmers, a live day + 6 days of history, removable), new look with the same greens and hand-drawn paddy-field SVGs on every page, checked at 375 px phone width.
-- [ ] **M8 — Deploy:** Dockerfile, push to GitHub, Neon DB, **Brevo email provider** (HTTPS API, since Render blocks SMTP), Render web service + env vars, smoke test on the live URL, demo checklist.
+- [x] **M8 — Deploy:** (code ready; accounts and the live smoke test: see docs/DEPLOY.md) Dockerfile, push to GitHub, Neon DB, **Brevo email provider** (HTTPS API, since Render blocks SMTP), Render web service + env vars, smoke test on the live URL, demo checklist.
 
 ---
 

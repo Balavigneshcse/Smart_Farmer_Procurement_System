@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.cropcoders.procurement.config.AppProperties;
 import com.cropcoders.procurement.dto.BookingResponse;
+import com.cropcoders.procurement.security.QrLinkSigner;
 import com.cropcoders.procurement.dto.NotificationListResponse;
 import com.cropcoders.procurement.dto.NotificationResponse;
 import com.cropcoders.procurement.email.EmailQueuedEvent;
@@ -53,9 +54,13 @@ public class NotificationService {
     private final ApplicationEventPublisher events;
     private final int dailyEmailLimit;
 
+    private final QrLinkSigner qrLinks;
+
     public NotificationService(NotificationRepository notificationRepository, FarmerProfileRepository profileRepository,
                                EmailTemplates templates, MessageSource messages, ApplicationEventPublisher events,
-                               AppProperties properties) {
+                               AppProperties properties,
+                               QrLinkSigner qrLinks) {
+        this.qrLinks = qrLinks;
         this.notificationRepository = notificationRepository;
         this.profileRepository = profileRepository;
         this.templates = templates;
@@ -87,9 +92,10 @@ public class NotificationService {
 
         if (status == EmailStatus.PENDING) {
             // The confirmation email carries the QR code, so the farmer can show it without opening the app.
-            String qrText = event == NotificationEvent.BOOKING_CONFIRMED ? BookingResponse.qrText(booking) : null;
+            boolean withQr = event == NotificationEvent.BOOKING_CONFIRMED;
             events.publishEvent(new EmailQueuedEvent(notification.getId(), templates.notification(farmer.getEmail(),
-                    language, farmer.getName(), subject, text, "/farmer/booking.html?id=" + booking.getId(), qrText)));
+                    language, farmer.getName(), subject, text, "/farmer/booking.html?id=" + booking.getId(),
+                    withQr ? BookingResponse.qrText(booking) : null, withQr ? qrLinks.url(booking.getId()) : null)));
         }
     }
 

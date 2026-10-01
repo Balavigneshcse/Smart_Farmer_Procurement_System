@@ -40,6 +40,7 @@ public class EmailTemplates {
                 null,
                 text("notify.otp.footer", locale),
                 null,
+                null,
                 null));
     }
 
@@ -49,12 +50,15 @@ public class EmailTemplates {
      */
     public EmailMessage notification(String to, String language, String farmerName, String subject, String message,
                                      String path) {
-        return notification(to, language, farmerName, subject, message, path, null);
+        return notification(to, language, farmerName, subject, message, path, null, null);
     }
 
-    /** The same, with the booking's QR code shown in the email (qrText = what the operator's scanner reads). */
+    /**
+     * The same, with the booking's QR code shown in the email (qrText = what the operator's scanner reads;
+     * qrUrl = a signed link to the same picture, used by senders without inline pictures).
+     */
     public EmailMessage notification(String to, String language, String farmerName, String subject, String message,
-                                     String path, String qrText) {
+                                     String path, String qrText, String qrUrl) {
         Locale locale = Locale.forLanguageTag(language);
         return render(new Content(to, locale,
                 subject,
@@ -65,13 +69,14 @@ public class EmailTemplates {
                 appUrl + path,
                 text("notify.footer", locale),
                 qrText == null ? null : QrCode.png(qrText, QR_SIZE * 2),   // double size: sharp on phone screens
-                qrText == null ? null : text("notify.qr", locale)));
+                qrText == null ? null : text("notify.qr", locale),
+                qrUrl));
     }
 
     /** Everything one email shows. greeting, highlight and button are optional (null). */
     private record Content(String to, Locale locale, String subject, String greeting, String message,
                            String highlight, String buttonLabel, String buttonUrl, String footer,
-                           byte[] qrPng, String qrCaption) {
+                           byte[] qrPng, String qrCaption, String qrUrl) {
     }
 
     private EmailMessage render(Content c) {
@@ -134,7 +139,7 @@ public class EmailTemplates {
         }
         text.append("--\n").append(c.footer()).append('\n');
 
-        return new EmailMessage(c.to(), c.subject(), html.toString(), text.toString(), c.qrPng());
+        return new EmailMessage(c.to(), c.subject(), html.toString(), text.toString(), c.qrPng(), c.qrUrl());
     }
 
     private static String paragraph(String value) {

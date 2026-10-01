@@ -35,7 +35,7 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/me").authenticated()
-                        .requestMatchers("/api/auth/**", "/api/ping", "/api/centres/**", "/api/crops", "/api/queue/**")
+                        .requestMatchers("/api/auth/**", "/api/ping", "/api/centres/**", "/api/crops", "/api/queue/**", "/api/qr/**")
                         .permitAll()
                         .requestMatchers("/api/farmers/**", "/api/bookings/**", "/api/notifications/**").hasRole("FARMER")
                         .requestMatchers("/api/operator/**").hasRole("OPERATOR")

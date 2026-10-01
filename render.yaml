@@ -1,0 +1,42 @@
+# Render Blueprint: New > Blueprint > pick this repository. Values marked sync: false are typed in
+# on Render's screen (they are secrets or depend on your Neon / Brevo accounts). See docs/DEPLOY.md.
+services:
+  - type: web
+    name: smart-farmer-procurement
+    runtime: docker
+    plan: free
+    region: singapore
+    healthCheckPath: /actuator/health
+    envVars:
+      # Neon PostgreSQL, e.g. jdbc:postgresql://ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+      - key: DB_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      # Secrets made by Render. Keep PAYOUT_ENCRYPTION_KEY: changing it makes saved bank details unreadable.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PAYOUT_ENCRYPTION_KEY
+        generateValue: true
+      - key: SUPERADMIN_USERNAME
+        sync: false
+      - key: SUPERADMIN_PASSWORD
+        sync: false
+      # Emails through Brevo (Render's free plan blocks Gmail's SMTP ports)
+      - key: EMAIL_PROVIDER
+        value: brevo
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: EMAIL_DAILY_LIMIT
+        value: "250"
+      # Razorpay TEST keys only (rzp_test_...)
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
