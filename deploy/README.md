@@ -7,7 +7,7 @@ Internet ──HTTPS──> Nginx ──> Java 21 (the app, a systemd service) �
                                    └──> Gmail SMTP (emails), Razorpay test API (payments)
 ```
 
-Everything is installed by one script, `deploy/setup-ec2.sh`, which you run in AWS's browser terminal.
+Everything is installed by one script, `setup-ec2.sh` (in this folder), which you run in AWS's browser terminal.
 Nothing needs to be installed on your PC. Time: about 25 minutes.
 
 **Cost.** Accounts created before 15 July 2025 get 750 hours a month of `t2.micro`/`t3.micro` free for 12 months.

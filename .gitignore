@@ -21,3 +21,10 @@ application-local.yml
 # Staff account list with starting passwords - never commit
 staff-accounts.xlsx
 ~$*.xlsx
+
+# Local notes and tools - kept on the PC, not part of the app
+.claude/
+skills-lock.json
+PLAN.md
+docs/
+Problem Statement*.txt

@@ -211,7 +211,7 @@ How it works (for the viva):
 
 ### Look and feel
 
-The design follows `docs/REDESIGN_PLAN.md` (built with the design skills in `.claude/skills/`):
+The design rules:
 - **One accent colour (green).** Amber, red and blue only mean a status and always come with a label and an icon.
 - **Light and dark theme.** The button next to the language switch changes it; until someone chooses, the device setting is used (`js/theme.js`). All colours are CSS variables at the top of `css/app.css`.
 - **Fonts.** Anek (one family for English and Tamil) and Geist Mono for tokens and the OTP, self-hosted in `static/fonts/` and cut down to the characters used (about 110 KB together). Hindi uses the device's own font, because the matching Hindi font alone is over 200 KB.
@@ -259,7 +259,7 @@ Secrets (JWT secret, Razorpay keys, Gmail App Password) live in the git-ignored 
 
 ## Deploying
 
-The live site runs on one free-tier **AWS EC2** server (Mumbai), without Docker: Java 21 runs the app as a systemd service, PostgreSQL is on the same server, and Nginx serves it over HTTPS (free Let's Encrypt certificate on an `sslip.io` name). Emails go through Gmail SMTP, which AWS allows. `deploy/setup-ec2.sh` installs everything in one go; `docs/DEPLOY.md` has the steps and the smoke test, and `deploy/update.sh` puts new code live.
+The live site runs on one free-tier **AWS EC2** server (Mumbai), without Docker: Java 21 runs the app as a systemd service, PostgreSQL is on the same server, and Nginx serves it over HTTPS (free Let's Encrypt certificate on an `sslip.io` name). Emails go through Gmail SMTP, which AWS allows. `deploy/setup-ec2.sh` installs everything in one go; `deploy/README.md` has the steps and the smoke test, and `deploy/update.sh` puts new code live.
 
 Email providers (`EMAIL_PROVIDER`): `console` (print in the log), `smtp` (Gmail) and `brevo` (Brevo HTTPS API, for hosts that block SMTP). Brevo cannot carry inline pictures, so with it the confirmation email shows the QR from a signed link (`/api/qr/{id}.png?sig=...`, `QrLinkSigner`).
 
@@ -291,8 +291,7 @@ src/main/resources/
 │                                 V5 roles and staff, V6 farmer payment details, V7 encrypted payment details
 └── static/                       HTML pages, css/, js/, i18n/ (en, ta, hi), fonts/, img/ (icons.svg, photos/)
 src/test/java/                    unit tests + EndToEndFlowTest (see "Tests")
-deploy/                           AWS EC2 setup and update scripts, systemd service, Nginx site
-docs/                             DEPLOY.md (AWS guide), REDESIGN_PLAN.md, DESIGN_BRIEF.md
+deploy/                           AWS EC2 guide (README.md), setup and update scripts, systemd service, Nginx site
 ```
 
 ### How login works (for the viva)
@@ -319,4 +318,4 @@ Run them in IntelliJ (right-click `src/test/java` → Run 'All Tests') or with M
 | `EncryptedTextTest` | Bank details are unreadable in the database and come back the same |
 | `MoneyFormatTest` | Amounts in emails use Indian grouping (₹6,00,000.00) |
 
-See [PLAN.md](PLAN.md) for the full design and milestone checklist.
+Deployment steps: [deploy/README.md](deploy/README.md).
