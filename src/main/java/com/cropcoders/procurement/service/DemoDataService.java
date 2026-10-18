@@ -311,7 +311,16 @@ public class DemoDataService {
         }
 
         // At a counter right now (counters 1, 2, ... so at least one counter stays free for "Call next").
-        for (int c = 1; c <= atCounter; c++) {
+        // A counter already serving a real farmer is left alone: one farmer per counter (uq_counter_serving).
+        Set<Integer> taken = new HashSet<>(jdbc.queryForList(
+                "SELECT counter_no FROM bookings WHERE centre_id = ? AND booking_date = ? AND status = 'CALLED'",
+                Integer.class, centre.getId(), today));
+        int placed = 0;
+        for (int c = 1; c <= centre.getCounters() && placed < atCounter; c++) {
+            if (taken.contains(c)) {
+                continue;
+            }
+            placed++;
             Visit v = newVisit(ctx, centre, today, busy);
             if (v == null || (v.slot = takeSeat(slots, anchor - 1)) == null) {
                 break;

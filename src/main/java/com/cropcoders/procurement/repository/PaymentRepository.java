@@ -36,13 +36,15 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             where p.id = :id""")
     Optional<Payment> findDetailedById(@Param("id") Long id);
 
-    @Query("""
-            select p from Payment p
-            join fetch p.procurement pr
-            join fetch pr.booking b
-            join fetch b.farmer
-            join fetch b.centre
-            join fetch b.crop
-            where p.rzpOrderId = :orderId""")
-    Optional<Payment> findDetailedByRzpOrderId(@Param("orderId") String orderId);
+    /**
+     * Locks one payment row until the transaction ends and returns its id. A second request for the same
+     * payment (a double click, two admins) waits here, then sees what the first one saved, so the same
+     * payment never gets two Razorpay orders or is marked paid twice.
+     */
+    @Query(nativeQuery = true, value = "SELECT id FROM payments WHERE id = :id FOR UPDATE")
+    Optional<Long> lockById(@Param("id") Long id);
+
+    /** Same as lockById, found by the Razorpay order id. */
+    @Query(nativeQuery = true, value = "SELECT id FROM payments WHERE rzp_order_id = :orderId FOR UPDATE")
+    Optional<Long> lockByRzpOrderId(@Param("orderId") String orderId);
 }

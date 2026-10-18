@@ -4,8 +4,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /** Everything under "app:" in application.yml. */
 @ConfigurationProperties(prefix = "app")
-public record AppProperties(String name, Jwt jwt, Otp otp, Email email, Booking booking, Queue queue,
-                            Razorpay razorpay) {
+public record AppProperties(String name, Jwt jwt, Otp otp, StaffLogin staffLogin, Email email, Booking booking,
+                            Queue queue, Razorpay razorpay) {
 
     /**
      * Razorpay test-mode keys (from .env). testChargeLimitPaise: the most one test payment charges through
@@ -35,6 +35,10 @@ public record AppProperties(String name, Jwt jwt, Otp otp, Email email, Booking 
 
     /** OTP rules that protect both security and the free email quota. */
     public record Otp(int validMinutes, int maxAttempts, int resendSeconds, int maxPerHour) {
+    }
+
+    /** Staff passwords: after maxAttempts wrong passwords in a row the account is locked for lockMinutes. */
+    public record StaffLogin(int maxAttempts, int lockMinutes) {
     }
 
     /**

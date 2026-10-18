@@ -13,6 +13,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -120,8 +121,7 @@ public class QueueService {
         LocalDate today = LocalDate.now();
         if (bookingRepository.existsByCentreIdAndBookingDateAndStatusAndCounterNo(centre.getId(), today,
                 BookingStatus.CALLED, counterNo)) {
-            throw new ApiException(HttpStatus.CONFLICT, "COUNTER_BUSY",
-                    "Counter " + counterNo + " is still serving a farmer. Finish or skip them first.");
+            throw counterBusy(counterNo);
         }
         Booking next = bookingRepository.lockNextWaiting(centre.getId(), today)
                 .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "QUEUE_EMPTY", "No farmers are waiting."));
@@ -129,6 +129,13 @@ public class QueueService {
         next.setStatus(BookingStatus.CALLED);
         next.setCounterNo(counterNo);
         next.setCalledAt(LocalDateTime.now());
+        // Two "Call next" clicks for the same counter at the same moment both pass the check above.
+        // Writing now lets the database index uq_counter_serving refuse the second one (V8).
+        try {
+            bookingRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw counterBusy(counterNo);
+        }
         eventRepository.save(new BookingEvent(next, BookingEventType.CALLED, "Counter " + counterNo, operator.id()));
         notificationService.notifyBooking(next, NotificationEvent.CALLED, counterNo);
 
@@ -390,6 +397,11 @@ public class QueueService {
                 .filter(b -> b.getStatus() == BookingStatus.CALLED)
                 .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "NOT_AT_COUNTER",
                         "This farmer is not at a counter any more."));
+    }
+
+    private static ApiException counterBusy(int counterNo) {
+        return new ApiException(HttpStatus.CONFLICT, "COUNTER_BUSY",
+                "Counter " + counterNo + " is still serving a farmer. Finish or skip them first.");
     }
 
     private static double minutesBetween(LocalDateTime from, LocalDateTime to) {

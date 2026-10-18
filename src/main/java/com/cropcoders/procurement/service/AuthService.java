@@ -1,6 +1,9 @@
 package com.cropcoders.procurement.service;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.http.HttpStatus;
@@ -100,15 +103,36 @@ public class AuthService {
                 UserResponse.farmer(user, request.language()));
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Staff login. After app.staff-login.max-attempts wrong passwords in a row the account is locked for
+     * lock-minutes, so a password cannot be guessed by trying many. The account row is locked while the
+     * password is checked, so wrong passwords sent at the same moment are all counted.
+     * noRollbackFor: a wrong password must still be counted even though we throw an error (like the OTP).
+     */
+    @Transactional(noRollbackFor = ApiException.class)
     public AuthResponse staffLogin(LoginRequest request) {
-        User user = userRepository.findByUsername(request.username().trim())
+        LocalDateTime now = LocalDateTime.now();
+        User user = userRepository.findForLoginByUsername(request.username().trim())
                 .filter(u -> u.getRole() != Role.FARMER)
-                .filter(u -> passwordEncoder.matches(request.password(), u.getPasswordHash()))
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "BAD_CREDENTIALS",
-                        "Wrong username or password."));
+                .orElseThrow(AuthService::badCredentials);
+        if (user.isLoginLocked(now)) {
+            long minutes = Math.max(1, (Duration.between(now, user.getLockedUntil()).toSeconds() + 59) / 60);
+            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "LOGIN_LOCKED",
+                    "Too many wrong passwords. Please try again in " + minutes + " minutes, or ask your admin "
+                            + "to set a new password.", Map.of("minutes", minutes));
+        }
+        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            AppProperties.StaffLogin rules = properties.staffLogin();
+            user.recordFailedLogin(now, rules.maxAttempts(), rules.lockMinutes());
+            throw badCredentials();
+        }
+        user.clearFailedLogins();
         ensureActive(user);
         return new AuthResponse(jwtService.createLoginToken(AuthUser.from(user)), UserResponse.staff(user));
+    }
+
+    private static ApiException badCredentials() {
+        return new ApiException(HttpStatus.UNAUTHORIZED, "BAD_CREDENTIALS", "Wrong username or password.");
     }
 
     @Transactional(readOnly = true)

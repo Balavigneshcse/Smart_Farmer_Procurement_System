@@ -13,6 +13,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import com.cropcoders.procurement.repository.UserRepository;
+
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
@@ -24,7 +26,8 @@ import jakarta.servlet.http.HttpServletResponse;
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtService jwtService) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtService jwtService, UserRepository userRepository)
+            throws Exception {
         http
                 // Stateless JWT API: no sessions, no cookies, so no CSRF token is needed.
                 .csrf(AbstractHttpConfigurer::disable)
@@ -50,7 +53,7 @@ public class SecurityConfig {
                         .accessDeniedHandler((request, response, e) ->
                                 writeError(response, 403, "FORBIDDEN", "You do not have access to this.")))
 
-                .addFilterBefore(new JwtAuthFilter(jwtService), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new JwtAuthFilter(jwtService, userRepository), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

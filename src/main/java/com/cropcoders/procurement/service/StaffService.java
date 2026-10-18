@@ -85,6 +85,7 @@ public class StaffService {
         user.setActive(request.active());
         if (request.password() != null && !request.password().isBlank()) {
             user.setPasswordHash(passwordEncoder.encode(request.password()));
+            user.clearFailedLogins();       // a new password also lifts a lock from wrong passwords
         }
         return StaffView.from(user);
     }

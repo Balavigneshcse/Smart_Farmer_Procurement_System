@@ -87,7 +87,9 @@ public class PaymentService {
      */
     @Transactional
     public PaymentOrderResponse createOrder(Long paymentId, AuthUser admin) {
-        Payment payment = paymentRepository.findDetailedById(paymentId)
+        // Locked first, so a second click waits and then reuses this order instead of making another one.
+        Payment payment = paymentRepository.lockById(paymentId)
+                .flatMap(paymentRepository::findDetailedById)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "PAYMENT_NOT_FOUND", "Payment not found."));
         AccessScope.requireCentre(admin, centreOf(payment));
         if (payment.getStatus() == PaymentStatus.PAID) {
@@ -118,7 +120,10 @@ public class PaymentService {
     /** Step 2: after Checkout succeeds, check Razorpay's signature and mark the payment as paid. */
     @Transactional
     public PaymentView verify(VerifyPaymentRequest request, AuthUser admin) {
-        Payment payment = paymentRepository.findDetailedByRzpOrderId(request.razorpayOrderId())
+        // Locked first, so if the same payment is verified twice at once, the second one waits, then sees
+        // PAID and does nothing (no second "paid" event or email).
+        Payment payment = paymentRepository.lockByRzpOrderId(request.razorpayOrderId())
+                .flatMap(paymentRepository::findDetailedById)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "PAYMENT_NOT_FOUND",
                         "No payment found for this Razorpay order."));
         AccessScope.requireCentre(admin, centreOf(payment));

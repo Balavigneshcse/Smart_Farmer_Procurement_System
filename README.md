@@ -100,6 +100,7 @@ How it works (for the viva):
 How it works (for the viva):
 - **Check-in** sets `queue_priority`. A farmer who arrives on time or early is placed by their slot start time. A farmer who arrives after slot end + 15 minutes is placed by their arrival time, which puts them at the back of the line.
 - **Call next** picks the first farmer with `SELECT … ORDER BY queue_priority, checked_in_at LIMIT 1 FOR UPDATE SKIP LOCKED`, so two counters pressing the button at the same moment always get different farmers.
+- **One farmer per counter.** A partial unique index (`uq_counter_serving`, on centre, day and counter where the status is `CALLED`) stops two clicks for the *same* counter (two tabs, two staff) from both calling a farmer. The second one is told the counter is busy.
 - **ETA** is calculated by `EtaCalculator` and unit tested. The average service time is the real average of the last farmers served today, or the centre's setting until at least 3 have been served. The wait for position *p* is `ceil(max(0, p − free counters) / counters) × average service time`.
 - **Live updates** use Server-Sent Events. Each screen keeps one connection open (`/api/queue/{centreId}/stream`), and after every change is committed, `QueueSseHub` pushes the new queue to all screens of that centre. The browser reconnects by itself if the connection drops.
 - **Privacy.** The public queue contains token numbers only, never names or phone numbers.
@@ -133,8 +134,9 @@ How it works (for the viva):
 2. **Pay.** The browser opens Razorpay Checkout for that order.
 3. **Receive the result.** Checkout returns `razorpay_order_id`, `razorpay_payment_id` and `razorpay_signature` to the browser.
 4. **Verify.** The server recomputes `HMAC-SHA256(order_id + "|" + payment_id, key_secret)` and compares it with the signature, then marks the payment Paid. Only Razorpay and our server know the secret, so a forged "success" is rejected. `RazorpayGatewayTest` checks this against a value computed with `openssl`.
-5. **Store amounts safely.** Amounts are stored in **paise** as whole numbers, so there are no rounding errors.
-6. **Real life.** Money would flow from the government to the farmer (DBT / RazorpayX Payouts). In the demo, the admin paying through Checkout stands in for that step.
+5. **One payment at a time.** Creating the order and verifying it both lock the payment row first (`SELECT … FOR UPDATE`). A double click or two admins paying the same farmer wait for each other, so a payment never gets two Razorpay orders and is never marked paid (or emailed about) twice.
+6. **Store amounts safely.** Amounts are stored in **paise** as whole numbers, so there are no rounding errors.
+7. **Real life.** Money would flow from the government to the farmer (DBT / RazorpayX Payouts). In the demo, the admin paying through Checkout stands in for that step.
 
 ### Emails and automation
 
@@ -288,7 +290,8 @@ src/main/resources/
 ├── application.yml               configuration
 ├── messages*.properties          email texts in English, Tamil, Hindi
 ├── db/migration/                 Flyway: V1 schema, V2 centres + crops, V3 staff accounts, V4 email instead of SMS,
-│                                 V5 roles and staff, V6 farmer payment details, V7 encrypted payment details
+│                                 V5 roles and staff, V6 farmer payment details, V7 encrypted payment details,
+│                                 V8 one farmer per counter + staff login lock
 └── static/                       HTML pages, css/, js/, i18n/ (en, ta, hi), fonts/, img/ (icons.svg, photos/)
 src/test/java/                    unit tests + EndToEndFlowTest (see "Tests")
 deploy/                           AWS EC2 guide (README.md), setup and update scripts, systemd service, Nginx site
@@ -300,8 +303,9 @@ deploy/                           AWS EC2 guide (README.md), setup and update sc
 2. **Verify.** The code is checked against the hash. There are 3 attempts, and each wrong try is saved even though the request fails (`noRollbackFor`).
 3. **New farmer.** The server returns a 15-minute *registration token* (a JWT marked `purpose=register`). This token can only be used to submit the registration form.
 4. **Login token.** A JWT signed with `JWT_SECRET` that holds the user id, role and centre. The browser keeps a farmer's token in `localStorage` (all tabs, 7 days) and a staff token in `sessionStorage` (this tab only, 12 hours), and sends it as `Authorization: Bearer …`.
-5. **Access rules.** `JwtAuthFilter` reads the token on every request. `SecurityConfig` allows `/api/farmers/**` only for FARMER, `/api/operator/**` only for OPERATOR (staff), and `/api/admin/**` for ADMIN and SUPER_ADMIN. Inside the admin APIs, `AccessScope` limits a centre admin to their own centre and keeps centres, crop rates and demo data for the super admin.
+5. **Access rules.** `JwtAuthFilter` reads the token on every request and checks that the account is still switched on, so switching an account off locks it out at once, not when its token runs out. `SecurityConfig` allows `/api/farmers/**` only for FARMER, `/api/operator/**` only for OPERATOR (staff), and `/api/admin/**` for ADMIN and SUPER_ADMIN. Inside the admin APIs, `AccessScope` limits a centre admin to their own centre and keeps centres, crop rates and demo data for the super admin.
 6. **Staff passwords** are stored as BCrypt hashes. The super admin's password comes from `.env` at start-up, so it is never in the code or a migration.
+7. **Guessing passwords.** After 5 wrong passwords in a row a staff account is locked for 15 minutes (`app.staff-login`), even for the right password. An admin setting a new password lifts the lock. Like the OTP, each wrong try is saved even though the request fails (`noRollbackFor`), and the account row is locked during the check so tries sent at the same moment are all counted.
 
 ## Tests
 
@@ -309,7 +313,7 @@ Run them in IntelliJ (right-click `src/test/java` → Run 'All Tests') or with M
 
 | Test | What it checks |
 |---|---|
-| `EndToEndFlowTest` | The whole app, step by step, on its own throw-away database (`farmer_procurement_e2e`, dropped afterwards; skipped without a local PostgreSQL): super admin, centre admin and staff with their access limits, farmer OTP login, registration with bank details (encrypted), UPI change, booking with the QR email, check-in, call next, weighment, Razorpay order and signature check, paid status, demo day |
+| `EndToEndFlowTest` | The whole app, step by step, on its own throw-away database (`farmer_procurement_e2e`, dropped afterwards; skipped without a local PostgreSQL): super admin, centre admin and staff with their access limits, a switched-off account's token refused, the lock after 5 wrong passwords, farmer OTP login, registration with bank details (encrypted), UPI change, booking with the QR email, check-in, call next, weighment, Razorpay order and signature check, paid status, demo day |
 | `JwtServiceTest` | Login and registration tokens, expiry, tampering |
 | `EtaCalculatorTest` | Waiting-time estimates in the queue |
 | `RazorpayGatewayTest` | Payment signature check, test keys only |

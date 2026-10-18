@@ -83,6 +83,10 @@ app:
     resend-seconds: 60
     max-per-hour: 5
 
+  staff-login:
+    max-attempts: 5                    # wrong passwords in a row before the account is locked
+    lock-minutes: 15                   # locked this long (or until an admin sets a new password)
+
   email:
     provider: ${EMAIL_PROVIDER:console}   # console = print in the log, smtp = Gmail, brevo = Brevo API (Render)
     from: ${MAIL_FROM:${MAIL_USERNAME:}}

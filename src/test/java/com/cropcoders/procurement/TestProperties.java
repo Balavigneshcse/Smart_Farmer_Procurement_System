@@ -12,6 +12,7 @@ public final class TestProperties {
         return new AppProperties("test",
                 new AppProperties.Jwt(secret, 168, 12, 15),
                 new AppProperties.Otp(5, 3, 60, 5),
+                new AppProperties.StaffLogin(5, 15),
                 new AppProperties.Email("console", "noreply@example.com", "Smart Farmer Procurement System", 250,
                         "http://localhost:8080"),
                 new AppProperties.Booking(7, 120),

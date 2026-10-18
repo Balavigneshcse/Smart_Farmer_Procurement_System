@@ -46,6 +46,10 @@ public class User {
     private boolean active = true;
     private LocalDateTime createdAt;
 
+    /** Staff only: wrong passwords in a row, and until when logging in is blocked after too many. */
+    private int failedLogins;
+    private LocalDateTime lockedUntil;
+
     protected User() {
         // for JPA
     }
@@ -126,5 +130,28 @@ public class User {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public LocalDateTime getLockedUntil() {
+        return lockedUntil;
+    }
+
+    public boolean isLoginLocked(LocalDateTime now) {
+        return lockedUntil != null && lockedUntil.isAfter(now);
+    }
+
+    /** Counts a wrong password; the one that reaches maxAttempts locks the account for lockMinutes. */
+    public void recordFailedLogin(LocalDateTime now, int maxAttempts, int lockMinutes) {
+        failedLogins++;
+        if (failedLogins >= maxAttempts) {
+            lockedUntil = now.plusMinutes(lockMinutes);
+            failedLogins = 0;       // after the lock ends, the next maxAttempts wrong passwords lock it again
+        }
+    }
+
+    /** After a correct password, or when an admin sets a new password. */
+    public void clearFailedLogins() {
+        failedLogins = 0;
+        lockedUntil = null;
     }
 }

@@ -52,7 +52,7 @@ class RazorpayGatewayTest {
 
     private static RazorpayGateway gateway(String keyId, String secret) {
         AppProperties base = TestProperties.withJwtSecret("test-secret-that-is-long-enough-0123456789");
-        return new RazorpayGateway(new AppProperties(base.name(), base.jwt(), base.otp(), base.email(), base.booking(),
+        return new RazorpayGateway(new AppProperties(base.name(), base.jwt(), base.otp(), base.staffLogin(), base.email(), base.booking(),
                 base.queue(), new AppProperties.Razorpay(keyId, secret, "https://api.razorpay.com/v1", 5_000_000)));
     }
 }

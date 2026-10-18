@@ -186,13 +186,38 @@ class EndToEndFlowTest {
         assertThat((String) JsonPath.read(body(expect(get("/api/operator/queue", staffToken), 200)), "$.centre.code"))
                 .isEqualTo("KMB");
 
-        // A switched-off account can no longer log in.
+        // A switched-off account can no longer log in, and the token it already has stops working at once.
         long staffId = ((Number) JsonPath.read(newStaff, "$.id")).longValue();
         expect(put("/api/admin/staff/" + staffId, adminToken, Map.of("name", "KMB Staff", "active", false)), 200);
         expect(post("/api/auth/login", null, Map.of("username", "staff.kmb", "password", "Pass-word-123")), 403, 401);
+        expect(get("/api/operator/queue", staffToken), 401);
         expect(put("/api/admin/staff/" + staffId, adminToken,
                 Map.of("name", "KMB Staff", "active", true, "password", "New-pass-456")), 200);
         staffToken = login("staff.kmb", "New-pass-456", "OPERATOR");
+
+        // 5 wrong passwords in a row lock the account, even for the right password; a new password unlocks it.
+        for (int i = 0; i < 5; i++) {
+            expect(post("/api/auth/login", null, Map.of("username", "staff.kmb", "password", "guess-" + i)), 401);
+        }
+        String locked = body(expect(post("/api/auth/login", null,
+                Map.of("username", "staff.kmb", "password", "New-pass-456")), 429));
+        assertThat((String) JsonPath.read(locked, "$.code")).isEqualTo("LOGIN_LOCKED");
+        expect(put("/api/admin/staff/" + staffId, adminToken,
+                Map.of("name", "KMB Staff", "active", true, "password", "New-pass-456")), 200);
+        staffToken = login("staff.kmb", "New-pass-456", "OPERATOR");
+
+        // A right password in between starts the count again.
+        for (int i = 0; i < 4; i++) {
+            expect(post("/api/auth/login", null, Map.of("username", "staff.kmb", "password", "guess-" + i)), 401);
+        }
+        staffToken = login("staff.kmb", "New-pass-456", "OPERATOR");
+        expect(post("/api/auth/login", null, Map.of("username", "staff.kmb", "password", "guess")), 401);
+        staffToken = login("staff.kmb", "New-pass-456", "OPERATOR");
+
+        // The database lets a counter serve only one farmer at a time (uq_counter_serving), even when
+        // two "Call next" clicks get past the service's check at the same moment.
+        assertThat(jdbc.queryForObject("SELECT indexdef FROM pg_indexes WHERE indexname = 'uq_counter_serving'",
+                String.class)).contains("UNIQUE", "counter_no", "CALLED");
 
         // ---------- Farmer: OTP, registration with payment details ----------
         String email = "e2e.farmer@example.com";
