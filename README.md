@@ -216,7 +216,7 @@ The design rules:
 - **Light and dark theme.** The button next to the language switch changes it; until someone chooses, the device setting is used (`js/theme.js`). All colours are CSS variables at the top of `css/app.css`.
 - **Fonts.** Anek (one family for English and Tamil) and Geist Mono for tokens and the OTP, self-hosted in `static/fonts/` and cut down to the characters used (about 110 KB together). Hindi uses the device's own font, because the matching Hindi font alone is over 200 KB.
 - **Icons.** Phosphor icons (MIT) in one file, `img/icons.svg`.
-- **Photos.** Four photos from Unsplash (free licence) as small WebP files in `img/photos/`: Nandhu Kumar (hero and login), Helena Pfisterer (grain), Declan Sun (paddy).
+- **Photos.** Four photos from Unsplash (free licence) as small WebP files in `img/photos/`: vivek vk (home page, mirrored), Foto Murthy (paddy seedlings), Heber Davis (tractor, farmer login), Declan Sun (paddy, staff login).
 - **The token is a ticket.** The token card has notches and a tear line like a paper token.
 - **Loading and asking.** Grey skeleton shapes show while data loads, and a styled dialog replaces the browser's confirm box (`js/ui.js`).
 - **Motion.** Only `transform` and `opacity` are animated, and everything stops when the device asks for reduced motion.

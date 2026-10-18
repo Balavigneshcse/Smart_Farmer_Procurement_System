@@ -12,8 +12,8 @@
   "landing.fact.slot": "Your own time slot",
   "landing.fact.live": "Live token on your phone",
   "landing.fact.paid": "Payment tracked till credited",
-  "landing.photo.hero": "A farmer resting on his spade beside green paddy fields",
-  "landing.photo.grain": "Hands checking grain in a winnowing basket",
+  "landing.photo.hero": "A farmer walking along the bund of a green paddy field",
+  "landing.photo.grain": "A farmer planting paddy seedlings in a flooded field",
 
   "landing.demo.label": "Your token",
   "landing.demo.position": "Position",
@@ -62,7 +62,7 @@
   "login.checkSpam": "Not in your inbox? Check the Spam or Promotions folder.",
   "login.otpResent": "A new OTP has been sent.",
   "login.expired": "Your session has ended. Please log in again.",
-  "login.photo": "A farmer sitting in a green paddy field",
+  "login.photo": "A green tractor in a field under a blue sky",
 
   "register.title": "Create your account",
   "register.subtitle": "Just a few details. You only do this once.",
