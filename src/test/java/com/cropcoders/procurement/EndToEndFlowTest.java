@@ -10,10 +10,18 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -43,6 +51,10 @@ import org.springframework.web.context.WebApplicationContext;
 
 import com.cropcoders.procurement.email.EmailMessage;
 import com.cropcoders.procurement.email.EmailSender;
+import com.cropcoders.procurement.enums.Role;
+import com.cropcoders.procurement.security.AuthUser;
+import com.cropcoders.procurement.security.JwtService;
+import com.cropcoders.procurement.service.AutomationService;
 import com.jayway.jsonpath.JsonPath;
 
 import jakarta.servlet.Filter;
@@ -52,6 +64,9 @@ import tools.jackson.databind.json.JsonMapper;
  * The whole app, step by step, the way people use it: super admin, centre admin, staff, farmer
  * (OTP login, registration with payment details, booking with the QR email), the operator desk
  * (check-in, call, weighment) and the payment (Razorpay order + signature check).
+ * The smaller tests each check one rule. Some send requests at the same moment from several threads, to show
+ * that two farmers can never get the same last place, a booking is never cancelled twice and OTP guesses are
+ * never lost; the others check a token with a made-up role, the automation jobs and the security header.
  *
  * It runs against its own throw-away database (farmer_procurement_e2e) on the local PostgreSQL,
  * so real data is never touched. Without a local PostgreSQL the test is skipped.
@@ -65,6 +80,8 @@ class EndToEndFlowTest {
 
     private static final String SERVER = "jdbc:postgresql://localhost:5432/";
     private static final String DATABASE = "farmer_procurement_e2e";
+    /** MockMvc requests come from 127.0.0.1; this is "another computer" (an address kept for examples). */
+    private static final String OTHER_COMPUTER = "203.0.113.7";
     private static boolean databaseReady;
 
     @Autowired
@@ -73,6 +90,10 @@ class EndToEndFlowTest {
     private CapturingEmailSender emails;
     @Autowired
     private JdbcTemplate jdbc;
+    @Autowired
+    private JwtService jwtService;
+    @Autowired
+    private AutomationService automationService;
     @Value("${app.razorpay.key-secret:}")
     private String razorpaySecret;
     @Value("${app.razorpay.key-id:}")
@@ -195,13 +216,29 @@ class EndToEndFlowTest {
                 Map.of("name", "KMB Staff", "active", true, "password", "New-pass-456")), 200);
         staffToken = login("staff.kmb", "New-pass-456", "OPERATOR");
 
-        // 5 wrong passwords in a row lock the account, even for the right password; a new password unlocks it.
+        // 5 wrong passwords in a row lock the username, even for the right password, but only from this
+        // computer (IP address): the real staff member at another computer can still log in.
         for (int i = 0; i < 5; i++) {
             expect(post("/api/auth/login", null, Map.of("username", "staff.kmb", "password", "guess-" + i)), 401);
         }
         String locked = body(expect(post("/api/auth/login", null,
                 Map.of("username", "staff.kmb", "password", "New-pass-456")), 429));
         assertThat((String) JsonPath.read(locked, "$.code")).isEqualTo("LOGIN_LOCKED");
+        assertThat(((Number) JsonPath.read(locked, "$.params.minutes")).longValue()).isBetween(1L, 15L);
+        expect(fromAddress(OTHER_COMPUTER, post("/api/auth/login", null,
+                Map.of("username", "staff.kmb", "password", "New-pass-456"))), 200);
+        expect(post("/api/auth/login", null, Map.of("username", "staff.kmb", "password", "New-pass-456")), 429);
+
+        // A username that does not exist gets the same answers (also locked after 5 tries),
+        // so trying usernames does not show which ones are real.
+        for (int i = 0; i < 5; i++) {
+            expect(post("/api/auth/login", null, Map.of("username", "no.such.user", "password", "guess-" + i)), 401);
+        }
+        String unknownLocked = body(expect(post("/api/auth/login", null,
+                Map.of("username", "no.such.user", "password", "guess")), 429));
+        assertThat((String) JsonPath.read(unknownLocked, "$.code")).isEqualTo("LOGIN_LOCKED");
+
+        // A new password set by the admin lifts the lock.
         expect(put("/api/admin/staff/" + staffId, adminToken,
                 Map.of("name", "KMB Staff", "active", true, "password", "New-pass-456")), 200);
         staffToken = login("staff.kmb", "New-pass-456", "OPERATOR");
@@ -243,7 +280,9 @@ class EndToEndFlowTest {
         assertThat((String) JsonPath.read(profile, "$.accountNumberMasked")).isEqualTo("XXXXXXXX9012");
         assertThat((String) JsonPath.read(profile, "$.ifsc")).isEqualTo("SBIN0001234");
         assertThat(profile).doesNotContain("123456789012");
-        String stored = jdbc.queryForObject("SELECT account_number FROM farmer_profiles", String.class);
+        String stored = jdbc.queryForObject("""
+                SELECT p.account_number FROM farmer_profiles p JOIN users u ON u.id = p.user_id
+                WHERE u.email = ?""", String.class, email);
         assertThat(stored).as("account number is encrypted in the database").startsWith("enc:").doesNotContain("123456789012");
 
         expect(put("/api/farmers/me/payout", farmerToken, Map.of("method", "UPI", "upiId", "not-a-upi")), 400);
@@ -332,7 +371,208 @@ class EndToEndFlowTest {
         expect(delete("/api/admin/demo", superToken), 200);
     }
 
+    @Test
+    void sixFarmersForTheLastFivePlacesAtTheSameMoment() throws Exception {
+        long slotId = tomorrowsSlot(true, 5);
+        long cropId = firstCrop();
+        List<MockHttpServletRequestBuilder> bookings = new ArrayList<>();
+        for (int i = 1; i <= 6; i++) {
+            bookings.add(post("/api/bookings", farmerToken(newFarmer("Race Farmer " + i)),
+                    Map.of("slotId", slotId, "cropId", cropId, "estQtyQtl", 10)));
+        }
+
+        List<MvcResult> results = atTheSameMoment(bookings);
+
+        assertThat(results).filteredOn(r -> r.getResponse().getStatus() == 201).hasSize(5);
+        List<MvcResult> refused = results.stream().filter(r -> r.getResponse().getStatus() != 201).toList();
+        assertThat(refused).hasSize(1);
+        assertThat(refused.get(0).getResponse().getStatus()).isEqualTo(409);
+        assertThat((String) JsonPath.read(body(refused.get(0)), "$.code")).isEqualTo("SLOT_FULL");
+        Map<String, Object> slot = jdbc.queryForMap("SELECT booked, capacity FROM slots WHERE id = ?", slotId);
+        assertThat(slot.get("booked")).as("never more bookings than places").isEqualTo(slot.get("capacity"));
+    }
+
+    @Test
+    void twoCancelsAtTheSameMomentGiveThePlaceBackOnce() throws Exception {
+        long slotId = tomorrowsSlot(false, 1);
+        String farmer = farmerToken(newFarmer("Cancel Farmer"));
+        String booking = body(expect(post("/api/bookings", farmer,
+                Map.of("slotId", slotId, "cropId", firstCrop(), "estQtyQtl", 10)), 201));
+        long bookingId = ((Number) JsonPath.read(booking, "$.id")).longValue();
+        int bookedBefore = jdbc.queryForObject("SELECT booked FROM slots WHERE id = ?", Integer.class, slotId);
+
+        String cancel = "/api/bookings/" + bookingId + "/cancel";
+        List<MvcResult> results = atTheSameMoment(List.of(post(cancel, farmer, null), post(cancel, farmer, null)));
+
+        assertThat(results).extracting(r -> r.getResponse().getStatus()).containsExactlyInAnyOrder(200, 400);
+        MvcResult second = results.stream().filter(r -> r.getResponse().getStatus() == 400).findFirst().orElseThrow();
+        assertThat((String) JsonPath.read(body(second), "$.code")).isEqualTo("BOOKING_NOT_CANCELLABLE");
+        assertThat(jdbc.queryForObject("SELECT booked FROM slots WHERE id = ?", Integer.class, slotId))
+                .as("the place is given back only once").isEqualTo(bookedBefore - 1);
+    }
+
+    @Test
+    void tokenWithAMadeUpRoleIsRefused() throws Exception {
+        long farmerId = newFarmer("Forged Role Farmer");
+        String forged = jwtService.createLoginToken(new AuthUser(farmerId, Role.SUPER_ADMIN, "x", null));
+
+        String refused = body(expect(get("/api/admin/dashboard", forged), 401));
+        assertThat((String) JsonPath.read(refused, "$.code")).isEqualTo("UNAUTHORIZED");
+        expect(get("/api/farmers/me", farmerToken(farmerId)), 200);     // the farmer's own role still works
+    }
+
+    @Test
+    void wrongOtpGuessesAtTheSameMomentAreAllCounted() throws Exception {
+        String email = "otp.race." + System.nanoTime() + "@example.com";
+        expect(post("/api/auth/otp/send", null, Map.of("email", email, "language", "en")), 200);
+        String otp = sixDigits(waitForEmail(email, "").text());
+        String wrong = otp.equals("000000") ? "111111" : "000000";
+
+        List<MockHttpServletRequestBuilder> guesses = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            guesses.add(post("/api/auth/otp/verify", null, Map.of("email", email, "otp", wrong)));
+        }
+        List<String> codes = new ArrayList<>();
+        for (MvcResult result : atTheSameMoment(guesses)) {
+            codes.add(JsonPath.read(body(result), "$.code"));
+        }
+
+        // 3 tries: the first two say "wrong, n left", the third and all later ones "too many".
+        assertThat(codes).filteredOn("OTP_INVALID"::equals).hasSize(2);
+        assertThat(codes).filteredOn("OTP_TOO_MANY_ATTEMPTS"::equals).hasSize(4);
+        assertThat(jdbc.queryForObject("SELECT attempts FROM otp_codes WHERE email = ?", Integer.class, email))
+                .isEqualTo(3);
+        String rightTooLate = body(expect(post("/api/auth/otp/verify", null, Map.of("email", email, "otp", otp)), 400));
+        assertThat((String) JsonPath.read(rightTooLate, "$.code")).isEqualTo("OTP_TOO_MANY_ATTEMPTS");
+    }
+
+    @Test
+    void automationMarksMissedBookingsAndRemindsOnlyOnce() {
+        LocalDateTime now = LocalDateTime.now();
+        assumeTrue(now.toLocalTime().isBefore(LocalTime.of(23, 0)), "needs a slot later today");
+        long tnj = jdbc.queryForObject("SELECT id FROM centres WHERE code = 'TNJ'", Long.class);
+
+        // A farmer who booked yesterday and never came is marked as missed (NO_SHOW).
+        LocalTime eight = LocalTime.of(8, 0, 17);
+        long yesterdaySlot = insertSlot(tnj, now.toLocalDate().minusDays(1), eight, eight.plusMinutes(30));
+        long missed = insertBooking("TNJ-901", newFarmer("Missed Farmer"), yesterdaySlot, tnj,
+                now.toLocalDate().minusDays(1));
+        automationService.markNoShows();
+        assertThat(jdbc.queryForObject("SELECT status FROM bookings WHERE id = ?", String.class, missed))
+                .isEqualTo("NO_SHOW");
+
+        // A slot that starts in half an hour gets one reminder, however often the job runs.
+        LocalTime soon = now.toLocalTime().plusMinutes(30).withSecond(17).withNano(0);
+        long todaySlot = insertSlot(tnj, now.toLocalDate(), soon, soon.plusMinutes(30));
+        long dueSoon = insertBooking("TNJ-902", newFarmer("Reminder Farmer"), todaySlot, tnj, now.toLocalDate());
+        automationService.sendReminders();
+        automationService.sendReminders();
+        assertThat(jdbc.queryForObject("SELECT reminder_sent FROM bookings WHERE id = ?", Boolean.class, dueSoon))
+                .isTrue();
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM notifications WHERE booking_id = ? AND event = 'REMINDER'", Integer.class, dueSoon))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void everyResponseCarriesTheContentSecurityPolicy() throws Exception {
+        String expected = "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net "
+                + "https://checkout.razorpay.com https://*.razorpay.com; style-src 'self' 'unsafe-inline'; "
+                + "img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self' https://*.razorpay.com; "
+                + "frame-src https://*.razorpay.com; media-src 'self' blob:; worker-src 'self' blob:; "
+                + "object-src 'none'; base-uri 'self'; form-action 'self' https://*.razorpay.com; frame-ancestors 'none'";
+
+        assertThat(expect(get("/api/ping", null), 200).getResponse().getHeader("Content-Security-Policy"))
+                .isEqualTo(expected);
+        assertThat(expect(get("/api/admin/dashboard", null), 401).getResponse().getHeader("Content-Security-Policy"))
+                .isEqualTo(expected);
+    }
+
     // ---------- helpers ----------
+
+    /**
+     * Sends all requests at the same moment, each from its own thread (a CountDownLatch lets them all start
+     * together), and returns the results in the same order.
+     */
+    private List<MvcResult> atTheSameMoment(List<MockHttpServletRequestBuilder> requests) throws Exception {
+        ExecutorService threads = Executors.newFixedThreadPool(requests.size());
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<MvcResult>> running = new ArrayList<>();
+            for (MockHttpServletRequestBuilder request : requests) {
+                running.add(threads.submit(() -> {
+                    start.await();
+                    return mvc.perform(request).andReturn();
+                }));
+            }
+            start.countDown();
+            List<MvcResult> results = new ArrayList<>();
+            for (Future<MvcResult> result : running) {
+                results.add(result.get(60, TimeUnit.SECONDS));
+            }
+            return results;
+        } finally {
+            threads.shutdownNow();
+        }
+    }
+
+    /** A farmer added straight into the database (no OTP email needed). Returns the user id. */
+    private long newFarmer(String name) {
+        String email = name.toLowerCase().replace(' ', '.') + "." + System.nanoTime() + "@example.com";
+        Long id = jdbc.queryForObject("""
+                INSERT INTO users (name, role, email, mobile, active, created_at)
+                VALUES (?, 'FARMER', ?, '9876500000', TRUE, LOCALTIMESTAMP) RETURNING id""", Long.class, name, email);
+        jdbc.update("""
+                INSERT INTO farmer_profiles (user_id, address, district, aadhaar_last4, language, updated_at)
+                VALUES (?, '1 Main Road, Thanjavur', 'Thanjavur', '1234', 'en', LOCALTIMESTAMP)""", id);
+        return id;
+    }
+
+    /** A login token for a farmer, made the same way the server makes it after the OTP. */
+    private String farmerToken(long farmerId) {
+        return jwtService.createLoginToken(new AuthUser(farmerId, Role.FARMER, "Test Farmer", null));
+    }
+
+    /**
+     * One of tomorrow's slots at Thanjavur, with its capacity set so that exactly `free` places are left.
+     * earliest = true takes the first slot of the day, false the last, so two tests never share a slot.
+     */
+    private long tomorrowsSlot(boolean earliest, int free) {
+        Long slotId = jdbc.queryForObject("""
+                SELECT s.id FROM slots s JOIN centres c ON c.id = s.centre_id
+                WHERE c.code = 'TNJ' AND s.slot_date = ?
+                ORDER BY s.start_time""" + (earliest ? " ASC" : " DESC") + " LIMIT 1",
+                Long.class, LocalDate.now().plusDays(1));
+        jdbc.update("UPDATE slots SET capacity = booked + ? WHERE id = ?", free, slotId);
+        return slotId;
+    }
+
+    private long insertSlot(long centreId, LocalDate date, LocalTime start, LocalTime end) {
+        return jdbc.queryForObject("""
+                INSERT INTO slots (centre_id, slot_date, start_time, end_time, capacity, booked)
+                VALUES (?, ?, ?, ?, 5, 1) RETURNING id""", Long.class, centreId, date, start, end);
+    }
+
+    /** A BOOKED booking added straight into the database (so its reminder is not marked as sent yet). */
+    private long insertBooking(String token, long farmerId, long slotId, long centreId, LocalDate date) {
+        return jdbc.queryForObject("""
+                INSERT INTO bookings (token, farmer_id, slot_id, centre_id, booking_date, crop_id, est_qty_qtl,
+                                      status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, 10, 'BOOKED', LOCALTIMESTAMP) RETURNING id""",
+                Long.class, token, farmerId, slotId, centreId, date, firstCrop());
+    }
+
+    private long firstCrop() {
+        return jdbc.queryForObject("SELECT min(id) FROM crops WHERE active", Long.class);
+    }
+
+    /** The same request, as if it came from another computer (MockMvc's default address is 127.0.0.1). */
+    private static MockHttpServletRequestBuilder fromAddress(String ip, MockHttpServletRequestBuilder request) {
+        return request.with(r -> {
+            r.setRemoteAddr(ip);
+            return r;
+        });
+    }
 
     private String login(String username, String password, String role) throws Exception {
         if (password == null) {

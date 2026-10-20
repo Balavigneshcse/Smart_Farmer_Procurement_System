@@ -18,11 +18,14 @@ import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * Runs before every request: if the request carries a valid "Bearer" token,
- * the user is marked as logged in with their role (ROLE_FARMER, ROLE_OPERATOR, ROLE_ADMIN).
+ * the user is marked as logged in with their role (ROLE_FARMER, ROLE_OPERATOR, ROLE_ADMIN, ...).
  *
- * The token alone is not enough: the account must still be switched on. A token stays valid for up to
- * 12 hours (staff) or 7 days (farmers), so without this check a switched-off account would keep working
- * until its token ran out. It costs one small query (by primary key) per logged-in request.
+ * The token alone is not enough. The account is read from the database (one small query by primary key):
+ *  - it must still be switched on. A token stays valid for up to 12 hours (staff) or 7 days (farmers),
+ *    so without this check a switched-off account would keep working until its token ran out.
+ *  - its role in the database must be the role in the token, so a token with a made-up role
+ *    (e.g. a farmer's id with SUPER_ADMIN) is refused.
+ *  - the name and centre the controllers see come from the database, not from the token.
  */
 public class JwtAuthFilter extends OncePerRequestFilter {
 
@@ -42,7 +45,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String header = request.getHeader(HttpHeaders.AUTHORIZATION);
         if (header != null && header.startsWith(BEARER)) {
             jwtService.parseLoginToken(header.substring(BEARER.length()))
-                    .filter(user -> userRepository.findActiveById(user.id()).orElse(false))
+                    .flatMap(fromToken -> userRepository.findActiveAuthUser(fromToken.id())
+                            .filter(fromDatabase -> fromDatabase.role() == fromToken.role()))
                     .ifPresent(user -> {
                         var authority = new SimpleGrantedAuthority("ROLE_" + user.role().name());
                         var authentication = new UsernamePasswordAuthenticationToken(user, null, List.of(authority));

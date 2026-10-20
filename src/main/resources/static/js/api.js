@@ -1,12 +1,28 @@
 /*
  * Small wrapper around fetch() for calling the backend.
- *  - adds the login token (if auth.js is loaded and the user is logged in)
+ *  - adds the login token (if auth.js is loaded and the user is logged in), but not to the public
+ *    login endpoints: they work without a login, and their 401 answers (wrong password, expired
+ *    registration) are about what was typed, not about our token
  *  - throws an Error with .status, .code, .params and .fieldErrors when the response is not OK
- *  - if the server says our token is no longer valid (401), logs out and goes to the login page
+ *  - if the login has run out while the page was open, or the server says our token is no longer
+ *    valid (401 UNAUTHORIZED), logs out and goes to the login page
  */
 const Api = (() => {
+    /** /api/auth/login, /otp/send, /otp/verify and /register are public; /api/auth/me needs a login. */
+    function isPublicAuth(path) {
+        return path.startsWith('/api/auth/') && !path.startsWith('/api/auth/me');
+    }
+
     async function request(method, path, body) {
-        const token = typeof Auth !== 'undefined' ? Auth.token() : null;
+        const useLogin = typeof Auth !== 'undefined' && !isPublicAuth(path);
+        if (useLogin && Auth.hasExpiredLogin()) {
+            // Sending it without the token would only fail: go to the login page straight away.
+            Auth.expire();
+            const error = new Error('Your session has ended. Please log in again.');
+            error.code = 'SESSION_EXPIRED';
+            throw error;
+        }
+        const token = useLogin ? Auth.token() : null;
         const options = { method, headers: { Accept: 'application/json' } };
         if (token) {
             options.headers.Authorization = `Bearer ${token}`;
@@ -26,7 +42,8 @@ const Api = (() => {
         }
 
         const data = res.status === 204 ? null : await res.json().catch(() => null);
-        if (res.status === 401 && token) {
+        // Only UNAUTHORIZED means "this token is no longer accepted"; other 401s must not log the user out.
+        if (res.status === 401 && token && data?.code === 'UNAUTHORIZED') {
             Auth.expire();
         }
         if (!res.ok) {

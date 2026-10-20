@@ -56,6 +56,11 @@ management:
 
 server:
   port: ${PORT:8080}
+  # The app runs behind Nginx. "native" lets Tomcat take the visitor's real IP address and "https" from
+  # Nginx's X-Forwarded-For / X-Forwarded-Proto headers (trusted only from this machine or a private network).
+  # The staff login lock counts wrong passwords per real IP address, and Spring Security sends the HSTS
+  # header only when it knows the request came in over HTTPS.
+  forward-headers-strategy: native
   # Text files are sent compressed: the pages load much faster on slow mobile networks.
   compression:
     enabled: true
@@ -66,12 +71,14 @@ app:
   name: Smart Farmer Procurement System
 
   # Key that encrypts farmers' bank account numbers and UPI IDs in the database.
-  # Set PAYOUT_ENCRYPTION_KEY (32+ random characters) in .env and on Render. The default is for local development only.
+  # Set PAYOUT_ENCRYPTION_KEY (32+ random characters) in .env and on the server. The default is for local
+  # development only: when APP_URL is not http://localhost or http://127.0.0.1 the app refuses to start with it.
   # Do not change it later: values saved with the old key could not be read any more.
   payout-encryption-key: ${PAYOUT_ENCRYPTION_KEY:local-dev-payout-key-change-me-0123456789}
 
   jwt:
-    # Set JWT_SECRET (32+ random characters) on Render. The default is for local development only.
+    # Set JWT_SECRET (32+ random characters) on the server. The default is for local development only:
+    # when APP_URL is not http://localhost or http://127.0.0.1 the app refuses to start with it.
     secret: ${JWT_SECRET:local-dev-secret-change-me-on-render-0123456789}
     farmer-expiry-hours: 168          # farmers stay logged in for 7 days (fewer OTP emails)
     staff-expiry-hours: 12
@@ -81,18 +88,21 @@ app:
     valid-minutes: 5
     max-attempts: 3
     resend-seconds: 60
-    max-per-hour: 5
+    max-per-hour: 5                    # per email address
+    # OTP emails per day for all addresses together, so a script trying made-up addresses cannot use up
+    # the email quota. Gmail allows about 500 a day = 250 notification emails + 200 OTPs + some margin.
+    max-per-day: ${OTP_DAILY_LIMIT:200}
 
   staff-login:
-    max-attempts: 5                    # wrong passwords in a row before the account is locked
-    lock-minutes: 15                   # locked this long (or until an admin sets a new password)
+    max-attempts: 5                    # wrong passwords in a row (per username and IP address) before a lock
+    lock-minutes: 15                   # locked this long from that address (or until an admin sets a new password)
 
   email:
     provider: ${EMAIL_PROVIDER:console}   # console = print in the log, smtp = Gmail, brevo = Brevo API (Render)
     from: ${MAIL_FROM:${MAIL_USERNAME:}}
     from-name: Smart Farmer Procurement System
-    daily-limit: ${EMAIL_DAILY_LIMIT:250}  # notification emails per day (Gmail allows 500, Brevo 300); OTPs are not capped
-    app-url: ${APP_URL:http://localhost:8080}   # used for links inside emails
+    daily-limit: ${EMAIL_DAILY_LIMIT:250}  # notification emails per day (Gmail allows 500, Brevo 300); OTPs: app.otp.max-per-day
+    app-url: ${APP_URL:http://localhost:8080}   # links inside emails; not localhost = real secrets required
 
   booking:
     days-ahead: 7                      # today + the next 6 days can be booked

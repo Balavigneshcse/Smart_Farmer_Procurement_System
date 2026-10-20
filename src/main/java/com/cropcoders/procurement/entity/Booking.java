@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import org.hibernate.annotations.DynamicUpdate;
+
 import com.cropcoders.procurement.enums.BookingStatus;
 
 import jakarta.persistence.Entity;
@@ -18,9 +20,16 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
-/** One farmer visit: a crop brought to a centre in a booked slot. */
+/**
+ * One farmer visit: a crop brought to a centre in a booked slot.
+ *
+ * {@code @DynamicUpdate}: when a booking is saved, Hibernate writes only the columns that were changed.
+ * Without it every column is written back, so changing one field could also undo a status that another
+ * request saved in the meantime (e.g. turn a just-cancelled booking back into BOOKED).
+ */
 @Entity
 @Table(name = "bookings")
+@DynamicUpdate
 public class Booking {
 
     @Id

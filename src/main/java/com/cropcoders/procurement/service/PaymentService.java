@@ -84,6 +84,9 @@ public class PaymentService {
     /**
      * Step 1: create (or reuse) the Razorpay order for this payment.
      * The amount always comes from our database, never from the browser.
+     * When the order already exists, Razorpay is asked first whether it was paid: if Checkout succeeded
+     * but step 2 never reached us (tab closed, network error), the payment is marked PAID now and the
+     * answer says alreadyPaid, so the browser does not open Checkout and pay the farmer twice.
      */
     @Transactional
     public PaymentOrderResponse createOrder(Long paymentId, AuthUser admin) {
@@ -99,11 +102,19 @@ public class PaymentService {
 
         // Test accounts refuse big amounts, so a large payment is charged as a stand-in amount (test mode only).
         long chargePaise = Math.min(payment.getAmountPaise(), razorpay.testChargeLimitPaise());
+        String earlierPaymentId = null;
         if (payment.getRzpOrderId() == null) {
             String orderId = razorpay.createOrder(chargePaise, "PAY-" + payment.getId(),
                     Map.of("token", booking.getToken(), "farmer", booking.getFarmer().getName(),
                             "full_amount_paise", String.valueOf(payment.getAmountPaise())));
             payment.setRzpOrderId(orderId);
+        } else {
+            earlierPaymentId = razorpay.findSuccessfulPayment(payment.getRzpOrderId()).orElse(null);
+            if (earlierPaymentId != null) {
+                log.info("Razorpay order {} was already paid ({}); payment {} is now marked as paid",
+                        payment.getRzpOrderId(), earlierPaymentId, payment.getId());
+                markPaid(payment, earlierPaymentId, admin.id());
+            }
         }
         return new PaymentOrderResponse(
                 payment.getId(),
@@ -114,7 +125,9 @@ public class PaymentService {
                 "INR",
                 "Procurement " + booking.getToken() + " - " + booking.getCrop().getNameEn(),
                 booking.getFarmer().getName(),
-                booking.getFarmer().getMobile());
+                booking.getFarmer().getMobile(),
+                earlierPaymentId != null,
+                earlierPaymentId);
     }
 
     /** Step 2: after Checkout succeeds, check Razorpay's signature and mark the payment as paid. */
@@ -136,15 +149,23 @@ public class PaymentService {
         }
 
         if (payment.getStatus() != PaymentStatus.PAID) {       // verifying twice is harmless
-            payment.markPaid(request.razorpayPaymentId());
-            Booking booking = payment.getProcurement().getBooking();
-            eventRepository.save(new BookingEvent(booking, BookingEventType.PAID,
-                    "Rs " + payment.amountRupees() + ", ref " + request.razorpayPaymentId(), admin.id()));
-            notificationService.notifyBooking(booking, NotificationEvent.PAID,
-                    NotificationService.money(payment.amountRupees()), request.razorpayPaymentId());
+            markPaid(payment, request.razorpayPaymentId(), admin.id());
         }
         String payTo = profileRepository.findById(farmerId(payment)).map(FarmerProfile::payoutSummary).orElse(null);
         return PaymentView.from(payment, payTo);
+    }
+
+    /**
+     * Marks the payment as paid, adds it to the farmer's timeline and emails them.
+     * Callers lock the payment row first and check it is not PAID yet, so this happens only once.
+     */
+    private void markPaid(Payment payment, String rzpPaymentId, Long adminId) {
+        payment.markPaid(rzpPaymentId);
+        Booking booking = payment.getProcurement().getBooking();
+        eventRepository.save(new BookingEvent(booking, BookingEventType.PAID,
+                "Rs " + payment.amountRupees() + ", ref " + rzpPaymentId, adminId));
+        notificationService.notifyBooking(booking, NotificationEvent.PAID,
+                NotificationService.money(payment.amountRupees()), rzpPaymentId);
     }
 
     private static Long farmerId(Payment payment) {

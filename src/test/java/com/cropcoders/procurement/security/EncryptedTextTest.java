@@ -7,7 +7,9 @@ import org.junit.jupiter.api.Test;
 
 class EncryptedTextTest {
 
-    private final EncryptedText converter = new EncryptedText("a-test-key-of-enough-length");
+    private static final String LOCAL = "http://localhost:8080";
+
+    private final EncryptedText converter = new EncryptedText("a-test-key-of-enough-length", LOCAL);
 
     @Test
     void savedValueIsUnreadableAndReadsBackTheSame() {
@@ -26,9 +28,16 @@ class EncryptedTextTest {
     @Test
     void anotherKeyCannotReadIt() {
         String stored = converter.convertToDatabaseColumn("ravi@okaxis");
-        EncryptedText other = new EncryptedText("a-different-key-of-enough-length");
+        EncryptedText other = new EncryptedText("a-different-key-of-enough-length", LOCAL);
 
         assertThatThrownBy(() -> other.convertToEntityAttribute(stored)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void developmentKeyIsRefusedOnAServer() {
+        assertThatThrownBy(() -> new EncryptedText("local-dev-payout-key-change-me-0123456789", "https://sfps.example.in"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("PAYOUT_ENCRYPTION_KEY");
     }
 
     @Test

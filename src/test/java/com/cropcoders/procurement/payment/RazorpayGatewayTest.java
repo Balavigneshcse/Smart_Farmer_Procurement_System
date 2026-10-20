@@ -3,6 +3,8 @@ package com.cropcoders.procurement.payment;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 
 import com.cropcoders.procurement.TestProperties;
@@ -48,6 +50,31 @@ class RazorpayGatewayTest {
         assertThatThrownBy(() -> gateway("rzp_live_abc", "secret").createOrder(100, "r", java.util.Map.of()))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("not set");
+    }
+
+    @Test
+    void earlierSuccessfulPaymentOfAnOrderIsFound() {
+        // "authorized" is when Checkout reports success; test mode then captures the money ("captured").
+        assertThat(RazorpayGateway.successfulPaymentId(List.of(
+                item("pay_FAILED1", "failed"), item("pay_OK1", "captured")))).contains("pay_OK1");
+        assertThat(RazorpayGateway.successfulPaymentId(List.of(item("pay_OK2", "authorized")))).contains("pay_OK2");
+    }
+
+    @Test
+    void ordersWithoutASuccessfulPaymentAreNotPaid() {
+        assertThat(RazorpayGateway.successfulPaymentId(List.of(
+                item("pay_FAILED1", "failed"), item("pay_NEW1", "created")))).isEmpty();
+        assertThat(RazorpayGateway.successfulPaymentId(List.of())).isEmpty();
+        assertThat(RazorpayGateway.successfulPaymentId(null)).isEmpty();
+    }
+
+    @Test
+    void withoutKeysTheEarlierPaymentCheckIsSkipped() {
+        assertThat(gateway("", "").findSuccessfulPayment("order_TEST123")).isEmpty();
+    }
+
+    private static RazorpayGateway.PaymentItem item(String id, String status) {
+        return new RazorpayGateway.PaymentItem(id, status);
     }
 
     private static RazorpayGateway gateway(String keyId, String secret) {

@@ -110,6 +110,8 @@
 
   "error.OTP_COOLDOWN": "Please wait {seconds} seconds before asking for a new OTP.",
   "error.OTP_LIMIT": "Too many OTP requests. Please try again after one hour.",
+  "error.OTP_DAILY_LIMIT": "We cannot send any more OTP emails today. Please try again tomorrow.",
+  "error.RATE_LIMITED": "Too many attempts. Please wait a minute and try again.",
   "error.EMAIL_FAILED": "We could not send the email right now. Please try again in a minute.",
   "error.OTP_INVALID": "Wrong OTP. {left} attempts left.",
   "error.OTP_EXPIRED": "This OTP has expired. Please ask for a new one.",

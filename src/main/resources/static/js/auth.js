@@ -17,6 +17,8 @@ const Auth = (() => {
         FARMER: '/farmer/dashboard.html', OPERATOR: '/operator/desk.html',
         ADMIN: '/admin/dashboard.html', SUPER_ADMIN: '/admin/dashboard.html',
     };
+    let pageNeedsLogin = false;    // set by require(): this page was opened with a login
+    let leaving = false;           // set by expire(): this page is on its way to the login page
 
     function readJson(storage, key) {
         try {
@@ -59,8 +61,9 @@ const Auth = (() => {
 
     /** This tab's staff login if there is one, otherwise the farmer login shared by all tabs. */
     function session() {
-        const tab = valid(readJson(sessionStorage, SESSION_KEY));
-        if (tab) return tab;
+        const tab = readJson(sessionStorage, SESSION_KEY);
+        // An expired staff login gives null here, not the farmer login below: a staff tab must never act as the farmer.
+        if (tab) return valid(tab);
         const shared = readJson(localStorage, SESSION_KEY);
         if (shared && shared.user?.role !== 'FARMER') {
             remove(localStorage, SESSION_KEY);    // a staff login saved by an older version: no longer shared
@@ -118,7 +121,10 @@ const Auth = (() => {
         const allowed = [].concat(roles);
         const role = allowed[0];
         const current = user();
-        if (current && allowed.includes(current.role)) return current;
+        if (current && allowed.includes(current.role)) {
+            pageNeedsLogin = true;
+            return current;
+        }
 
         if (current) {
             location.replace(homeFor(current.role));        // logged in, but with another role
@@ -130,8 +136,22 @@ const Auth = (() => {
         return null;
     }
 
-    /** Called when the server rejects our token (401). */
+    /**
+     * True when this page was opened with a login that has run out since then (api.js checks it before
+     * every request). Only pages that called require() count: the login, registration and home pages
+     * work without a login, so an old expired one saved in the browser must not send them away.
+     */
+    function hasExpiredLogin() {
+        if (leaving) return true;
+        if (!pageNeedsLogin) return false;
+        const saved = readJson(sessionStorage, SESSION_KEY) ?? readJson(localStorage, SESSION_KEY);
+        return Boolean(saved?.token) && isExpired(saved.token);
+    }
+
+    /** Called when the server rejects our token (401), or the login has run out while the page was open. */
     function expire() {
+        if (leaving) return;    // several requests can notice at the same time: log out and redirect only once
+        leaving = true;
         const role = (readJson(sessionStorage, SESSION_KEY) ?? readJson(localStorage, SESSION_KEY))?.user?.role;
         clear();
         location.replace(loginPageFor(role) + '?expired=1');
@@ -157,7 +177,7 @@ const Auth = (() => {
     }
 
     return {
-        user, token, save, updateUser, clear, require, expire, logout, homeFor, loginPageFor,
+        user, token, save, updateUser, clear, require, hasExpiredLogin, expire, logout, homeFor, loginPageFor,
         setPendingRegistration, pendingRegistration, clearPendingRegistration,
     };
 })();

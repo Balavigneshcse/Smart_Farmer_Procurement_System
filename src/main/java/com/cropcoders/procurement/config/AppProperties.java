@@ -33,18 +33,25 @@ public record AppProperties(String name, Jwt jwt, Otp otp, StaffLogin staffLogin
     public record Jwt(String secret, int farmerExpiryHours, int staffExpiryHours, int registrationExpiryMinutes) {
     }
 
-    /** OTP rules that protect both security and the free email quota. */
-    public record Otp(int validMinutes, int maxAttempts, int resendSeconds, int maxPerHour) {
+    /**
+     * OTP rules that protect both security and the free email quota.
+     * maxPerHour: OTPs per email address per hour. maxPerDay: OTPs per day for all addresses together.
+     */
+    public record Otp(int validMinutes, int maxAttempts, int resendSeconds, int maxPerHour, int maxPerDay) {
     }
 
-    /** Staff passwords: after maxAttempts wrong passwords in a row the account is locked for lockMinutes. */
+    /**
+     * Staff passwords: after maxAttempts wrong passwords in a row from one IP address, that username is
+     * locked for lockMinutes from that address (LoginAttemptService).
+     */
     public record StaffLogin(int maxAttempts, int lockMinutes) {
     }
 
     /**
      * provider: "console" prints emails in the log, "smtp" sends them with Gmail.
-     * dailyLimit: notification emails per day (OTP emails are not counted, a farmer must always be able to log in).
-     * appUrl: the website address, used for the links inside emails.
+     * dailyLimit: notification emails per day (OTP emails are not counted here; they have their own Otp.maxPerDay).
+     * appUrl: the website address, used for the links inside emails. When it is not http://localhost, the
+     * development secrets from application.yml are refused (SecretGuard).
      */
     public record Email(String provider, String from, String fromName, int dailyLimit, String appUrl) {
     }

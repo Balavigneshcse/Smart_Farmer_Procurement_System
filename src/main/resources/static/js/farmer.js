@@ -40,11 +40,10 @@ const Farmer = (() => {
         }
     }
 
-    /** Escapes text before putting it into HTML. */
+    /** Escapes text before putting it into HTML, quotes too, so it is also safe inside attribute values. */
     function esc(value) {
-        const div = document.createElement('div');
-        div.textContent = value ?? '';
-        return div.innerHTML;
+        const replacements = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+        return String(value ?? '').replace(/[&<>"']/g, char => replacements[char]);
     }
 
     function cropName(crop) {

@@ -1,10 +1,10 @@
 package com.cropcoders.procurement.service;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -42,16 +42,23 @@ public class AuthService {
     private final OtpService otpService;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
+    private final LoginAttemptService loginAttempts;
     private final AppProperties properties;
 
+    /** A hash of a random password nobody knows. Unknown usernames are checked against it (see staffLogin). */
+    private final String dummyPasswordHash;
+
     public AuthService(UserRepository userRepository, FarmerProfileRepository profileRepository, OtpService otpService,
-                       JwtService jwtService, PasswordEncoder passwordEncoder, AppProperties properties) {
+                       JwtService jwtService, PasswordEncoder passwordEncoder, LoginAttemptService loginAttempts,
+                       AppProperties properties) {
         this.userRepository = userRepository;
         this.profileRepository = profileRepository;
         this.otpService = otpService;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
+        this.loginAttempts = loginAttempts;
         this.properties = properties;
+        this.dummyPasswordHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
 
     public SendOtpResponse sendOtp(SendOtpRequest request) {
@@ -104,29 +111,34 @@ public class AuthService {
     }
 
     /**
-     * Staff login. After app.staff-login.max-attempts wrong passwords in a row the account is locked for
-     * lock-minutes, so a password cannot be guessed by trying many. The account row is locked while the
-     * password is checked, so wrong passwords sent at the same moment are all counted.
+     * Staff login. After app.staff-login.max-attempts wrong passwords in a row from one IP address, that
+     * username is locked for lock-minutes from that address only (LoginAttemptService), so a password
+     * cannot be guessed by trying many, and a stranger cannot lock the real staff out.
+     * An unknown username gets exactly the same answers as a real one (also LOGIN_LOCKED after too many
+     * tries, and the password check takes as long), so nobody can find out which usernames exist.
      * noRollbackFor: a wrong password must still be counted even though we throw an error (like the OTP).
      */
     @Transactional(noRollbackFor = ApiException.class)
-    public AuthResponse staffLogin(LoginRequest request) {
+    public AuthResponse staffLogin(LoginRequest request, String ip) {
         LocalDateTime now = LocalDateTime.now();
-        User user = userRepository.findForLoginByUsername(request.username().trim())
-                .filter(u -> u.getRole() != Role.FARMER)
-                .orElseThrow(AuthService::badCredentials);
-        if (user.isLoginLocked(now)) {
-            long minutes = Math.max(1, (Duration.between(now, user.getLockedUntil()).toSeconds() + 59) / 60);
+        String username = request.username().trim();
+        loginAttempts.minutesLocked(username, ip, now).ifPresent(minutes -> {
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "LOGIN_LOCKED",
                     "Too many wrong passwords. Please try again in " + minutes + " minutes, or ask your admin "
                             + "to set a new password.", Map.of("minutes", minutes));
-        }
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            AppProperties.StaffLogin rules = properties.staffLogin();
-            user.recordFailedLogin(now, rules.maxAttempts(), rules.lockMinutes());
+        });
+
+        Optional<User> account = userRepository.findForLoginByUsername(username)
+                .filter(u -> u.getRole() != Role.FARMER);
+        // No such account: check against the dummy hash anyway, so the answer takes as long as for a real one.
+        String hash = account.map(User::getPasswordHash).orElse(dummyPasswordHash);
+        boolean rightPassword = passwordEncoder.matches(request.password(), hash);
+        if (account.isEmpty() || !rightPassword) {
+            loginAttempts.recordFailure(username, ip, now);
             throw badCredentials();
         }
-        user.clearFailedLogins();
+        User user = account.get();
+        loginAttempts.clear(username, ip);
         ensureActive(user);
         return new AuthResponse(jwtService.createLoginToken(AuthUser.from(user)), UserResponse.staff(user));
     }

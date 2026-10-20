@@ -21,7 +21,8 @@ import jakarta.persistence.Converter;
  * Keeps a column encrypted in the database (AES-256 in GCM mode). Used for the farmer's bank account
  * number and UPI ID: someone who only gets a copy of the database cannot read them.
  *
- * The key comes from PAYOUT_ENCRYPTION_KEY (.env on the PC, an environment variable on Render).
+ * The key comes from PAYOUT_ENCRYPTION_KEY (.env on the PC, an environment variable on the server).
+ * On a server it must be set: the development default from application.yml is refused (SecretGuard).
  * Every value gets its own random 12-byte IV; the column holds "enc:" + Base64(IV + ciphertext + tag).
  * Changing the key makes the saved values unreadable, so keep it safe.
  */
@@ -37,10 +38,12 @@ public class EncryptedText implements AttributeConverter<String, String> {
     private final SecretKeySpec key;
     private final SecureRandom random = new SecureRandom();
 
-    public EncryptedText(@Value("${app.payout-encryption-key}") String secret) {
+    public EncryptedText(@Value("${app.payout-encryption-key}") String secret,
+                         @Value("${app.email.app-url}") String appUrl) {
         if (secret == null || secret.length() < 16) {
             throw new IllegalStateException("PAYOUT_ENCRYPTION_KEY must be at least 16 characters long.");
         }
+        SecretGuard.requireRealSecret(secret, "PAYOUT_ENCRYPTION_KEY", appUrl);
         try {
             // Any text of any length becomes a 256-bit key.
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(secret.getBytes(StandardCharsets.UTF_8));

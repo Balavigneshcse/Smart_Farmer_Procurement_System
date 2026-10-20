@@ -58,11 +58,17 @@ public class AutomationService {
         LocalTime untilTime = until.toLocalDate().isAfter(now.toLocalDate()) ? LocalTime.MAX : until.toLocalTime();
 
         List<Booking> due = bookingRepository.findDueForReminder(now.toLocalDate(), now.toLocalTime(), untilTime);
+        int sent = 0;
         for (Booking booking : due) {
-            booking.setReminderSent(true);
-            notificationService.notifyBooking(booking, NotificationEvent.REMINDER);
+            // Only the flag is written, and only if it is still unset and the booking still BOOKED. So a farmer
+            // who cancelled or checked in a moment ago keeps that status, and gets no reminder; and two runs
+            // at the same moment cannot both send one.
+            if (bookingRepository.markReminderSent(booking.getId()) == 1) {
+                notificationService.notifyBooking(booking, NotificationEvent.REMINDER);
+                sent++;
+            }
         }
-        return due.size();
+        return sent;
     }
 
     /** Marks bookings as NO_SHOW when the farmer has not checked in by slot end + noShowAfterMinutes. */
@@ -71,9 +77,20 @@ public class AutomationService {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime cutoff = now.minusMinutes(noShowAfterMinutes);
 
-        List<Booking> missed = bookingRepository.findNotArrivedBefore(cutoff.toLocalDate(), cutoff.toLocalTime());
+        // Locked first, then loaded: a farmer being checked in at this very moment is skipped (SKIP LOCKED),
+        // and nobody can check one in while we mark it.
+        List<Long> ids = bookingRepository.lockNotArrivedBefore(cutoff.toLocalDate(), cutoff.toLocalTime());
+        if (ids.isEmpty()) {
+            return 0;
+        }
+        List<Booking> missed = bookingRepository.findDetailedByIds(ids);
         Set<Long> centresToRefresh = new HashSet<>();
+        int marked = 0;
         for (Booking booking : missed) {
+            if (booking.getStatus() != BookingStatus.BOOKED) {
+                continue;       // cannot happen while it is locked, but never overwrite another status
+            }
+            marked++;
             booking.setStatus(BookingStatus.NO_SHOW);
             eventRepository.save(new BookingEvent(booking, BookingEventType.NO_SHOW,
                     "Did not arrive by " + noShowAfterMinutes + " minutes after the slot", null));
@@ -85,6 +102,6 @@ public class AutomationService {
             }
         }
         centresToRefresh.forEach(centreId -> events.publishEvent(new QueueChangedEvent(centreId)));
-        return missed.size();
+        return marked;
     }
 }

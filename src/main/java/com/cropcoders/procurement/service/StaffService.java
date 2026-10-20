@@ -32,12 +32,14 @@ public class StaffService {
     private final UserRepository userRepository;
     private final CentreRepository centreRepository;
     private final PasswordEncoder passwordEncoder;
+    private final LoginAttemptService loginAttempts;
 
     public StaffService(UserRepository userRepository, CentreRepository centreRepository,
-                        PasswordEncoder passwordEncoder) {
+                        PasswordEncoder passwordEncoder, LoginAttemptService loginAttempts) {
         this.userRepository = userRepository;
         this.centreRepository = centreRepository;
         this.passwordEncoder = passwordEncoder;
+        this.loginAttempts = loginAttempts;
     }
 
     @Transactional(readOnly = true)
@@ -85,7 +87,7 @@ public class StaffService {
         user.setActive(request.active());
         if (request.password() != null && !request.password().isBlank()) {
             user.setPasswordHash(passwordEncoder.encode(request.password()));
-            user.clearFailedLogins();       // a new password also lifts a lock from wrong passwords
+            loginAttempts.clearAll(user.getUsername());   // a new password also lifts a lock from wrong passwords
         }
         return StaffView.from(user);
     }

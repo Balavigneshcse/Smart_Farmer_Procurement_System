@@ -40,11 +40,13 @@ const Admin = (() => {
         }
     }
 
-    /** Escapes text before putting it into HTML. */
+    /**
+     * Escapes text before putting it into HTML. Quotes are escaped too, so text inside value="..."
+     * (e.g. a centre name typed by a centre admin) cannot close the attribute and add attributes of its own.
+     */
     function esc(value) {
-        const div = document.createElement('div');
-        div.textContent = value ?? '';
-        return div.innerHTML;
+        const replacements = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+        return String(value ?? '').replace(/[&<>"']/g, char => replacements[char]);
     }
 
     /** 806238.3 -> "₹8,06,238" (Indian grouping) */

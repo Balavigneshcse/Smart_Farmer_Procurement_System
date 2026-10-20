@@ -131,9 +131,14 @@ public class BookingService {
         return withTimeline(find(farmerId, bookingId));
     }
 
-    /** Cancels a booking that has not started yet, and gives the place back to the slot. */
+    /**
+     * Cancels a booking that has not started yet, and gives the place back to the slot.
+     * The booking is locked first: a second cancel at the same moment (double click, two tabs) or a check-in
+     * at the counter waits, then sees the new status, so the place is given back only once.
+     */
     @Transactional
     public BookingResponse cancel(Long farmerId, Long bookingId) {
+        bookingRepository.lockForFarmer(bookingId, farmerId).orElseThrow(BookingService::bookingNotFound);
         Booking booking = find(farmerId, bookingId);
         if (!booking.isCancellable(LocalDateTime.now())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "BOOKING_NOT_CANCELLABLE",
@@ -155,8 +160,11 @@ public class BookingService {
     }
 
     private Booking find(Long farmerId, Long bookingId) {
-        return bookingRepository.findForFarmer(bookingId, farmerId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "BOOKING_NOT_FOUND", "Booking not found."));
+        return bookingRepository.findForFarmer(bookingId, farmerId).orElseThrow(BookingService::bookingNotFound);
+    }
+
+    private static ApiException bookingNotFound() {
+        return new ApiException(HttpStatus.NOT_FOUND, "BOOKING_NOT_FOUND", "Booking not found.");
     }
 
     private BookingResponse withTimeline(Booking booking) {

@@ -299,7 +299,12 @@ public class QueueService {
         return new OperatorActionResponse(message, view, toOperatorView(day));
     }
 
-    /** The first few farmers in the waiting line get one "your turn is near" email each. */
+    /**
+     * The first few farmers in the waiting line get one "your turn is near" email each.
+     * These are other farmers' bookings, which other counters may be changing right now, so only the flag
+     * is written (markTurnAlertSent), never the whole booking. The email goes out only if this call set the
+     * flag, so two counters at the same moment cannot both send it.
+     */
     private void alertFarmersNearTheFront(DayState day, Booking justCheckedIn) {
         int count = Math.min(TURN_NEAR_POSITION, day.waiting().size());
         for (int i = 0; i < count; i++) {
@@ -307,8 +312,9 @@ public class QueueService {
             if (b.isTurnAlertSent()) {
                 continue;
             }
-            b.setTurnAlertSent(true);
-            if (b != justCheckedIn) {
+            boolean flagSetNow = bookingRepository.markTurnAlertSent(b.getId()) == 1;
+            // The farmer who just checked in is marked too, but their check-in email already gives their place.
+            if (flagSetNow && b != justCheckedIn) {
                 notificationService.notifyBooking(b, NotificationEvent.TURN_NEAR, i + 1, day.etaFor(i + 1));
             }
         }
@@ -361,6 +367,8 @@ public class QueueService {
     /**
      * code is either a token ("TNJ-005") or the QR text ("SFPS:12:TNJ-005").
      * The booking must be for this centre and for today.
+     * It is locked first, then loaded: a second check-in of the same farmer, the farmer cancelling or the
+     * no-show job at the same moment wait, and then see the new status.
      */
     private Booking findTodaysBooking(Centre centre, String code) {
         LocalDate today = LocalDate.now();
@@ -370,12 +378,14 @@ public class QueueService {
             if (parts.length != 3 || !parts[1].matches("\\d{1,18}")) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_CODE", "This QR code is not a booking QR code.");
             }
-            booking = bookingRepository.findDetailedById(Long.valueOf(parts[1]))
+            booking = bookingRepository.lockById(Long.valueOf(parts[1]))
+                    .flatMap(bookingRepository::findDetailedById)
                     .filter(b -> b.getToken().equals(parts[2]))
                     .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "TOKEN_NOT_FOUND",
                             "No booking found for this QR code."));
         } else {
-            booking = bookingRepository.findDetailedByToken(centre.getId(), today, code)
+            booking = bookingRepository.lockByToken(centre.getId(), today, code)
+                    .flatMap(bookingRepository::findDetailedById)
                     .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "TOKEN_NOT_FOUND",
                             "No booking with token " + code + " at this centre today."));
         }
@@ -390,9 +400,14 @@ public class QueueService {
         return booking;
     }
 
-    /** A booking of this centre that is currently at a counter (status CALLED). */
+    /**
+     * A booking of this centre that is currently at a counter (status CALLED), used by recall, skip and the
+     * weighment. Locked first, then loaded: if skip and weighment of the same farmer arrive at the same
+     * moment, the second one waits and then sees that the farmer is no longer at the counter.
+     */
     Booking bookingAtCounter(Centre centre, Long bookingId) {
-        return bookingRepository.findDetailedById(bookingId)
+        return bookingRepository.lockById(bookingId)
+                .flatMap(bookingRepository::findDetailedById)
                 .filter(b -> b.getCentre().getId().equals(centre.getId()))
                 .filter(b -> b.getStatus() == BookingStatus.CALLED)
                 .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "NOT_AT_COUNTER",

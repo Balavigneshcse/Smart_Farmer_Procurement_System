@@ -11,7 +11,7 @@ public final class TestProperties {
     public static AppProperties withJwtSecret(String secret) {
         return new AppProperties("test",
                 new AppProperties.Jwt(secret, 168, 12, 15),
-                new AppProperties.Otp(5, 3, 60, 5),
+                new AppProperties.Otp(5, 3, 60, 5, 200),
                 new AppProperties.StaffLogin(5, 15),
                 new AppProperties.Email("console", "noreply@example.com", "Smart Farmer Procurement System", 250,
                         "http://localhost:8080"),

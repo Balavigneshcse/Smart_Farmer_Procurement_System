@@ -1,0 +1,309 @@
+/*
+ * New booking (/farmer/book.html): centre, day, time, crop and quantity, then the token.
+ * In its own file because the Content-Security-Policy header does not allow inline scripts.
+ */
+const $ = id => document.getElementById(id);
+const { esc } = Farmer;
+const t = (key, params) => I18N.t(key, params);
+
+const state = {
+    profile: null,
+    centres: [],
+    crops: [],
+    centre: null,     // chosen centre
+    days: [],         // slots of the chosen centre, grouped by day
+    date: null,       // chosen day "2026-09-24"
+    slot: null,       // chosen slot
+    booking: null,    // the booking after success
+};
+
+function showAlert(text) {
+    $('alert').textContent = text;
+    $('alert').className = 'alert alert-error';
+    $('alert').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function hideAlert() {
+    $('alert').className = 'alert hidden';
+}
+
+function show(id, visible) {
+    $(id).classList.toggle('hidden', !visible);
+    updateStepper();
+}
+
+/** The bar at the top: steps already chosen are filled, the step being chosen is highlighted. */
+function updateStepper() {
+    const current = !state.centre ? 0 : !state.date ? 1 : !state.slot ? 2 : 3;
+    [...$('stepper').children].forEach((li, i) => {
+        li.classList.toggle('done', i < current);
+        li.classList.toggle('current', i === current);
+    });
+}
+
+/** low / medium / high crowd level from how full something is. */
+function crowdLevel(booked, capacity) {
+    const ratio = capacity ? booked / capacity : 1;
+    if (ratio >= 0.85) return 'high';
+    if (ratio >= 0.5) return 'medium';
+    return 'low';
+}
+
+// ---------- Step 1: centre ----------
+
+function renderCentres() {
+    $('centres').innerHTML = state.centres.map(c => {
+        const nearYou = c.district.toLowerCase() === state.profile.district.toLowerCase();
+        return `
+        <button type="button" class="option-card" data-centre="${c.id}" aria-pressed="${state.centre?.id === c.id}">
+            <span class="option-title">${esc(c.name)}</span>
+            <span class="muted small">${esc(c.address)}</span>
+            <span class="centre-meta">
+                ${nearYou ? `<span class="badge">${UI.icon('map-pin')}${esc(t('book.nearYou'))}</span>` : ''}
+                <span class="badge badge-grey">${UI.icon('clock')}${esc(t('landing.centres.hours', {
+                    open: I18N.formatTime(c.openTime), close: I18N.formatTime(c.closeTime),
+                }))}</span>
+            </span>
+        </button>`;
+    }).join('');
+}
+
+async function selectCentre(centreId) {
+    hideAlert();
+    state.centre = state.centres.find(c => c.id === centreId);
+    state.days = [];
+    state.date = null;
+    state.slot = null;
+    renderCentres();
+    show('step-date', true);
+    show('step-slot', false);
+    show('step-details', false);
+    $('dates').innerHTML = UI.skeleton(2, esc(t('common.loading')));
+
+    let days;
+    try {
+        days = await Api.get(`/api/centres/${centreId}/slots`);
+    } catch (error) {
+        if (state.centre?.id === centreId) showAlert(Api.errorMessage(error));
+        return;
+    }
+    // The farmer picked another centre while this one was loading: this answer is out of date.
+    if (state.centre?.id !== centreId) return;
+    state.days = days;
+    renderDates();
+    const firstOpenDay = state.days.find(day => day.slots.some(s => s.bookable));
+    if (firstOpenDay) selectDate(firstOpenDay.date, false);
+    $('step-date').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ---------- Step 2: day ----------
+
+function renderDates() {
+    $('dates').innerHTML = state.days.map(day => {
+        const open = day.slots.some(s => s.bookable);
+        const percent = day.capacity ? Math.round(day.booked * 100 / day.capacity) : 100;
+        return `
+        <button type="button" class="option-card date-chip" data-date="${day.date}"
+                aria-pressed="${state.date === day.date}" ${open ? '' : 'disabled'}>
+            <span class="day-name">${esc(Farmer.dayName(day.date))}</span>
+            <span class="day-num">${esc(I18N.formatDate(day.date, { day: 'numeric', month: 'short' }))}</span>
+            ${open
+                ? `<span class="fill-bar" data-level="${crowdLevel(day.booked, day.capacity)}"><span style="width: ${percent}%"></span></span>`
+                : `<span class="small muted">${esc(t('book.full'))}</span>`}
+        </button>`;
+    }).join('');
+}
+
+function selectDate(date, scroll = true) {
+    state.date = date;
+    state.slot = null;
+    renderDates();
+    renderSlots();
+    show('step-slot', true);
+    show('step-details', false);
+    if (scroll) $('step-slot').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ---------- Step 3: time ----------
+
+function renderSlots() {
+    const day = state.days.find(d => d.date === state.date);
+    const visible = day ? day.slots.filter(s => !s.past) : [];
+    const bookable = visible.filter(s => s.bookable);
+    if (!bookable.length) {
+        $('slots').innerHTML = `<p class="muted">${esc(t('book.noSlots'))}</p>`;
+        return;
+    }
+    // Smart suggestion: the least crowded open time (the earliest one if several are equal).
+    const suggested = bookable.reduce((best, s) => (s.booked / s.capacity < best.booked / best.capacity ? s : best));
+
+    $('slots').innerHTML = visible.map(s => `
+        <button type="button" class="slot-btn" data-slot="${s.id}"
+                data-level="${s.bookable ? crowdLevel(s.booked, s.capacity) : 'full'}"
+                aria-pressed="${state.slot?.id === s.id}" ${s.bookable ? '' : 'disabled'}>
+            <span class="slot-time">${esc(Farmer.slotTime(s.startTime, s.endTime))}</span>
+            <span class="slot-left">${esc(s.bookable ? t('book.slotsLeft', { n: s.available }) : t('book.full'))}</span>
+            ${s.id === suggested.id ? `<span class="badge">${esc(t('book.suggested'))}</span>` : ''}
+        </button>`).join('');
+}
+
+function selectSlot(slotId) {
+    const day = state.days.find(d => d.date === state.date);
+    state.slot = day.slots.find(s => s.id === slotId);
+    renderSlots();
+    renderSummary();
+    show('step-details', true);
+    $('step-details').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ---------- Step 4: crop, quantity, confirm ----------
+
+function renderCrops() {
+    const selected = document.querySelector('input[name="crop"]:checked')?.value;
+    $('crops').innerHTML = state.crops.map(c => `
+        <label class="choice">
+            <input type="radio" name="crop" value="${c.id}" ${String(c.id) === selected ? 'checked' : ''}>
+            <span>
+                <strong>${esc(Farmer.cropName(c))}</strong>
+                <small>${esc(t('book.ratePerQtl', { rate: I18N.formatMoney(c.ratePerQtl) }))}</small>
+            </span>
+        </label>`).join('');
+}
+
+function selectedCrop() {
+    const id = Number(document.querySelector('input[name="crop"]:checked')?.value);
+    return state.crops.find(c => c.id === id) || null;
+}
+
+function renderSummary() {
+    if (!state.slot) return;
+    $('summary').innerHTML = `${UI.icon('calendar-check')}<span>${esc(state.centre.name)}<br>`
+        + `${esc(Farmer.dayLabel(state.date))}, ${esc(Farmer.slotTime(state.slot.startTime, state.slot.endTime))}</span>`;
+}
+
+function renderEstimate() {
+    const crop = selectedCrop();
+    const qty = Number($('quantity').value);
+    $('estimate').textContent = crop && qty > 0
+        ? t('book.estimate', { amount: I18N.formatMoney(Math.round(qty * crop.ratePerQtl)) })
+        : '';
+}
+
+function clearFieldErrors() {
+    ['crop', 'quantity'].forEach(id => { $(`${id}-error`).textContent = ''; });
+    $('quantity').removeAttribute('aria-invalid');
+}
+
+$('booking-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    hideAlert();
+    clearFieldErrors();
+
+    const crop = selectedCrop();
+    const qty = Number($('quantity').value);
+    let valid = true;
+    if (!crop) {
+        $('crop-error').textContent = t('validation.crop');
+        valid = false;
+    }
+    if (!(qty >= 0.5 && qty <= 500)) {
+        $('quantity-error').textContent = t('validation.quantity');
+        $('quantity').setAttribute('aria-invalid', 'true');
+        valid = false;
+    }
+    if (!valid) return;
+
+    const button = $('confirm-btn');
+    button.disabled = true;
+    button.textContent = t('book.confirming');
+    try {
+        state.booking = await Api.post('/api/bookings', {
+            slotId: state.slot.id,
+            cropId: crop.id,
+            estQtyQtl: Math.round(qty * 100) / 100,
+        });
+        showSuccess();
+    } catch (error) {
+        showAlert(Api.errorMessage(error));
+        if (error.code === 'SLOT_FULL' || error.code === 'SLOT_CLOSED') {
+            // Someone else took the last place - reload so the farmer sees the real numbers.
+            const date = state.date;
+            await selectCentre(state.centre.id);
+            if (state.days.some(d => d.date === date)) selectDate(date);
+        }
+    } finally {
+        button.disabled = false;
+        button.textContent = t('book.confirm');
+    }
+});
+
+// ---------- Success ----------
+
+function renderSuccess() {
+    const b = state.booking;
+    $('s-token').textContent = b.token;
+    $('s-view').href = `/farmer/booking.html?id=${b.id}`;
+    $('s-details').innerHTML = `
+        <dt>${esc(t('booking.centre'))}</dt><dd>${esc(b.centre.name)}</dd>
+        <dt>${esc(t('booking.date'))}</dt><dd>${esc(Farmer.dayLabel(b.date))}</dd>
+        <dt>${esc(t('booking.time'))}</dt><dd>${esc(Farmer.slotTime(b.startTime, b.endTime))}</dd>
+        <dt>${esc(t('booking.crop'))}</dt><dd>${esc(Farmer.cropName(b.crop))}, ${esc(Farmer.quantity(b.estQtyQtl))}</dd>`;
+}
+
+function showSuccess() {
+    show('booking-steps', false);
+    show('success', true);
+    renderSuccess();
+    Farmer.renderQr($('s-qr'), state.booking.qrText);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ---------- Events ----------
+
+$('centres').addEventListener('click', event => {
+    const button = event.target.closest('[data-centre]');
+    if (button) selectCentre(Number(button.dataset.centre));
+});
+$('dates').addEventListener('click', event => {
+    const button = event.target.closest('[data-date]');
+    if (button && !button.disabled) selectDate(button.dataset.date);
+});
+$('slots').addEventListener('click', event => {
+    const button = event.target.closest('[data-slot]');
+    if (button && !button.disabled) selectSlot(Number(button.dataset.slot));
+});
+$('crops').addEventListener('change', renderEstimate);
+$('quantity').addEventListener('input', renderEstimate);
+
+document.addEventListener('langchange', () => {
+    if (!state.profile) return;
+    renderCentres();
+    renderCrops();
+    if (state.days.length) renderDates();
+    if (state.date) renderSlots();
+    renderSummary();
+    renderEstimate();
+    if (state.booking) renderSuccess();
+});
+
+async function init() {
+    const me = await Farmer.initPage();
+    if (!me) return;
+    try {
+        [state.profile, state.centres, state.crops] = await Promise.all([
+            Api.get('/api/farmers/me'), Api.get('/api/centres'), Api.get('/api/crops'),
+        ]);
+    } catch (error) {
+        $('centres').replaceChildren();
+        showAlert(Api.errorMessage(error));
+        return;
+    }
+    // Centres in the farmer's own district come first.
+    const home = state.profile.district.toLowerCase();
+    state.centres.sort((a, b) => (b.district.toLowerCase() === home) - (a.district.toLowerCase() === home));
+    renderCentres();
+    renderCrops();
+    updateStepper();
+}
+
+init();

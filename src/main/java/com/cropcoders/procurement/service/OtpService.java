@@ -23,6 +23,8 @@ import com.cropcoders.procurement.repository.OtpCodeRepository;
  *
  * Rules (from application.yml, app.otp):
  *  - a new OTP only after resend-seconds, and at most max-per-hour per email (protects the free email quota)
+ *  - at most max-per-day OTPs for all email addresses together, so a script trying made-up addresses
+ *    cannot use up the day's email quota (OTP emails do not count towards app.email.daily-limit)
  *  - an OTP is valid for valid-minutes and allows max-attempts wrong tries
  *  - only a BCrypt hash of the code is stored, never the code itself
  */
@@ -67,6 +69,12 @@ public class OtpService {
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "OTP_LIMIT",
                     "Too many OTP requests. Please try again after one hour.");
         }
+        // All addresses together since midnight. Requests at the very same moment can both pass when the
+        // count is just below the limit (one or two OTPs too many); that is fine for a daily limit.
+        if (otpCodeRepository.countCreatedSince(now.toLocalDate().atStartOfDay()) >= rules.maxPerDay()) {
+            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "OTP_DAILY_LIMIT",
+                    "Too many logins today. Please try again tomorrow, or contact the procurement centre.");
+        }
 
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
         otpCodeRepository.save(new OtpCode(email, passwordEncoder.encode(code), now,
@@ -78,11 +86,13 @@ public class OtpService {
 
     /**
      * Checks the latest OTP for the email. Throws ApiException if it is wrong, expired or used up.
+     * The OTP row is locked first, so guesses sent at the same moment are checked one after the other
+     * and each wrong one is counted (otherwise two could both save "1 wrong try").
      * noRollbackFor: a wrong attempt must still be counted even though we throw an error.
      */
     @Transactional(noRollbackFor = ApiException.class)
     public void verifyOtp(String email, String code) {
-        OtpCode otp = otpCodeRepository.findFirstByEmailOrderByCreatedAtDesc(email)
+        OtpCode otp = otpCodeRepository.lockLatestByEmail(email)
                 .filter(o -> !o.isUsed())
                 .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "OTP_NOT_FOUND",
                         "Please ask for an OTP first."));

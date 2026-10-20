@@ -1,5 +1,7 @@
 package com.cropcoders.procurement.scheduler;
 
+import java.time.LocalDateTime;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -8,9 +10,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import com.cropcoders.procurement.service.AutomationService;
+import com.cropcoders.procurement.service.LoginAttemptService;
 
 /**
- * Reminders and no-show marking, every 15 minutes during the day.
+ * Reminders and no-show marking, every 15 minutes during the day (plus forgetting old wrong staff passwords).
  * Nothing runs at night, so the free database (Neon) can sleep and save its monthly hours.
  * Also runs at startup, because the free Render server sleeps and may have missed some runs.
  */
@@ -20,9 +23,11 @@ public class AutomationJob {
     private static final Logger log = LoggerFactory.getLogger(AutomationJob.class);
 
     private final AutomationService automationService;
+    private final LoginAttemptService loginAttempts;
 
-    public AutomationJob(AutomationService automationService) {
+    public AutomationJob(AutomationService automationService, LoginAttemptService loginAttempts) {
         this.automationService = automationService;
+        this.loginAttempts = loginAttempts;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -40,6 +45,7 @@ public class AutomationJob {
         try {
             int reminders = automationService.sendReminders();
             int noShows = automationService.markNoShows();
+            loginAttempts.deleteOld(LocalDateTime.now());     // keeps the login_attempts table small
             if (reminders > 0 || noShows > 0) {
                 log.info("Automation: {} reminder(s) sent, {} booking(s) marked as no-show", reminders, noShows);
             }

@@ -40,6 +40,8 @@ public class JwtService {
 
     public JwtService(AppProperties properties) {
         this.config = properties.jwt();
+        // Also protects QrLinkSigner, which signs the QR links with the same secret.
+        SecretGuard.requireRealSecret(config.secret(), "JWT_SECRET", properties.email().appUrl());
         byte[] secret = config.secret().getBytes(StandardCharsets.UTF_8);
         if (secret.length < 32) {
             throw new IllegalStateException("app.jwt.secret must be at least 32 characters long");

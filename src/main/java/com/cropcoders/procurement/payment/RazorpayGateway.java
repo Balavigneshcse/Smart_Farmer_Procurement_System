@@ -3,8 +3,11 @@ package com.cropcoders.procurement.payment;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
+import java.time.Duration;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -15,6 +18,7 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -33,6 +37,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  *  3. Checkout returns order id + payment id + signature to the browser, which sends them to us.
  *  4. isValidSignature() - we recompute HMAC-SHA256(orderId + "|" + paymentId, keySecret).
  *     Only Razorpay and our server know the secret, so a matching signature proves the payment is real.
+ *  If step 3 never reaches us (tab closed, network error), the next click on Pay asks Razorpay with
+ *  findSuccessfulPayment() whether the order was already paid, so the farmer is not paid twice.
  */
 @Component
 public class RazorpayGateway {
@@ -51,8 +57,14 @@ public class RazorpayGateway {
         if (http == null) {
             synchronized (this) {
                 if (http == null) {
+                    // Time limits: Razorpay is called while the payment row is locked and the database pool
+                    // has only 5 connections, so a hanging Razorpay must not hold them for ever.
+                    SimpleClientHttpRequestFactory timeouts = new SimpleClientHttpRequestFactory();
+                    timeouts.setConnectTimeout(Duration.ofSeconds(5));
+                    timeouts.setReadTimeout(Duration.ofSeconds(10));
                     http = RestClient.builder()
                             .baseUrl(config.apiUrl())
+                            .requestFactory(timeouts)
                             .defaultHeaders(headers -> headers.setBasicAuth(config.keyId(), config.keySecret()))
                             .build();
                 }
@@ -116,6 +128,44 @@ public class RazorpayGateway {
         }
     }
 
+    /**
+     * The id of a successful payment for this order, if Razorpay has one. Asked with our secret key
+     * (server to server), so the answer cannot be faked by a browser.
+     * Any problem (Razorpay unreachable, unexpected answer) gives empty: this check must never stop
+     * the admin from paying.
+     */
+    public Optional<String> findSuccessfulPayment(String orderId) {
+        if (!isConfigured()) {
+            return Optional.empty();
+        }
+        try {
+            PaymentList payments = http().get()
+                    .uri("/orders/{orderId}/payments", orderId)
+                    .retrieve()
+                    .body(PaymentList.class);
+            return successfulPaymentId(payments == null ? null : payments.items());
+        } catch (RuntimeException e) {
+            // RuntimeException, not only RestClientException: also when the HTTP client itself cannot start.
+            log.warn("Could not ask Razorpay about earlier payments for order {}: {}", orderId, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Picks the successful payment from an order's payments. Checkout reports success once a payment is
+     * "authorized" (test mode then captures it automatically), the same moment our verify step marks it paid.
+     * "created" and "failed" payments did not take any money.
+     */
+    static Optional<String> successfulPaymentId(List<PaymentItem> items) {
+        if (items == null) {
+            return Optional.empty();
+        }
+        return items.stream()
+                .filter(p -> p.id() != null && ("captured".equals(p.status()) || "authorized".equals(p.status())))
+                .map(PaymentItem::id)
+                .findFirst();
+    }
+
     /** Checks the signature Razorpay Checkout returned for a successful payment. */
     public boolean isValidSignature(String orderId, String paymentId, String signature) {
         requireConfigured();
@@ -162,5 +212,14 @@ public class RazorpayGateway {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record OrderResponse(String id, String status, Long amount) {
+    }
+
+    /** Razorpay's answer to GET /orders/{id}/payments: {"items": [{"id": "pay_...", "status": "captured"}]} */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record PaymentList(List<PaymentItem> items) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record PaymentItem(String id, String status) {
     }
 }

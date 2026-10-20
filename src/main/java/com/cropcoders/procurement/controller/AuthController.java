@@ -20,6 +20,7 @@ import com.cropcoders.procurement.dto.VerifyOtpResponse;
 import com.cropcoders.procurement.security.AuthUser;
 import com.cropcoders.procurement.service.AuthService;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 @RestController
@@ -48,9 +49,13 @@ public class AuthController {
         return authService.register(request);
     }
 
+    /**
+     * The client's IP address counts wrong passwords per computer (see AuthService.staffLogin).
+     * Behind Nginx it is the visitor's real address (server.forward-headers-strategy in application.yml).
+     */
     @PostMapping("/login")
-    public AuthResponse login(@Valid @RequestBody LoginRequest request) {
-        return authService.staffLogin(request);
+    public AuthResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        return authService.staffLogin(request, httpRequest.getRemoteAddr());
     }
 
     @GetMapping("/me")

@@ -70,7 +70,11 @@ Each browser tab keeps its own staff login (in `sessionStorage`), so an admin an
 
 **Payment details.** At registration the farmer chooses how to be paid: a **bank account** (account holder, account number typed twice, IFSC code, bank name) or a **UPI ID**. The form and the server check the same rules (account number 9 to 18 digits, IFSC like `SBIN0001234`, UPI like `name@okaxis`). The browser only ever gets the last 4 digits of the account number back. The account number and the UPI ID are **encrypted in the database** (AES-256-GCM, `EncryptedText`) with the key `PAYOUT_ENCRYPTION_KEY` from `.env`, so a copy of the database alone does not reveal them. Farmers can change the details on their dashboard, and the admin's payments page shows where each farmer wants to be paid.
 
-OTP rules: valid for 5 minutes, 3 wrong tries, a new OTP only after 60 seconds, at most 5 per hour per email address.
+OTP rules:
+- valid for 5 minutes, 3 wrong tries
+- a new OTP only after 60 seconds, at most 5 per hour per email address
+- at most 200 a day for the whole site, all addresses together (`OTP_DAILY_LIMIT`), so a script trying made-up addresses cannot use up the day's Gmail quota. After that the server answers 429 `OTP_DAILY_LIMIT` until midnight.
+- on the live server, Nginx also counts login requests per IP address: sending an OTP 6 a minute (plus a burst of 12), checking an OTP or a staff password 20 a minute together (plus a burst of 20). Over that, Nginx itself answers 429 `RATE_LIMITED` (see `deploy/README.md`, section 9).
 
 ### Booking a slot
 
@@ -84,7 +88,8 @@ The farmer then gets a **token** (e.g. `TNJ-001`) and a **QR code** to show at t
 
 How it works (for the viva):
 - **Slot generation.** `SlotGenerationJob` creates slots at startup and every morning at 7:00 for the next 7 days. The insert uses `ON CONFLICT DO NOTHING`, so running it twice doesn't create duplicates. Places per slot = counters × slot minutes ÷ average service minutes.
-- **No overbooking.** A place is taken with a single SQL statement: `UPDATE slots SET booked = booked + 1 WHERE id = ? AND booked < capacity`. If it changes 0 rows, the slot is full. In a test, 6 farmers booked the last 5 places at the same moment: exactly 5 succeeded and 1 was told the slot is full.
+- **No overbooking.** A place is taken with a single SQL statement: `UPDATE slots SET booked = booked + 1 WHERE id = ? AND booked < capacity`. If it changes 0 rows, the slot is full. In a test (`EndToEndFlowTest`), 6 farmers booked the last 5 places at the same moment: exactly 5 succeeded and 1 was told the slot is full.
+- **Cancel only once.** Cancelling locks the booking row first (`SELECT … FOR UPDATE`) and loads it after. A second cancel at the same moment (double click, two tabs) or a check-in at the counter waits, then sees the new status, so the place goes back to the slot only once. In a test, two cancels at the same moment: one succeeded and the other was told the booking can no longer be cancelled.
 - **One booking per day.** A partial unique index (`uq_active_booking`) stops a farmer from holding two active bookings on the same day.
 - **Tokens.** `token_counters` is updated with `INSERT … ON CONFLICT DO UPDATE … RETURNING`, so two bookings can never get the same number.
 - **Status history.** Every change is saved in `booking_events` and shown to the farmer as a timeline.
@@ -101,8 +106,11 @@ How it works (for the viva):
 - **Check-in** sets `queue_priority`. A farmer who arrives on time or early is placed by their slot start time. A farmer who arrives after slot end + 15 minutes is placed by their arrival time, which puts them at the back of the line.
 - **Call next** picks the first farmer with `SELECT … ORDER BY queue_priority, checked_in_at LIMIT 1 FOR UPDATE SKIP LOCKED`, so two counters pressing the button at the same moment always get different farmers.
 - **One farmer per counter.** A partial unique index (`uq_counter_serving`, on centre, day and counter where the status is `CALLED`) stops two clicks for the *same* counter (two tabs, two staff) from both calling a farmer. The second one is told the counter is busy.
+- **One change at a time per farmer.** Check-in (by token or QR code), **Call again**, **Not present** and the weighment lock the booking row first (`SELECT id … FOR UPDATE`, in `BookingRepository`) and load the booking after. Two actions on the same farmer at the same moment, such as two check-ins, skip and weighment, or a check-in while the farmer cancels, run one after the other, and the second one sees what the first saved. The order matters: a booking already loaded in the transaction would not be read again, so the lock would not help. The no-show job locks with `FOR UPDATE SKIP LOCKED`, so it leaves out a booking the desk is changing right now and looks at it again on its next run. The desk itself sends one check-in at a time.
+- **Only changed columns are saved.** `Booking` has `@DynamicUpdate`, so saving a booking writes only the columns that changed. Without it every column is written back, and changing one field could undo a status another request saved in the meantime (e.g. turn a just-cancelled booking back into *Booked*).
+- **Each email only once.** The "reminder sent" and "turn is near sent" flags are set with a conditional update, for example `UPDATE bookings SET reminder_sent = true WHERE id = ? AND reminder_sent = false AND status = 'BOOKED'`. The email goes out only when that changed exactly 1 row. So two counters, or two runs of the reminder job, never send the same email twice, and a farmer who cancelled a moment ago gets no reminder. Only that one column is written, so other changes are kept.
 - **ETA** is calculated by `EtaCalculator` and unit tested. The average service time is the real average of the last farmers served today, or the centre's setting until at least 3 have been served. The wait for position *p* is `ceil(max(0, p − free counters) / counters) × average service time`.
-- **Live updates** use Server-Sent Events. Each screen keeps one connection open (`/api/queue/{centreId}/stream`), and after every change is committed, `QueueSseHub` pushes the new queue to all screens of that centre. The browser reconnects by itself if the connection drops.
+- **Live updates** use Server-Sent Events. Each screen keeps one connection open (`/api/queue/{centreId}/stream`), and after every change is committed, `QueueSseHub` pushes the new queue to all screens of that centre. After a dropped connection the browser reconnects by itself. But when the server answers with an error instead (e.g. 502 from Nginx while the app restarts), the browser gives up for good, so `js/live.js` opens a new connection itself: after 2 seconds, then 4, 8, 16, and at most every 30 seconds until it works. The operator desk then reloads its lists, because changes made during the outage were never streamed to it.
 - **Privacy.** The public queue contains token numbers only, never names or phone numbers.
 
 ### Weighment and payment
@@ -135,8 +143,12 @@ How it works (for the viva):
 3. **Receive the result.** Checkout returns `razorpay_order_id`, `razorpay_payment_id` and `razorpay_signature` to the browser.
 4. **Verify.** The server recomputes `HMAC-SHA256(order_id + "|" + payment_id, key_secret)` and compares it with the signature, then marks the payment Paid. Only Razorpay and our server know the secret, so a forged "success" is rejected. `RazorpayGatewayTest` checks this against a value computed with `openssl`.
 5. **One payment at a time.** Creating the order and verifying it both lock the payment row first (`SELECT … FOR UPDATE`). A double click or two admins paying the same farmer wait for each other, so a payment never gets two Razorpay orders and is never marked paid (or emailed about) twice.
-6. **Store amounts safely.** Amounts are stored in **paise** as whole numbers, so there are no rounding errors.
-7. **Real life.** Money would flow from the government to the farmer (DBT / RazorpayX Payouts). In the demo, the admin paying through Checkout stands in for that step.
+6. **If the result never arrives.** The connection can drop (or the tab be closed) right after paying, so step 4 never reaches our server and the payment still shows *Pending*. So:
+   - The browser saves Checkout's result in `localStorage` before sending it, and sends it again the next time the payments page opens. Once the server has given its final answer, the saved result is removed.
+   - When the admin clicks **Pay** again, the order already exists, so the server first asks Razorpay with the secret key, server to server (`GET /orders/{id}/payments`, `RazorpayGateway.findSuccessfulPayment`), whether it was already paid. If it was, the server marks the payment Paid with that `pay_…` reference and answers `alreadyPaid`. The page then shows a notice with the reference instead of opening Checkout, so the farmer is never paid twice. If Razorpay cannot be asked, Checkout simply opens as usual.
+   - Calls to Razorpay have a time limit (5 seconds to connect, 10 seconds for the answer), because they run while the payment row is locked and the database pool has only 5 connections.
+7. **Store amounts safely.** Amounts are stored in **paise** as whole numbers, so there are no rounding errors.
+8. **Real life.** Money would flow from the government to the farmer (DBT / RazorpayX Payouts). In the demo, the admin paying through Checkout stands in for that step.
 
 ### Emails and automation
 
@@ -165,7 +177,7 @@ Use `EMAIL_PROVIDER=console` to print emails in the log instead (handy for testi
 How it works (for the viva):
 - **Texts in 3 languages.** Email texts live in `messages.properties` (English), `messages_ta.properties` and `messages_hi.properties`, and are picked by the farmer's saved language. Every text is HTML-escaped before it goes into the email.
 - **Sent after commit, in the background.** A notification is saved in the same transaction as the booking change. The email is sent by `EmailDispatcher` only **after** that transaction commits (`@TransactionalEventListener(AFTER_COMMIT)`), on a separate thread (`@Async`), so the operator's click is not slowed down by Gmail and no email goes out for a change that failed. The row is then marked `SENT` (with Gmail's message id) or `FAILED`.
-- **Free quota.** At most `EMAIL_DAILY_LIMIT` (default 250) notification emails per day (Gmail allows 500, Brevo 300). After that, notifications are shown in the app only (`SKIPPED`). OTP emails are never capped, so farmers can always log in.
+- **Free quota.** At most `EMAIL_DAILY_LIMIT` (default 250) notification emails per day (Gmail allows 500, Brevo 300). After that, notifications are shown in the app only (`SKIPPED`). OTP emails are not counted here, so farmers can still log in when the notification quota is used up. They have their own limit for the whole site, `OTP_DAILY_LIMIT` (default 200), so together they stay under Gmail's 500 a day.
 - **Scheduled jobs.** `AutomationJob` runs every 15 minutes from 7 am to 10 pm and also at startup (so nothing is missed after a restart). Nothing runs at night, so the free database can sleep too.
 - **Pluggable sender.** `EmailSender` is an interface; `ConsoleEmailSender` and `SmtpEmailSender` are chosen by `EMAIL_PROVIDER`. `BrevoEmailSender` (HTTPS API) is there for hosts that block SMTP ports.
 - **Fast OTP.** The OTP email is also sent in the background, so "Send OTP" answers in about 0.2 seconds and the farmer can type the code as soon as it arrives.
@@ -207,6 +219,7 @@ How it works (for the viva):
 ### Keeping the pages smooth
 
 - **Live pages pause in hidden tabs.** A browser keeps at most 6 connections open to one server, and every live page (operator desk, TV, farmer's booking) holds one. `js/live.js` closes the connection while a tab is hidden and reopens it when the tab is shown; the server then sends the current queue at once.
+- **Live pages come back by themselves.** If the server could not be reached (e.g. during an update), `js/live.js` reopens the connection with growing waits (2, 4, 8, 16, then every 30 seconds), so a TV at the centre does not need a manual reload after a restart. It never holds more than one connection, and it stops trying while the tab is hidden.
 - **Cheap animations.** Only `transform` and `opacity` are animated (the pulsing "live" dot, the queue number, the "go to counter" alert), which the graphics card handles without redrawing the page. The header is solid (no blur effect).
 - **Small files.** Fonts are cut down to the characters used, icons are one sprite file, photos are small WebP files, and the server compresses HTML, CSS, JS and JSON.
 - **Load in parallel.** Farmer pages ask for their data at the same time as the language file, the admin charts library loads in the background (numbers first, charts a moment later), and the operator desk only downloads the camera QR scanner when "Scan QR" is pressed.
@@ -222,6 +235,14 @@ The design rules:
 - **The token is a ticket.** The token card has notches and a tear line like a paper token.
 - **Loading and asking.** Grey skeleton shapes show while data loads, and a styled dialog replaces the browser's confirm box (`js/ui.js`).
 - **Motion.** Only `transform` and `opacity` are animated, and everything stops when the device asks for reduced motion.
+
+### Page scripts and browser security
+
+- **One script file per page.** Each page's own code is in `js/pages/` (e.g. `admin-payments.js` for `/admin/payments.html`), next to the shared files in `js/` (`api.js`, `auth.js`, `live.js`, `ui.js`, ...). The HTML pages have no inline `<script>` blocks, no `onclick="..."` attributes and no `javascript:` links, because the security header below does not allow them.
+- **Content-Security-Policy.** `SecurityConfig` sends this header with every response. It tells the browser to run scripts only from our own server, cdnjs, jsDelivr and Razorpay, to talk only to our API and Razorpay, to load no plugins, and to let no other site show our pages inside a frame (clickjacking). So even if someone slipped a script into a page (XSS), the browser would not run it. Styles allow `'unsafe-inline'`, because our scripts set `style="..."` on elements. `EndToEndFlowTest` checks the exact header.
+- **Subresource Integrity.** The libraries from CDNs (Chart.js and qrcodejs from cdnjs, the html5-qrcode camera scanner from jsDelivr) are loaded with an `integrity="sha384-…"` hash of that exact version. If a CDN ever served a different file, the browser would refuse to run it. Razorpay's `checkout.js` has no hash, because Razorpay only offers one unversioned URL and updates the file.
+- **Escaping.** Text from the server is escaped before it goes into HTML (`esc()` in `admin.js`, `farmer.js` and the page scripts), quotes included, so a name typed by someone cannot close an attribute and add its own.
+- **Ended logins.** When a login runs out while a page is open, `api.js` goes to the login page before the next request instead of sending it. Only a 401 with code `UNAUTHORIZED` (the server refused our token) logs the browser out; a wrong password (`BAD_CREDENTIALS`) or an expired registration (`REGISTRATION_EXPIRED`) does not.
 
 ### Testing the queue outside centre hours
 
@@ -240,28 +261,36 @@ DELETE FROM slots WHERE centre_id = (SELECT id FROM centres WHERE code = 'TNJ') 
 
 ### Configuration
 
-Local defaults are in `src/main/resources/application.yml`. Override them in the git-ignored `.env` file in the project folder (`example.env` lists every key), or as environment variables:
+Local defaults are in `src/main/resources/application.yml`. Override them in the git-ignored `.env` file in the project folder (`example.env` is a template with the main keys), or as environment variables:
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `DB_URL` | `jdbc:postgresql://localhost:5432/farmer_procurement` | Database URL |
 | `DB_USERNAME` / `DB_PASSWORD` | `postgres` / `postgres` | Database login |
 | `PORT` | `8080` | HTTP port |
-| `JWT_SECRET` | a local development value | Signs login tokens (and QR picture links). **Set a random 32+ character value in production** |
-| `PAYOUT_ENCRYPTION_KEY` | a local development value | Encrypts farmers' account numbers and UPI IDs. **Random 32+ characters in production; never change it later** |
+| `JWT_SECRET` | a local development value (`local-dev-...`) | Signs login tokens (and QR picture links). **Required on a server:** when `APP_URL` is not `http://localhost` or `http://127.0.0.1`, the app refuses to start with the development value (`SecretGuard`). Use 32+ random characters |
+| `PAYOUT_ENCRYPTION_KEY` | a local development value (`local-dev-...`) | Encrypts farmers' account numbers and UPI IDs. **Required on a server**, the same way as `JWT_SECRET`. 32+ random characters; **never change it later** |
 | `SUPERADMIN_USERNAME` / `SUPERADMIN_PASSWORD` | – | The super admin account, created at start-up if there is none |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | – | Razorpay **test** keys (`rzp_test_...`); live keys are refused |
 | `EMAIL_PROVIDER` | `console` | `console` prints emails in the log; `smtp` sends them with Gmail; `brevo` uses the Brevo API |
 | `MAIL_USERNAME` / `MAIL_PASSWORD` | – | Gmail address and App Password (for `smtp`) |
-| `EMAIL_DAILY_LIMIT` | `250` | Notification emails per day before switching to in-app only |
+| `EMAIL_DAILY_LIMIT` | `250` | Notification emails per day before switching to in-app only (OTP emails are not counted) |
+| `OTP_DAILY_LIMIT` | `200` | OTP emails per day for the whole site, all addresses together (`app.otp.max-per-day`) |
 | `BREVO_API_KEY` / `MAIL_FROM` | – | Only for `brevo` |
-| `APP_URL` | `http://localhost:8080` | Website address used for links inside emails |
+| `APP_URL` | `http://localhost:8080` | Website address used for links inside emails. Anything other than `http://localhost` or `http://127.0.0.1` counts as a server, so `JWT_SECRET` and `PAYOUT_ENCRYPTION_KEY` must then be set |
 
-Secrets (JWT secret, Razorpay keys, Gmail App Password) live in the git-ignored `.env` file on the PC, or in `/opt/sfps/.env` on the server. They are never committed.
+Secrets (JWT secret, encryption key, Razorpay keys, Gmail App Password) live in the git-ignored `.env` file on the PC, or in `/opt/sfps/.env` on the server. They are never committed. The built-in development values are in the public code (anyone could sign their own login token with them, even as super admin), which is why the app refuses them on a server.
 
 ## Deploying
 
 The live site runs on one free-tier **AWS EC2** server (Mumbai), without Docker: Java 21 runs the app as a systemd service, PostgreSQL is on the same server, and Nginx serves it over HTTPS (free Let's Encrypt certificate on an `sslip.io` name). Emails go through Gmail SMTP, which AWS allows. `deploy/setup-ec2.sh` installs everything in one go; `deploy/README.md` has the steps and the smoke test, and `deploy/update.sh` puts new code live.
+
+How it works (for the viva):
+- **Secrets.** The setup script generates `JWT_SECRET` and `PAYOUT_ENCRYPTION_KEY` into `/opt/sfps/.env`. Without them the app does not start on the server (see *Configuration*).
+- **Nightly backups.** A cron job (`/etc/cron.d/sfps-backup`) saves a `pg_dump` copy of the database every night at 3 a.m. India time in `/var/backups/sfps`, and the last 7 nightly copies are kept. Only the `postgres` user can open the folder, because the copies hold farmers' details. `deploy/README.md` (section 8) shows how to put a copy back.
+- **Safe updates.** `update.sh` builds the new code (if the build fails, the old version keeps running), saves a copy of the database before the new Flyway migrations run, keeps the running version as `app.jar.prev` and restarts with the new one. It then asks `/actuator/health` every 5 seconds, for up to 3 minutes, until it says `UP`. If it never does, the script puts the previous version back and restarts it. That is safe because the migrations leave the database usable for the previous version (for example, V9 keeps the old login columns).
+- **Login rate limits.** Nginx counts login requests per IP address (the numbers are under *Logging in*) and answers 429 `RATE_LIMITED` above them. The limits are generous on purpose, because many mobile users in India share one public IP address; the finer limits are in the app.
+- **The visitor's real IP.** Every Nginx location that passes requests to the app sends `X-Forwarded-For`, `X-Real-IP`, `X-Forwarded-Proto` and `Host`. With `server.forward-headers-strategy: native`, Tomcat takes the visitor's address from that header, but only from a proxy on the same machine or a private network. Without it every visitor would look like `127.0.0.1`, and the staff login lock would lock an account for everybody.
 
 Email providers (`EMAIL_PROVIDER`): `console` (print in the log), `smtp` (Gmail) and `brevo` (Brevo HTTPS API, for hosts that block SMTP). Brevo cannot carry inline pictures, so with it the confirmation email shows the QR from a signed link (`/api/qr/{id}.png?sig=...`, `QrLinkSigner`).
 
@@ -271,18 +300,20 @@ Email providers (`EMAIL_PROVIDER`): `console` (print in the log), `smtp` (Gmail)
 src/main/java/com/cropcoders/procurement/
 ├── ProcurementApplication.java   entry point (forces Asia/Kolkata time zone)
 ├── config/                       AppProperties (the "app:" settings), SuperAdminSeeder
-├── security/                     SecurityConfig (who can call what), JWT service + filter, AccessScope (centre limits),
-│                                 EncryptedText (bank details), QrLinkSigner
+├── security/                     SecurityConfig (who can call what, Content-Security-Policy), JWT service + filter,
+│                                 AccessScope (centre limits), EncryptedText (bank details), QrLinkSigner,
+│                                 SecretGuard (no development secrets on a server)
 ├── controller/                   REST endpoints
-├── service/                      business logic (login, booking, queue, weighment, payment, notifications,
-│                                 admin dashboard and settings, demo data, ...)
+├── service/                      business logic (login, LoginAttemptService (wrong staff passwords per IP),
+│                                 booking, queue, weighment, payment, notifications, admin dashboard and
+│                                 settings, demo data, ...)
 ├── repository/                   Spring Data JPA repositories + DashboardRepository (SQL for the dashboard)
 ├── entity/                       JPA entities (tables)
 ├── enums/                        Role, BookingStatus, NotificationEvent, EmailStatus, ...
 ├── dto/                          request/response objects
-├── scheduler/                    timed jobs (slot generation, reminders + no-shows)
+├── scheduler/                    timed jobs (slot generation, reminders + no-shows, forgetting old wrong passwords)
 ├── realtime/                     live queue updates (Server-Sent Events)
-├── payment/                      RazorpayGateway (orders API + signature check)
+├── payment/                      RazorpayGateway (orders API, signature check, earlier payments of an order)
 ├── email/                        EmailSender (console / Gmail SMTP / Brevo), EmailTemplates, EmailDispatcher (background
 │                                 sending), QrCode (QR picture with ZXing)
 └── exception/                    ApiException + GlobalExceptionHandler (JSON errors)
@@ -291,35 +322,44 @@ src/main/resources/
 ├── messages*.properties          email texts in English, Tamil, Hindi
 ├── db/migration/                 Flyway: V1 schema, V2 centres + crops, V3 staff accounts, V4 email instead of SMS,
 │                                 V5 roles and staff, V6 farmer payment details, V7 encrypted payment details,
-│                                 V8 one farmer per counter + staff login lock
-└── static/                       HTML pages, css/, js/, i18n/ (en, ta, hi), fonts/, img/ (icons.svg, photos/)
+│                                 V8 one farmer per counter + staff login lock,
+│                                 V9 login_attempts (staff login lock per username and IP) + index for the daily OTP limit
+└── static/                       HTML pages, css/, js/ (shared scripts), js/pages/ (one script per page),
+                                  i18n/ (en, ta, hi), fonts/, img/ (icons.svg, photos/)
 src/test/java/                    unit tests + EndToEndFlowTest (see "Tests")
-deploy/                           AWS EC2 guide (README.md), setup and update scripts, systemd service, Nginx site
+deploy/                           AWS EC2 guide (README.md), setup script (with nightly backups), update script
+                                  (health check + rollback), systemd service, Nginx site (with login rate limits)
 ```
 
 ### How login works (for the viva)
 
 1. **Farmer OTP.** The server makes a random 6-digit code, stores only its BCrypt hash, and emails it in the farmer's language. Email addresses are stored in lower case, so `Ravi@Gmail.com` and `ravi@gmail.com` are the same farmer.
-2. **Verify.** The code is checked against the hash. There are 3 attempts, and each wrong try is saved even though the request fails (`noRollbackFor`).
+2. **Verify.** The code is checked against the hash. There are 3 attempts, and each wrong try is saved even though the request fails (`noRollbackFor`). The newest OTP row is locked while it is checked (`SELECT … FOR UPDATE`), so guesses sent at the same moment are checked one after the other and every wrong one is counted. In a test, 6 wrong guesses at the same moment used up exactly the 3 tries, and after that even the right code was refused.
 3. **New farmer.** The server returns a 15-minute *registration token* (a JWT marked `purpose=register`). This token can only be used to submit the registration form.
-4. **Login token.** A JWT signed with `JWT_SECRET` that holds the user id, role and centre. The browser keeps a farmer's token in `localStorage` (all tabs, 7 days) and a staff token in `sessionStorage` (this tab only, 12 hours), and sends it as `Authorization: Bearer …`.
-5. **Access rules.** `JwtAuthFilter` reads the token on every request and checks that the account is still switched on, so switching an account off locks it out at once, not when its token runs out. `SecurityConfig` allows `/api/farmers/**` only for FARMER, `/api/operator/**` only for OPERATOR (staff), and `/api/admin/**` for ADMIN and SUPER_ADMIN. Inside the admin APIs, `AccessScope` limits a centre admin to their own centre and keeps centres, crop rates and demo data for the super admin.
+4. **Login token.** A JWT signed with `JWT_SECRET` that holds the user id, role and centre. The browser keeps a farmer's token in `localStorage` (all tabs, 7 days) and a staff token in `sessionStorage` (this tab only, 12 hours), and sends it as `Authorization: Bearer …`. A token the server refuses gets 401 with code `UNAUTHORIZED`, and only that code logs the browser out.
+5. **Access rules.** `JwtAuthFilter` reads the token on every request and then loads the account from the database (one small query by id). The account must still be switched on, so switching an account off locks it out at once, not when its token runs out. Its role in the database must also be the role in the token, so a token with a made-up role (e.g. a farmer's id with `SUPER_ADMIN`) is refused with 401. The role, name and centre the controllers see come from the database, not from the token. `SecurityConfig` allows `/api/farmers/**` only for FARMER, `/api/operator/**` only for OPERATOR (staff), and `/api/admin/**` for ADMIN and SUPER_ADMIN. Inside the admin APIs, `AccessScope` limits a centre admin to their own centre and keeps centres, crop rates and demo data for the super admin.
 6. **Staff passwords** are stored as BCrypt hashes. The super admin's password comes from `.env` at start-up, so it is never in the code or a migration.
-7. **Guessing passwords.** After 5 wrong passwords in a row a staff account is locked for 15 minutes (`app.staff-login`), even for the right password. An admin setting a new password lifts the lock. Like the OTP, each wrong try is saved even though the request fails (`noRollbackFor`), and the account row is locked during the check so tries sent at the same moment are all counted.
+7. **Guessing passwords.** Wrong staff passwords are counted per username **and** client IP address, in the `login_attempts` table (V9, `LoginAttemptService`). After 5 wrong passwords in a row from one address, that username is locked for 15 minutes from that address only (`app.staff-login`), even for the right password. A stranger guessing passwords therefore locks out only themselves, and the real staff can still log in at their own computers. (Before V9 the whole account was locked for everybody, and the usernames are easy to guess.)
+   - **Unknown usernames** are counted and locked the same way, and their password is checked against a dummy BCrypt hash so the answer takes as long. So the answers never show which usernames exist.
+   - **Tries at the same moment** are all counted: each wrong one is a single `INSERT … ON CONFLICT DO UPDATE` that adds 1 in the database. Like the OTP, it is saved even though the request fails (`noRollbackFor`).
+   - **Unlocking.** The right password (when not locked) clears the count for that address. An admin setting a new password lifts the lock for every address. `AutomationJob` deletes rows that have not changed for a day and are not locked.
+   - **The address** is `request.getRemoteAddr()`. Behind Nginx it is the visitor's real address, taken from `X-Forwarded-For` (`server.forward-headers-strategy: native`, see *Deploying*). On the server Nginx also limits login requests per IP address and answers 429 `RATE_LIMITED`.
 
 ## Tests
 
-Run them in IntelliJ (right-click `src/test/java` → Run 'All Tests') or with Maven (`mvn test`).
+Run them in IntelliJ (right-click `src/test/java` → Run 'All Tests') or with Maven (`mvn test`). There are 43 tests in 10 classes. The 7 in `EndToEndFlowTest` are skipped without a local PostgreSQL.
 
 | Test | What it checks |
 |---|---|
-| `EndToEndFlowTest` | The whole app, step by step, on its own throw-away database (`farmer_procurement_e2e`, dropped afterwards; skipped without a local PostgreSQL): super admin, centre admin and staff with their access limits, a switched-off account's token refused, the lock after 5 wrong passwords, farmer OTP login, registration with bank details (encrypted), UPI change, booking with the QR email, check-in, call next, weighment, Razorpay order and signature check, paid status, demo day |
-| `JwtServiceTest` | Login and registration tokens, expiry, tampering |
-| `EtaCalculatorTest` | Waiting-time estimates in the queue |
-| `RazorpayGatewayTest` | Payment signature check, test keys only |
-| `EmailTemplatesTest` | Emails in three languages, HTML escaping |
-| `QrCodeTest` | The email's QR picture reads back as the booking's QR text |
-| `EncryptedTextTest` | Bank details are unreadable in the database and come back the same |
-| `MoneyFormatTest` | Amounts in emails use Indian grouping (₹6,00,000.00) |
+| `EndToEndFlowTest` (7) | The whole app, step by step, on its own throw-away database (`farmer_procurement_e2e`, dropped afterwards; skipped without a local PostgreSQL): super admin, centre admin and staff with their access limits, a switched-off account's token refused, the lock after 5 wrong passwords (only from that IP address: the same user at another address still logs in; an unknown username is locked the same way; a new password lifts it), farmer OTP login, registration with bank details (encrypted), UPI change, booking with the QR email, check-in, call next, weighment, Razorpay order and signature check, paid status, demo day. Six smaller tests, some sending requests from several threads at the same moment: 6 farmers for the last 5 places (exactly 5 get one), two cancels of one booking (the place goes back once), 6 wrong OTP guesses (exactly 3 tries counted), a token with a made-up role (refused), the no-show and reminder jobs (one reminder however often they run), and the exact Content-Security-Policy header |
+| `JwtServiceTest` (5) | Login and registration tokens, expiry, tampering |
+| `SecretGuardTest` (4) | The built-in `local-dev-...` secrets stop the app when `APP_URL` is not localhost (also through `JwtService`), and are fine on the PC |
+| `OtpServiceTest` (4) | The daily OTP limit for the whole site (`OTP_DAILY_LIMIT`, counted from midnight, no OTP saved or emailed after it), and that the limit per address is checked first |
+| `EtaCalculatorTest` (5) | Waiting-time estimates in the queue |
+| `RazorpayGatewayTest` (7) | Payment signature check, test keys only, finding an order's earlier successful payment (`captured` or `authorized`, not `failed` or `created`) |
+| `EmailTemplatesTest` (4) | Emails in three languages, HTML escaping |
+| `QrCodeTest` (1) | The email's QR picture reads back as the booking's QR text |
+| `EncryptedTextTest` (5) | Bank details are unreadable in the database and come back the same; the development key is refused on a server |
+| `MoneyFormatTest` (1) | Amounts in emails use Indian grouping (₹6,00,000.00) |
 
 Deployment steps: [deploy/README.md](deploy/README.md).
