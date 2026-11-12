@@ -30,6 +30,8 @@ public class FarmerProfile {
 
     private String address;
     private String district;
+    /** Encrypted in the database (see EncryptedText). */
+    @Convert(converter = EncryptedText.class)
     private String aadhaarLast4;
 
     /** "en", "ta" or "hi" - used for the farmer's pages and emails. */

@@ -54,7 +54,7 @@ Subject: 123456 is your login OTP
 ...
 ```
 
-A new email address goes to the registration form: name, mobile number (for the centre to call), address, district, last 4 digits of Aadhaar, and language. That language is then used for the farmer's pages and emails.
+A new email address goes to the registration form: name, mobile number (for the centre to call), address, district, last 4 digits of Aadhaar (stored encrypted), and language. That language is then used for the farmer's pages and emails.
 
 **Staff, centre admins and the super admin** all log in on one page, `/staff/login.html`, with a username and password. The server finds the role and the browser opens the right screen.
 
@@ -68,7 +68,7 @@ Each browser tab keeps its own staff login (in `sessionStorage`), so an admin an
 
 `V5__roles_and_staff.sql` creates one admin (`admin.tnj`, `admin.tvr`, `admin.ngt`) and one staff account (`staff.tnj`, `staff.tvr`, `staff.ngt`) per centre with random starting passwords. The passwords are in `staff-accounts.xlsx` in the project folder, which is git-ignored. Accounts are switched off rather than deleted, because weighments and payments point to them.
 
-**Payment details.** At registration the farmer chooses how to be paid: a **bank account** (account holder, account number typed twice, IFSC code, bank name) or a **UPI ID**. The form and the server check the same rules (account number 9 to 18 digits, IFSC like `SBIN0001234`, UPI like `name@okaxis`). The browser only ever gets the last 4 digits of the account number back. The account number and the UPI ID are **encrypted in the database** (AES-256-GCM, `EncryptedText`) with the key `PAYOUT_ENCRYPTION_KEY` from `.env`, so a copy of the database alone does not reveal them. Farmers can change the details on their dashboard, and the admin's payments page shows where each farmer wants to be paid.
+**Payment details.** At registration the farmer chooses how to be paid: a **bank account** (account holder, account number typed twice, IFSC code, bank name) or a **UPI ID**. The form and the server check the same rules (account number 9 to 18 digits, IFSC like `SBIN0001234`, UPI like `name@okaxis`). The browser only ever gets the last 4 digits of the account number back. The account number, the UPI ID and the last 4 digits of Aadhaar are **encrypted in the database** (AES-256-GCM, `EncryptedText`) with the key `PAYOUT_ENCRYPTION_KEY` from `.env`, so a copy of the database alone does not reveal them. Farmers can change the details on their dashboard, and the admin's payments page shows where each farmer wants to be paid.
 
 OTP rules:
 - valid for 5 minutes, 3 wrong tries
@@ -329,7 +329,7 @@ src/main/resources/
 ├── application.yml               configuration
 ├── messages*.properties          email texts in English, Tamil, Hindi
 ├── db/migration/                 Flyway: V1 schema, V2 centres + crops, V3 staff accounts, V4 email instead of SMS,
-│                                 V5 roles and staff, V6 farmer payment details, V7 encrypted payment details,
+│                                 V5 roles and staff, V6 farmer payment details, V7 encrypted payment details, V10 encrypted Aadhaar digits,
 │                                 V8 one farmer per counter + staff login lock,
 │                                 V9 login_attempts (staff login lock per username and IP) + index for the daily OTP limit
 └── static/                       HTML pages, css/, js/ (shared scripts), js/pages/ (one script per page),

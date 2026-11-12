@@ -515,7 +515,7 @@ public class DemoDataService {
                     INSERT INTO farmer_profiles (user_id, address, district, aadhaar_last4, language, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?)""",
                     id, (10 + random.nextInt(190)) + ", Main Road, " + VILLAGES[i % VILLAGES.length], district,
-                    "%04d".formatted(random.nextInt(10_000)), language, joined);
+                    encrypted.convertToDatabaseColumn("%04d".formatted(random.nextInt(10_000))), language, joined);
             addPayoutDetails(id, name, mobile, i, random);
             farmers.add(new Farmer(id, language));
         }

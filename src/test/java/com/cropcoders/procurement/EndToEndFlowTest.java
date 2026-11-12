@@ -284,6 +284,11 @@ class EndToEndFlowTest {
                 SELECT p.account_number FROM farmer_profiles p JOIN users u ON u.id = p.user_id
                 WHERE u.email = ?""", String.class, email);
         assertThat(stored).as("account number is encrypted in the database").startsWith("enc:").doesNotContain("123456789012");
+        String aadhaar = jdbc.queryForObject("""
+                SELECT p.aadhaar_last4 FROM farmer_profiles p JOIN users u ON u.id = p.user_id
+                WHERE u.email = ?""", String.class, email);
+        assertThat(aadhaar).as("Aadhaar last 4 digits are encrypted in the database").startsWith("enc:").doesNotContain("4821");
+        assertThat((String) JsonPath.read(profile, "$.aadhaarLast4")).as("the farmer still sees them").isEqualTo("4821");
 
         expect(put("/api/farmers/me/payout", farmerToken, Map.of("method", "UPI", "upiId", "not-a-upi")), 400);
         String upi = body(expect(put("/api/farmers/me/payout", farmerToken, Map.of("method", "UPI", "upiId", "ravi@okaxis")), 200));
