@@ -13,7 +13,7 @@ RUN mvn -B -q -DskipTests package \
  && java -Djarmode=tools -jar app.jar extract --layers --destination /out
 
 # ---------- run ----------
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 RUN addgroup -S app && adduser -S app -G app
 WORKDIR /app
 
