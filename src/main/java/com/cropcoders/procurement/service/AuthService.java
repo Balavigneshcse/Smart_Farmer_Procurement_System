@@ -6,6 +6,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -36,6 +38,8 @@ import com.cropcoders.procurement.security.JwtService;
  */
 @Service
 public class AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     private final UserRepository userRepository;
     private final FarmerProfileRepository profileRepository;
@@ -123,6 +127,7 @@ public class AuthService {
         LocalDateTime now = LocalDateTime.now();
         String username = request.username().trim();
         loginAttempts.minutesLocked(username, ip, now).ifPresent(minutes -> {
+            log.warn("Staff login refused, locked: user={} ip={}", forLog(username), ip);
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "LOGIN_LOCKED",
                     "Too many wrong passwords. Please try again in " + minutes + " minutes, or ask your admin "
                             + "to set a new password.", Map.of("minutes", minutes));
@@ -135,12 +140,20 @@ public class AuthService {
         boolean rightPassword = passwordEncoder.matches(request.password(), hash);
         if (account.isEmpty() || !rightPassword) {
             loginAttempts.recordFailure(username, ip, now);
+            log.warn("Staff login failed: user={} ip={}", forLog(username), ip);
             throw badCredentials();
         }
         User user = account.get();
         loginAttempts.clear(username, ip);
         ensureActive(user);
+        log.info("Staff login: user={} role={} ip={}", forLog(username), user.getRole(), ip);
         return new AuthResponse(jwtService.createLoginToken(AuthUser.from(user)), UserResponse.staff(user));
+    }
+
+    /** A username typed by anyone: no line breaks (no fake log lines) and at most 64 characters. */
+    private static String forLog(String text) {
+        String clean = text.replaceAll("[\\r\\n\\t]", "_");
+        return clean.length() > 64 ? clean.substring(0, 64) + "..." : clean;
     }
 
     private static ApiException badCredentials() {

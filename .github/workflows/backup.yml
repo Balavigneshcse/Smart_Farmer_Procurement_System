@@ -1,0 +1,43 @@
+# Nightly backup of the Neon database (Neon's free plan keeps only 6 hours of history).
+# The dump is encrypted with a passphrase before it is stored, because it holds farmers' details.
+#
+# Setup once: GitHub repo -> Settings -> Secrets and variables -> Actions -> New repository secret
+#   NEON_DATABASE_URL  the same DATABASE_URL as on Render
+#   BACKUP_PASSPHRASE  a long random passphrase; keep a copy outside GitHub, it is needed to restore
+#
+# Restore (on your PC, needs gpg and PostgreSQL's psql):
+#   gpg --decrypt sfps-YYYY-MM-DD.sql.gz.gpg | gunzip | psql "postgresql://...target database..."
+name: Database backup
+
+on:
+  schedule:
+    - cron: "30 21 * * *"     # 3:00 a.m. India time
+  workflow_dispatch:           # or run it by hand from the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump, compress and encrypt
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$PASSPHRASE" ]; then
+            echo "Add the NEON_DATABASE_URL and BACKUP_PASSPHRASE secrets first."; exit 1
+          fi
+          file="sfps-$(date -u +%F).sql.gz.gpg"
+          docker run --rm -e DATABASE_URL postgres:18-alpine sh -c 'pg_dump --no-owner --no-privileges "$DATABASE_URL"' \
+            | gzip -9 \
+            | gpg --batch --yes --pinentry-mode loopback --symmetric --cipher-algo AES256 --passphrase-fd 3 -o "$file" 3<<<"$PASSPHRASE"
+          test -s "$file"
+          echo "FILE=$file" >> "$GITHUB_ENV"
+      - name: Keep for 30 days
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILE }}
+          path: ${{ env.FILE }}
+          retention-days: 30
