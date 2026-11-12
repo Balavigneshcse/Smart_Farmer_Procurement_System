@@ -99,7 +99,7 @@ How it works (for the viva):
 | Screen | URL | Who |
 |---|---|---|
 | Operator desk | `/operator/desk.html` | Counter staff: check in by token or QR code (typed, USB scanner or camera), **Call next** per counter, **Call again**, **Not present** |
-| TV display | `/display.html?centre=1` | Centre TV: now serving per counter, next tokens with waiting time, labels in 3 languages, optional chime and spoken announcement |
+| TV display | `/display.html?centre=1` | Centre TV: one large row per counter with the token it is serving, the next tokens in order with their waiting time (as many as fit, then "+ N more"), the day's figures, labels in English with Tamil and Hindi below, optional chime and spoken announcement, dark by default with a light/dark button (or open `/display.html?centre=1&theme=light`). The sound and theme buttons show when the mouse moves. |
 | Farmer phone | `/farmer/booking.html?id=…` | Farmer: live position and waiting time, then "Please go to Counter 2 now" (the phone vibrates) |
 
 How it works (for the viva):
@@ -228,7 +228,7 @@ How it works (for the viva):
 
 The design rules:
 - **One accent colour (green).** Amber, red and blue only mean a status and always come with a label and an icon.
-- **Light and dark theme.** The button next to the language switch changes it; until someone chooses, the device setting is used (`js/theme.js`). All colours are CSS variables at the top of `css/app.css`.
+- **Light and dark theme.** The button next to the language switch changes it; until someone chooses, the device setting is used (`js/theme.js`). All colours are CSS variables at the top of `css/app.css`. The TV display is dark until someone chooses light (button in its footer, or `?theme=light` in the address for a TV without a mouse), and it remembers its choice separately, so a laptop that uses the light theme for the admin pages still shows the TV board in dark.
 - **Fonts.** Anek (one family for English and Tamil) and Geist Mono for tokens and the OTP, self-hosted in `static/fonts/` and cut down to the characters used (about 110 KB together). Hindi uses the device's own font, because the matching Hindi font alone is over 200 KB.
 - **Icons.** Phosphor icons (MIT) in one file, `img/icons.svg`.
 - **Photos.** Four photos from Unsplash (free licence) as small WebP files in `img/photos/`: vivek vk (home page, mirrored), Foto Murthy (paddy seedlings), Heber Davis (tractor, farmer login), Declan Sun (paddy, staff login).
@@ -283,7 +283,15 @@ Secrets (JWT secret, encryption key, Razorpay keys, Gmail App Password) live in 
 
 ## Deploying
 
-The live site runs on one free-tier **AWS EC2** server (Mumbai), without Docker: Java 21 runs the app as a systemd service, PostgreSQL is on the same server, and Nginx serves it over HTTPS (free Let's Encrypt certificate on an `sslip.io` name). Emails go through Gmail SMTP, which AWS allows. `deploy/setup-ec2.sh` installs everything in one go; `deploy/README.md` has the steps and the smoke test, and `deploy/update.sh` puts new code live.
+**Render + Neon (free, the current setup).** The app runs on Render from the `Dockerfile` (Java 21, sized for the 512 MB free container), the database is a free Neon PostgreSQL, and emails go from a Gmail account through a Google Apps Script, because Render's free plan blocks the SMTP ports. `render.yaml` is the Render Blueprint: Render generates `JWT_SECRET`, `PAYOUT_ENCRYPTION_KEY` and `GOOGLE_SCRIPT_SECRET`, and asks once for `DATABASE_URL`, `SUPERADMIN_USERNAME`/`SUPERADMIN_PASSWORD`, the Razorpay test keys and `GOOGLE_SCRIPT_URL`. Every push to `main` deploys again.
+- **Database.** Neon gives one `DATABASE_URL` (`postgresql://...?sslmode=require`); `DatabaseUrl` turns it into the JDBC settings at start-up and upgrades `require` to `verify-full`, so the database's certificate is checked against Java's trusted authorities, not only encrypted. Use Neon's address with connection pooling **off** (Flyway needs a direct connection).
+- **Email.** `deploy/google-apps-script/Code.gs` is the script (deploy it as a web app, *Execute as: Me*, *Who has access: Anyone*). It sends nothing unless the request carries the secret that is in its `SECRET` script property, and the booking QR travels as an inline picture. Gmail allows about 100 such emails a day, so the Blueprint sets `EMAIL_DAILY_LIMIT=50` and `OTP_DAILY_LIMIT=40`.
+- **Login rate limits.** There is no Nginx on Render, so `RateLimitFilter` applies the same per-IP limits in the app (OTP emails 6 a minute with a burst of 12; OTP checks and staff logins 20 a minute with a burst of 20; 429 `RATE_LIMITED`). Requests from the machine itself (local development, tests) are not limited.
+- **The visitor's real IP.** `GET /api/ping` (also the health check) shows `yourIp`: after a deploy it must be your own public address, not Render's. Otherwise the per-IP limits and the staff login lock would count all visitors together.
+- **Free plan.** The app sleeps after 15 minutes without visitors and takes about a minute to wake up; slots, reminders and missed bookings are also handled at start-up, so nothing is lost while it sleeps. Neon keeps only 6 hours of history, so take a `pg_dump` now and then.
+- `PAYOUT_ENCRYPTION_KEY` must never change: if the Render service is ever created again, copy the old value into the new one, or the saved bank details cannot be read.
+
+**AWS EC2 (alternative).** The app can also run on one free-tier **AWS EC2** server (Mumbai), without Docker: Java 21 runs the app as a systemd service, PostgreSQL is on the same server, and Nginx serves it over HTTPS (free Let's Encrypt certificate on an `sslip.io` name). Emails go through Gmail SMTP, which AWS allows. `deploy/setup-ec2.sh` installs everything in one go; `deploy/README.md` has the steps and the smoke test, and `deploy/update.sh` puts new code live.
 
 How it works (for the viva):
 - **Secrets.** The setup script generates `JWT_SECRET` and `PAYOUT_ENCRYPTION_KEY` into `/opt/sfps/.env`. Without them the app does not start on the server (see *Configuration*).
@@ -292,7 +300,7 @@ How it works (for the viva):
 - **Login rate limits.** Nginx counts login requests per IP address (the numbers are under *Logging in*) and answers 429 `RATE_LIMITED` above them. The limits are generous on purpose, because many mobile users in India share one public IP address; the finer limits are in the app.
 - **The visitor's real IP.** Every Nginx location that passes requests to the app sends `X-Forwarded-For`, `X-Real-IP`, `X-Forwarded-Proto` and `Host`. With `server.forward-headers-strategy: native`, Tomcat takes the visitor's address from that header, but only from a proxy on the same machine or a private network. Without it every visitor would look like `127.0.0.1`, and the staff login lock would lock an account for everybody.
 
-Email providers (`EMAIL_PROVIDER`): `console` (print in the log), `smtp` (Gmail) and `brevo` (Brevo HTTPS API, for hosts that block SMTP). Brevo cannot carry inline pictures, so with it the confirmation email shows the QR from a signed link (`/api/qr/{id}.png?sig=...`, `QrLinkSigner`).
+Email providers (`EMAIL_PROVIDER`): `console` (print in the log), `smtp` (Gmail), `google-script` (Gmail through a Google Apps Script, used on Render) and `brevo` (Brevo HTTPS API, for hosts that block SMTP). Brevo cannot carry inline pictures, so with it the confirmation email shows the QR from a signed link (`/api/qr/{id}.png?sig=...`, `QrLinkSigner`).
 
 ## Project structure
 

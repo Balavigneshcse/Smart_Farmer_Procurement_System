@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" data-theme-key="sfps.tv-theme" data-theme-default="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,50 +7,127 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="preload" href="/fonts/geist-mono.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="/css/app.css">
+    <script src="/js/theme.js"></script>
     <style>
-        /* TV board: always dark (the page sets data-theme="dark"), very large type, never scrolls at 16:9 */
+        /*
+         * TV board for a 16:9 screen: header, then "Now serving" (left, one row per counter) and "Next in line"
+         * (right), then a slim footer. Dark unless light is chosen (button in the footer, or ?theme=light); the choice is kept
+         * apart from the other pages (data-theme-key above). Labels are English with Tamil and Hindi on a
+         * smaller second line. Nothing scrolls on a TV; on small screens the two columns stack.
+         */
         body.tv { min-height: 100dvh; }
-        .tv-wrap { padding: 2.4vh 3vw; display: flex; flex-direction: column; gap: 2.4vh; height: 100dvh; overflow: hidden; }
-        .tv-head { display: flex; justify-content: space-between; align-items: center; gap: 16px 32px; flex-wrap: wrap; }
-        .tv-head-right { display: flex; align-items: center; gap: 2.6vw; flex-wrap: wrap; }
-        .tv-centre { font-size: clamp(1.4rem, 3vw, 2.8rem); font-weight: 700; line-height: 1.15; }
-        .tv-sub { color: var(--muted); font-size: clamp(.9rem, 1.2vw, 1.2rem); }
-        .tv-clock { font-family: var(--font-mono); font-size: clamp(1.6rem, 3.2vw, 3rem); font-weight: 600; }
-        .tv-tri { display: inline-flex; flex-wrap: wrap; gap: 0 .9em; }
-        .tv-tri span:first-child { color: var(--ink); }
-        .tv-label { font-size: clamp(1rem, 1.5vw, 1.5rem); color: var(--muted); font-weight: 600; margin: 0 0 1.2vh; }
-        .tv-label .tv-tri span:first-child { color: var(--warn-ink); }
-        .tv-counters { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5vw; }
-        .tv-counter { background: var(--surface); border: 2px solid var(--line); border-radius: var(--radius-lg); padding: 1.8vh 1.5vw; text-align: center; }
-        .tv-counter.busy { border-color: var(--warn-line); }
-        .tv-counter.flash { animation: tv-flash 1s ease-in-out 4; }
-        @keyframes tv-flash { 50% { opacity: .35; transform: scale(.985); } }
-        .tv-counter-name { display: flex; justify-content: center; font-size: clamp(.95rem, 1.5vw, 1.5rem); color: var(--muted); font-weight: 600; }
-        .tv-token { font-family: var(--font-mono); font-size: clamp(2.6rem, 7.2vw, 8rem); font-weight: 700; line-height: 1.12; color: var(--warn-ink); }
-        .tv-free { display: flex; justify-content: center; font-size: clamp(1.2rem, 2.4vw, 2.2rem); color: var(--muted); font-weight: 600; padding: 2.4vh 0; }
-        .tv-next-section { flex: 1; min-height: 0; overflow: hidden; }
-        .tv-next { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 1vw; }
-        .tv-next li { background: var(--surface); border-radius: var(--radius); padding: 1.2vh 1.2vw; display: flex; flex-direction: column; gap: 2px; }
-        .tv-next-token { font-family: var(--font-mono); font-size: clamp(1.4rem, 2.5vw, 2.4rem); font-weight: 700; white-space: nowrap; line-height: 1.2; }
-        .tv-next-eta { color: var(--muted); font-size: clamp(.9rem, 1.3vw, 1.3rem); white-space: nowrap; }
-        .tv-stat { text-align: right; }
-        .tv-stat-label { color: var(--muted); font-size: clamp(.75rem, 1vw, 1rem); }
-        .tv-stat .tv-tri { justify-content: flex-end; }
-        .tv-stat-value { font-size: clamp(1.4rem, 2.4vw, 2.4rem); font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
-        .tv-next li.tv-empty { background: none; color: var(--muted); font-size: clamp(1rem, 1.6vw, 1.4rem); padding-left: 0; }
-        .tv-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px 24px; flex-wrap: wrap; color: var(--muted); font-size: clamp(.9rem, 1.2vw, 1.2rem); border-top: 1px solid var(--line); padding-top: 1.6vh; }
-        .tv-foot-right { display: flex; gap: 16px; align-items: center; }
+        .tv-wrap {
+            height: 100dvh; overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+            gap: 2.6vh; padding: 3vh 3vw 2.4vh;
+        }
+
+        /* A label: English on top, Tamil · Hindi below in a smaller, quieter line */
+        .tv-l { display: inline-flex; flex-direction: column; gap: .15em; line-height: 1.15; }
+        .tv-l-alt { display: flex; flex-wrap: wrap; column-gap: .45em; font-size: .7em; font-weight: 500; color: var(--muted); }
+        .tv-l-alt .sep { opacity: .6; }
+
+        /* Header: centre on the left, time and date on the right */
+        .tv-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 2vw; padding-bottom: 2vh; border-bottom: 1px solid var(--line); }
+        .tv-centre { font-size: clamp(1.5rem, 3vw, 3.2rem); font-weight: 700; letter-spacing: -.01em; line-height: 1.1; text-wrap: balance; }
+        .tv-sub { color: var(--muted); font-size: clamp(.9rem, 1.15vw, 1.25rem); margin-top: .35em; }
+        .tv-time { text-align: right; flex: none; }
+        .tv-clock { font-family: var(--font-mono); font-size: clamp(1.8rem, 3.4vw, 3.6rem); font-weight: 600; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+        .tv-date { color: var(--muted); font-size: clamp(.85rem, 1.1vw, 1.2rem); margin-top: .5em; }
+
+        .tv-main { display: grid; grid-template-columns: minmax(0, 2.3fr) minmax(0, 1fr); gap: 2vw; min-height: 0; }
+        .tv-title { font-size: clamp(1.05rem, 1.7vw, 1.85rem); font-weight: 600; margin: 0 0 1.6vh; }
+        .tv-title .tv-l-en { color: var(--accent); }
+
+        /* Now serving: one wide row per counter (two columns from 5 counters; the script sets --cols and --rows) */
+        .tv-serving { display: flex; flex-direction: column; min-height: 0; }
+        .tv-counters {
+            flex: 1; min-height: 0; display: grid; gap: 1.4vw;
+            grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr));
+            grid-template-rows: repeat(var(--rows, 1), minmax(0, 1fr));
+        }
+        .tv-counter {
+            position: relative; display: flex; justify-content: space-between; align-items: center; gap: 2vw;
+            padding: 1.6vh 2.4vw; min-height: 0;
+            background: var(--surface); border: 2px solid var(--line); border-radius: var(--radius-lg);
+        }
+        .tv-counter.busy { background: var(--warn-bg); border-color: var(--warn-line); }
+        .tv-counter.free { background: transparent; border-style: dashed; }
+        .tv-counter-name { font-size: clamp(1.1rem, 2.1vw, 2.4rem); font-weight: 600; flex: none; }
+        .tv-counter.free .tv-counter-name { color: var(--muted); }
+        .tv-token {
+            font-family: var(--font-mono); font-weight: 700; line-height: 1; letter-spacing: -.03em; white-space: nowrap;
+            color: var(--warn-ink); font-size: clamp(2.2rem, 6vw, 7rem); font-variant-numeric: tabular-nums;
+        }
+        /* The token always fits on one line: its size follows the height and width of its row */
+        @supports (container-type: size) {
+            .tv-counter { container-type: size; }
+            .tv-token { font-size: min(62cqh, 12.5cqi); }
+        }
+        .tv-free { font-size: clamp(1.1rem, 2.1vw, 2.4rem); font-weight: 600; color: var(--muted); text-align: right; }
+        .tv-free .tv-l { align-items: flex-end; }
+        .tv-free .tv-l-alt { justify-content: flex-end; }
+        /* A newly called token: the tile's ring pulses four times (opacity only, cheap to draw) */
+        .tv-counter.flash::after {
+            content: ""; position: absolute; inset: -6px; border: 4px solid var(--warn-line); border-radius: calc(var(--radius-lg) + 4px);
+            opacity: 0; animation: tv-flash 1s ease-in-out 4; pointer-events: none;
+        }
+        @keyframes tv-flash { 50% { opacity: 1; } }
+
+        /* Next in line: the day's figures, then the waiting tokens in order */
+        .tv-queue {
+            display: flex; flex-direction: column; min-height: 0; padding: 2.4vh 1.4vw 2vh;
+            background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
+        }
+        .tv-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8vw; padding-bottom: 2vh; margin-bottom: 2vh; border-bottom: 1px solid var(--line); }
+        .tv-stat-value { font-size: clamp(1.4rem, 2.5vw, 2.8rem); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+        .tv-stat-value small { font-size: .5em; font-weight: 600; color: var(--muted); margin-left: .15em; }
+        .tv-stat-label { font-size: clamp(.85rem, 1.2vw, 1.35rem); color: var(--muted); font-weight: 600; margin-top: .8vh; }
+        .tv-stat-label .tv-l-alt { font-size: .8em; }
+        .tv-next { list-style: none; margin: 0; padding: 0; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: .9vh; overflow: hidden; }
+        .tv-next li {
+            display: grid; grid-template-columns: 1.9em minmax(0, 1fr) auto; align-items: center; gap: .6vw;
+            padding: 1.1vh 1vw; border-radius: var(--radius); background: var(--sunken); flex: none;
+        }
+        .tv-next li.first { background: var(--accent-soft); }
+        .tv-pos { font-family: var(--font-mono); color: var(--muted); font-size: clamp(.9rem, 1.3vw, 1.45rem); font-variant-numeric: tabular-nums; }
+        .tv-next-token { font-family: var(--font-mono); font-weight: 700; white-space: nowrap; letter-spacing: -.02em; font-size: clamp(1.25rem, 2.2vw, 2.5rem); line-height: 1.15; }
+        .tv-next-eta { color: var(--muted); font-size: clamp(.9rem, 1.3vw, 1.45rem); white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .tv-next li.first .tv-next-eta { color: var(--accent); font-weight: 600; }
+        .tv-next li.tv-more { display: block; background: none; text-align: center; color: var(--muted); font-size: clamp(.9rem, 1.2vw, 1.3rem); padding-top: .4vh; }
+        .tv-next li.tv-empty .tv-l { align-items: center; }
+        .tv-next li.tv-empty .tv-l-alt { justify-content: center; }
+        .tv-next li.tv-empty { display: flex; flex: 1; justify-content: center; align-items: center; background: none; color: var(--muted); font-size: clamp(1.1rem, 1.8vw, 2rem); text-align: center; }
+
+        /* Footer: what to do, the live status, and the buttons (they fade out when the mouse is not used) */
+        .tv-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px 24px; flex-wrap: wrap; color: var(--muted); font-size: clamp(1rem, 1.4vw, 1.6rem); }
+        .tv-foot .tv-l-en { color: var(--ink); font-weight: 600; }
+        .tv-foot-right { display: flex; gap: 20px; align-items: center; }
+        .tv-foot .live-status { font-size: clamp(.95rem, 1.2vw, 1.35rem); }
+        .tv-controls { display: flex; gap: 10px; align-items: center; opacity: 0; transition: opacity .3s; }
+        body.controls-visible .tv-controls, .tv-controls:focus-within { opacity: 1; }
+
+        /* Centre picker: /display.html without ?centre= */
         .tv-picker { max-width: 640px; margin: 10vh auto; padding: 0 16px; }
-        .tv-picker a { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 12px; font-size: 1.2rem; font-weight: 600; text-decoration: none; }
+        .tv-picker-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+        .tv-picker a { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 12px; font-size: 1.2rem; font-weight: 600; text-decoration: none; transition: border-color .2s; }
         .tv-picker a:hover { border-color: var(--accent); }
-        @media (max-width: 800px) { .tv-wrap { height: auto; overflow: visible; } }
+
+        @media (max-width: 900px) {
+            .tv-wrap { height: auto; overflow: visible; }
+            .tv-main { grid-template-columns: 1fr; }
+            .tv-counters { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-rows: 18vh; }
+            .tv-controls { opacity: 1; }
+        }
     </style>
 </head>
 <body class="tv">
 
 <!-- Shown when no centre is chosen: /display.html -->
 <div id="picker" class="tv-picker hidden">
-    <h1>Queue display</h1>
+    <div class="tv-picker-head">
+        <h1>Queue display</h1>
+        <button type="button" class="theme-toggle" aria-label="Switch to light theme"><svg class="icon icon-moon" aria-hidden="true"><use href="/img/icons.svg#moon"></use></svg><svg class="icon icon-sun" aria-hidden="true"><use href="/img/icons.svg#sun"></use></svg></button>
+    </div>
     <p class="tv-sub">Choose the centre for this screen:</p>
     <div id="centre-links"></div>
 </div>
@@ -62,38 +139,46 @@
             <div class="tv-centre" id="centre-name"></div>
             <div class="tv-sub">Smart Farmer Procurement System</div>
         </div>
-        <div class="tv-head-right">
-            <div class="tv-stat">
-                <div class="tv-stat-label"><span class="tv-tri"><span>Waiting</span><span lang="ta">காத்திருப்பு</span><span lang="hi">प्रतीक्षा</span></span></div>
-                <div class="tv-stat-value" id="waiting-count">0</div>
-            </div>
-            <div class="tv-stat">
-                <div class="tv-stat-label"><span class="tv-tri"><span>Avg wait</span><span lang="ta">சராசரி</span><span lang="hi">औसत</span></span></div>
-                <div class="tv-stat-value" id="avg-wait">0 min</div>
-            </div>
-            <div class="tv-stat">
-                <div class="tv-stat-label"><span class="tv-tri"><span>Served</span><span lang="ta">சேவை</span><span lang="hi">सेवा</span></span></div>
-                <div class="tv-stat-value" id="served">0</div>
-            </div>
+        <div class="tv-time">
             <div class="tv-clock" id="clock"></div>
+            <div class="tv-date" id="date"></div>
         </div>
     </header>
 
-    <section>
-        <h2 class="tv-label"><span class="tv-tri"><span>Now serving</span><span lang="ta">இப்போது</span><span lang="hi">अभी</span></span></h2>
-        <div class="tv-counters" id="serving"></div>
-    </section>
+    <main class="tv-main">
+        <section class="tv-serving" aria-labelledby="serving-title">
+            <h2 class="tv-title" id="serving-title"><span class="tv-l"><span class="tv-l-en">Now serving</span><span class="tv-l-alt"><span lang="ta">இப்போது</span><span class="sep">·</span><span lang="hi">अभी</span></span></span></h2>
+            <div class="tv-counters" id="serving"></div>
+        </section>
 
-    <section class="tv-next-section">
-        <h2 class="tv-label"><span class="tv-tri"><span>Next</span><span lang="ta">அடுத்து</span><span lang="hi">अगला</span></span></h2>
-        <ol class="tv-next" id="next"></ol>
-    </section>
+        <aside class="tv-queue" aria-labelledby="next-title">
+            <div class="tv-stats">
+                <div>
+                    <div class="tv-stat-value" id="waiting-count">0</div>
+                    <div class="tv-stat-label"><span class="tv-l"><span>Waiting</span><span class="tv-l-alt"><span lang="ta">காத்திருப்பு</span><span class="sep">·</span><span lang="hi">प्रतीक्षा</span></span></span></div>
+                </div>
+                <div>
+                    <div class="tv-stat-value" id="avg-wait">–</div>
+                    <div class="tv-stat-label"><span class="tv-l"><span>Average wait</span><span class="tv-l-alt"><span lang="ta">சராசரி</span><span class="sep">·</span><span lang="hi">औसत</span></span></span></div>
+                </div>
+                <div>
+                    <div class="tv-stat-value" id="served">0</div>
+                    <div class="tv-stat-label"><span class="tv-l"><span>Served today</span><span class="tv-l-alt"><span lang="ta">சேவை</span><span class="sep">·</span><span lang="hi">सेवा</span></span></span></div>
+                </div>
+            </div>
+            <h2 class="tv-title" id="next-title"><span class="tv-l"><span class="tv-l-en">Next in line</span><span class="tv-l-alt"><span lang="ta">அடுத்து</span><span class="sep">·</span><span lang="hi">अगला</span></span></span></h2>
+            <ol class="tv-next" id="next"></ol>
+        </aside>
+    </main>
 
     <footer class="tv-foot">
-        <span class="tv-tri"><span>Show your token at the counter</span><span lang="ta">டோக்கனை கவுண்டரில் காட்டுங்கள்</span><span lang="hi">अपना टोकन काउंटर पर दिखाएँ</span></span>
+        <span class="tv-l"><span class="tv-l-en">Show your token at the counter</span><span class="tv-l-alt"><span lang="ta">டோக்கனை கவுண்டரில் காட்டுங்கள்</span><span class="sep">·</span><span lang="hi">अपना टोकन काउंटर पर दिखाएँ</span></span></span>
         <span class="tv-foot-right">
+            <span class="tv-controls">
+                <button type="button" class="btn btn-quiet btn-sm" id="sound-btn">Turn sound on</button>
+                <button type="button" class="theme-toggle" aria-label="Switch to light theme"><svg class="icon icon-moon" aria-hidden="true"><use href="/img/icons.svg#moon"></use></svg><svg class="icon icon-sun" aria-hidden="true"><use href="/img/icons.svg#sun"></use></svg></button>
+            </span>
             <span class="live-status offline" id="live-status"><span class="live-dot"></span><span id="live-text">Connecting…</span></span>
-            <button type="button" class="btn btn-quiet btn-sm" id="sound-btn">Turn sound on</button>
         </span>
     </footer>
 </div>

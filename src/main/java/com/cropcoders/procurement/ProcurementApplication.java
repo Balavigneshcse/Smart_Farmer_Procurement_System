@@ -9,6 +9,8 @@ import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoCon
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+import com.cropcoders.procurement.config.DatabaseUrl;
+
 // We log users in ourselves (OTP / username + password with JWT),
 // so Spring Boot's default in-memory user with a generated password is switched off.
 @SpringBootApplication(exclude = UserDetailsServiceAutoConfiguration.class)
@@ -20,6 +22,8 @@ public class ProcurementApplication {
     public static void main(String[] args) {
         // Slots, queues and timestamps are all Indian time, wherever the server runs.
         TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"));
+        // On Render the database comes as Neon's DATABASE_URL
+        DatabaseUrl.fromEnvironment().ifPresent(DatabaseUrl::applyAsSystemProperties);
         SpringApplication.run(ProcurementApplication.class, args);
     }
 }

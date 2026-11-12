@@ -16,7 +16,12 @@ spring:
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
     hikari:
-      maximum-pool-size: 5
+      # Small pool: the free Neon database and the 512 MB Render container are both tiny
+      maximum-pool-size: 4
+      minimum-idle: 0
+      idle-timeout: 120000
+      max-lifetime: 600000
+      connection-timeout: 20000
 
   jpa:
     open-in-view: false
@@ -26,6 +31,7 @@ spring:
 
   flyway:
     enabled: true
+    connect-retries: 10            # Neon may need a moment to wake up
 
   # Email texts: messages.properties (English), messages_ta.properties, messages_hi.properties
   messages:
@@ -33,7 +39,7 @@ spring:
     fallback-to-system-locale: false
 
   # Gmail SMTP (used when app.email.provider = smtp). Render's free plan blocks these ports,
-  # so the deployed site uses the Brevo HTTPS API instead (M8).
+  # so the deployed site sends through a Google Apps Script over HTTPS instead (google-script).
   mail:
     host: smtp.gmail.com
     port: 587
@@ -56,11 +62,17 @@ management:
 
 server:
   port: ${PORT:8080}
-  # The app runs behind Nginx. "native" lets Tomcat take the visitor's real IP address and "https" from
-  # Nginx's X-Forwarded-For / X-Forwarded-Proto headers (trusted only from this machine or a private network).
+  # The app runs behind a proxy (Render's, or Nginx on a server). "native" lets Tomcat take the visitor's real
+  # IP address and "https" from its X-Forwarded-For / X-Forwarded-Proto headers (trusted only from a private network).
   # The staff login lock counts wrong passwords per real IP address, and Spring Security sends the HSTS
   # header only when it knows the request came in over HTTPS.
   forward-headers-strategy: native
+  error:
+    include-stacktrace: never
+  tomcat:
+    threads:
+      max: 20
+      min-spare: 2
   # Text files are sent compressed: the pages load much faster on slow mobile networks.
   compression:
     enabled: true
@@ -98,11 +110,12 @@ app:
     lock-minutes: 15                   # locked this long from that address (or until an admin sets a new password)
 
   email:
-    provider: ${EMAIL_PROVIDER:console}   # console = print in the log, smtp = Gmail, brevo = Brevo API (Render)
+    provider: ${EMAIL_PROVIDER:console}   # console = print in the log, smtp = Gmail, google-script = Gmail via Apps Script (Render), brevo = Brevo API
     from: ${MAIL_FROM:${MAIL_USERNAME:}}
     from-name: Smart Farmer Procurement System
     daily-limit: ${EMAIL_DAILY_LIMIT:250}  # notification emails per day (Gmail allows 500, Brevo 300); OTPs: app.otp.max-per-day
-    app-url: ${APP_URL:http://localhost:8080}   # links inside emails; not localhost = real secrets required
+    # Links inside emails; not localhost = real secrets required. Render sets RENDER_EXTERNAL_URL itself.
+    app-url: ${APP_URL:${RENDER_EXTERNAL_URL:http://localhost:8080}}
 
   booking:
     days-ahead: 7                      # today + the next 6 days can be booked

@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: smart-farmer-procurement   # becomes https://smart-farmer-procurement.onrender.com (if the name is free)
+    runtime: docker
+    plan: free
+    region: singapore                # nearest to India; cannot be changed later
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/ping       # answers without login and without the database
+    autoDeployTrigger: commit        # every push to main deploys again
+    envVars:
+      # Typed once in the Render dashboard (secret, never in GitHub)
+      - key: DATABASE_URL            # Neon connection string, pooling OFF
+        sync: false
+      - key: SUPERADMIN_USERNAME
+        sync: false
+      - key: SUPERADMIN_PASSWORD     # long and unique; used once to create the super admin
+        sync: false
+      - key: RAZORPAY_KEY_ID         # TEST key only (rzp_test_...); live keys are refused
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: GOOGLE_SCRIPT_URL       # the Apps Script web app address ending in /exec
+        sync: false
+      # Long random secrets that Render makes once
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PAYOUT_ENCRYPTION_KEY   # encrypts bank details; never change it after the first start
+        generateValue: true
+      - key: GOOGLE_SCRIPT_SECRET    # copy into the script's SECRET property
+        generateValue: true
+      # Normal settings
+      - key: EMAIL_PROVIDER
+        value: google-script
+      - key: EMAIL_DAILY_LIMIT       # Gmail through Apps Script allows about 100 emails a day in total
+        value: "50"
+      - key: OTP_DAILY_LIMIT
+        value: "40"
