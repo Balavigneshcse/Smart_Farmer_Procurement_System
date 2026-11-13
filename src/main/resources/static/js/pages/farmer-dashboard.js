@@ -187,7 +187,8 @@ async function init() {
     renderProfile();
     try {
         [profile, bookings, notifications] = await loading;
-        if (profile.language !== I18N.lang) await I18N.setLang(profile.language);
+        // the saved language, unless the farmer clicked a language button while the data was loading
+        if (profile.language !== I18N.lang && !I18N.chosenByUser) await I18N.setLang(profile.language);
         renderAll();
     } catch (error) {
         showNotice(Api.errorMessage(error), 'error');

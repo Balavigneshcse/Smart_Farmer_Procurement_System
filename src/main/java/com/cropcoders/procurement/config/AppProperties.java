@@ -13,6 +13,11 @@ public record AppProperties(String name, Jwt jwt, Otp otp, StaffLogin staffLogin
      * payment is charged as this stand-in amount and recorded as paid in full.
      */
     public record Razorpay(String keyId, String keySecret, String apiUrl, long testChargeLimitPaise) {
+        /** A space or line break pasted along with a key would make Razorpay refuse every request (401). */
+        public Razorpay {
+            keyId = keyId == null ? null : keyId.strip();
+            keySecret = keySecret == null ? null : keySecret.strip();
+        }
     }
 
     /**

@@ -14,9 +14,12 @@ const I18N = (() => {
     const LOCALES = { en: 'en-IN', ta: 'ta-IN', hi: 'hi-IN' };
     const STORAGE_KEY = 'sfps.lang';
 
-    let lang = 'en';
+    let lang = 'en';          // the language the page is shown in
+    let wanted = 'en';        // the language last asked for (its file may still be downloading)
+    let chosenByUser = false; // the farmer clicked a language button on this page
     let dict = {};
-    const cache = {};
+    let english = {};
+    const cache = {};         // language code -> Promise of its texts
 
     function savedLang() {
         try {
@@ -26,17 +29,22 @@ const I18N = (() => {
         }
     }
 
-    async function loadDictionary(code) {
+    /** Each language file is fetched once; two quick clicks share the same download. */
+    function loadDictionary(code) {
         if (!cache[code]) {
-            const res = await fetch(`/i18n/${code}.json`);
-            cache[code] = res.ok ? await res.json() : {};
+            cache[code] = fetch(`/i18n/${code}.json`)
+                .then(res => (res.ok ? res.json() : {}))
+                .catch(() => {
+                    delete cache[code];   // try again next time (network hiccup)
+                    return {};
+                });
         }
         return cache[code];
     }
 
     /** Translate a key; {placeholders} are filled from params. Falls back to English, then the key. */
     function t(key, params = {}) {
-        const text = dict[key] ?? cache.en?.[key] ?? key;
+        const text = dict[key] ?? english[key] ?? key;
         return text.replace(/\{(\w+)\}/g, (_, name) => (name in params ? params[name] : `{${name}}`));
     }
 
@@ -56,30 +64,45 @@ const I18N = (() => {
         });
     }
 
+    /**
+     * Shows the page in another language. On a slow connection the language files can arrive out of
+     * order (Hindi asked first, English clicked meanwhile), so only the language asked for last is applied.
+     */
     async function setLang(code) {
-        lang = SUPPORTED.includes(code) ? code : 'en';
+        const target = SUPPORTED.includes(code) ? code : 'en';
+        wanted = target;
         try {
-            localStorage.setItem(STORAGE_KEY, lang);
+            localStorage.setItem(STORAGE_KEY, target);
         } catch {
             // Private mode etc. - the language just won't be remembered.
         }
-        await loadDictionary('en');
-        dict = await loadDictionary(lang);
+        // the button lights up at once; the texts follow when their file has arrived
+        document.querySelectorAll('.lang-switch [data-lang]').forEach(btn => {
+            btn.setAttribute('aria-pressed', String(btn.dataset.lang === target));
+        });
+        const [en, texts] = await Promise.all([loadDictionary('en'), loadDictionary(target)]);
+        if (target !== wanted) return;   // another language was chosen while this one was loading
+        english = en;
+        dict = texts;
+        lang = target;
         apply();
         document.dispatchEvent(new CustomEvent('langchange', { detail: { lang } }));
     }
 
     /**
      * Loads the saved language and wires the language buttons.
-     * options.onUserChange(lang) runs when the user clicks a language button
-     * (farmer pages use it to save the choice to their profile).
+     * options.onUserChange(lang, shown) runs when the user clicks a language button (farmer pages use
+     * it to save the choice to their profile); shown is a promise that settles once the page shows it.
      */
     async function init(options = {}) {
         document.querySelectorAll('.lang-switch [data-lang]').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                if (btn.dataset.lang === lang) return;
-                await setLang(btn.dataset.lang);
-                options.onUserChange?.(lang);
+            btn.addEventListener('click', () => {
+                const code = btn.dataset.lang;
+                if (code === wanted) return;
+                chosenByUser = true;
+                const shown = setLang(code);
+                // saving starts at once, alongside the download of the language file
+                options.onUserChange?.(code, shown);
             });
         });
         await setLang(savedLang() || 'en');
@@ -120,5 +143,7 @@ const I18N = (() => {
     return {
         init, t, setLang, apply, locale, formatTime, formatDate, formatDateTime, formatMoney,
         get lang() { return lang; },
+        /** True once the farmer clicked a language button; the page then keeps their choice. */
+        get chosenByUser() { return chosenByUser; },
     };
 })();

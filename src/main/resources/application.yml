@@ -38,6 +38,15 @@ spring:
     basename: messages
     fallback-to-system-locale: false
 
+  # Pages, scripts, styles, language files and pictures: the browser keeps a copy and only asks "changed?"
+  # (answer 304, nothing re-sent), so pages open much faster on the slow free server, and a new deploy is
+  # still picked up at once. API answers stay "no-store" (Spring Security), so private data is never kept.
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-cache: true
+
   # Gmail SMTP (used when app.email.provider = smtp). Render's free plan blocks these ports,
   # so the deployed site sends through a Google Apps Script over HTTPS instead (google-script).
   mail:

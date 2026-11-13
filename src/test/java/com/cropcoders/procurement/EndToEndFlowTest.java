@@ -493,6 +493,14 @@ class EndToEndFlowTest {
                 .isEqualTo(expected);
     }
 
+    @Test
+    void staticFilesAreRevalidatedButApiAnswersAreNeverStored() throws Exception {
+        assertThat(expect(get("/js/i18n.js", null), 200).getResponse().getHeader("Cache-Control"))
+                .isEqualTo("no-cache");
+        assertThat(expect(get("/api/ping", null), 200).getResponse().getHeader("Cache-Control"))
+                .contains("no-store");
+    }
+
     // ---------- helpers ----------
 
     /**

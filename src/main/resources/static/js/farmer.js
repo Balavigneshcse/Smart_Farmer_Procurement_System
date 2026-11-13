@@ -23,17 +23,25 @@ const Farmer = (() => {
         if (!me) return null;
         document.getElementById('logout-btn')?.addEventListener('click', Auth.logout);
         await I18N.init({ onUserChange: saveLanguage });
-        if (me.language && me.language !== I18N.lang) {
+        // the registered language, unless the farmer already clicked another one while the page was loading
+        if (me.language && me.language !== I18N.lang && !I18N.chosenByUser) {
             await I18N.setLang(me.language);
         }
         return me;
     }
 
+    let lastSave = Promise.resolve();
+
     /** A language button was clicked: save it so the farmer's emails use it too. */
-    async function saveLanguage(language) {
+    async function saveLanguage(language, shown) {
+        // saves go one after another, so after quick clicks the server also ends with the last one
+        const save = lastSave.then(() => Api.put('/api/farmers/me/language', { language }));
+        lastSave = save.catch(() => {});
         try {
-            await Api.put('/api/farmers/me/language', { language });
+            await save;
             Auth.updateUser({ language });
+            await shown;   // so the "saved" message appears in the new language
+            if (language !== I18N.lang) return;   // the farmer has clicked yet another language since
             document.dispatchEvent(new CustomEvent('languagesaved', { detail: { language } }));
         } catch (error) {
             document.dispatchEvent(new CustomEvent('languagesavefailed', { detail: { error } }));
