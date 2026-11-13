@@ -18,8 +18,7 @@ application-local.yml
 # Logs
 *.log
 
-# Staff account list with starting passwords - never commit
-staff-accounts.xlsx
+# Excel's lock file while a workbook is open (staff-accounts.xlsx itself is committed; it is kept out of the Docker image)
 ~$*.xlsx
 
 # Local notes and tools - kept on the PC, not part of the app

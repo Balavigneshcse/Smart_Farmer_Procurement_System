@@ -9,6 +9,11 @@ Farmers often wait all day at procurement centres without knowing the schedule o
 - **Admin dashboard.** Today's farmers, queue lengths, average wait, crop procured and payments, with charts for the last 7 days.
 - **Three staff levels.** A super admin adds centres and centre admins and sets crop rates; each centre admin sees only their own centre and adds its counter staff; staff work the operator desk.
 
+**Live site:** https://smart-farmer-procurement-cysn.onrender.com  
+(Render's free plan: after 15 minutes without visitors the server sleeps, so the first page then takes about a minute to open.)
+
+Staff logins: [staff-accounts.xlsx](staff-accounts.xlsx) lists every admin and staff account, its starting password and its login page (`/staff/login.html`). Change a starting password after the first login.
+
 Theme: Smart Automation · College mini project
 
 ## Tech stack
@@ -20,8 +25,8 @@ Theme: Smart Automation · College mini project
 | Database | PostgreSQL |
 | Payments | Razorpay (test mode) |
 | QR codes | qrcodejs in the browser, ZXing on the server (email) |
-| Email | Gmail SMTP (on the PC and on the server); optional Brevo email API |
-| Hosting | AWS EC2 free tier (Mumbai): Java 21 + PostgreSQL + Nginx on one server, no Docker |
+| Email | Gmail: SMTP on the PC, a Google Apps Script web app on Render (its free plan blocks SMTP); optional Brevo email API |
+| Hosting | Render free plan (Docker) + Neon PostgreSQL, live at https://smart-farmer-procurement-cysn.onrender.com; AWS EC2 is described as an alternative |
 
 ## Run it locally (IntelliJ IDEA)
 
