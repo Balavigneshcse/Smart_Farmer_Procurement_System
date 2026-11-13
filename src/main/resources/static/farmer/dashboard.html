@@ -12,6 +12,9 @@
 </head>
 <body>
 
+<!-- The star shape used by the review reminder (its colours come from app.css, so it follows the light/dark theme) -->
+<svg class="svg-defs" aria-hidden="true" focusable="false"><symbol id="star" viewBox="0 0 24 24"><path d="M12 2.5l2.69 6.7 7.2.49-5.54 4.62 1.76 7L12 17.48l-6.11 3.83 1.76-7-5.54-4.62 7.2-.49z"/></symbol></svg>
+
 <header class="site-header">
     <div class="container header-row">
         <a class="brand" href="/farmer/dashboard.html">
@@ -40,6 +43,16 @@
     </div>
 
     <div id="notice" class="alert hidden" role="status"></div>
+
+    <!-- Asks for a review of the newest visit whose crop was weighed in the last 7 days and not reviewed yet -->
+    <section class="card feedback-reminder hidden" id="feedback-reminder" aria-labelledby="feedback-reminder-title">
+        <span class="feedback-reminder-icon"><svg class="star-svg" aria-hidden="true" focusable="false"><use href="#star"></use></svg></span>
+        <div>
+            <h2 id="feedback-reminder-title"></h2>
+            <p class="muted" data-i18n="feedback.reminder.text">Rate the centre and this app in one minute. It helps us make things better.</p>
+        </div>
+        <a class="btn btn-outline" id="feedback-reminder-link" href="/farmer/dashboard.html"><span data-i18n="feedback.reminder.button">Give review</span><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#arrow-right"></use></svg></a>
+    </section>
 
     <section class="dash-section" aria-labelledby="bookings-title">
         <h2 id="bookings-title" data-i18n="dashboard.bookings.title">My bookings</h2>

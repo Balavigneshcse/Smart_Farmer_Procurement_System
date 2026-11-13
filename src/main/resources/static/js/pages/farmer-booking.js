@@ -53,6 +53,7 @@ function render() {
 
     $('cancel-btn').classList.toggle('hidden', !b.cancellable);
     renderResult();
+    renderFeedback();
     $('content').classList.remove('hidden');
     updateLive();
 }
@@ -98,6 +99,155 @@ function renderResult() {
             <dt>${esc(t('result.amount'))}</dt><dd class="result-amount">${esc(I18N.formatMoney(p.amount))}</dd>
         </dl>
         ${paymentHtml}`;
+}
+
+// ---------- Review of the visit (after the crop is weighed: accepted or rejected) ----------
+
+const REVIEW_STATUSES = ['COMPLETED', 'REJECTED'];
+const PARTS = ['centre', 'app'];   // the two halves of the form; their element ids start with these words
+const COMMENT_MAX = 500;
+let sendingFeedback = false;
+
+/** Shows a translated text; data-i18n lets I18N.apply() translate it again when the language changes. */
+function setText(element, key) {
+    if (!key) {
+        delete element.dataset.i18n;
+        element.textContent = '';
+        return;
+    }
+    if (element.dataset.i18n === key) return;   // unchanged: don't make screen readers repeat it
+    element.dataset.i18n = key;
+    element.textContent = t(key);
+}
+
+function chosenRating(part) {
+    return Number($('feedback-form').querySelector(`input[name="${part}Rating"]:checked`)?.value) || null;
+}
+
+function chosenIssues(part) {
+    return [...$('feedback-form').querySelectorAll(`input[name="${part}Issues"]:checked`)].map(box => box.value);
+}
+
+function commentText(part) {
+    return $(`${part}-comment`).value.trim() || null;
+}
+
+/** The word under the stars ("Good") and the letter counter follow what the farmer has chosen and typed. */
+function syncPart(part) {
+    const rating = chosenRating(part);
+    const word = $(`${part}-rating-word`);
+    setText(word, rating ? `feedback.word.${rating}` : 'feedback.tapStar');
+    word.classList.toggle('chosen', Boolean(rating));
+    if (rating) setText($(`${part}-rating-error`), null);
+    $(`${part}-comment-count`).textContent = `${$(`${part}-comment`).value.length}/${COMMENT_MAX}`;
+}
+
+/**
+ * The review card: the form while there is no review yet, a thank-you with the farmer's answers after.
+ * Only the texts around the form change here, never the inputs, so nothing typed is lost on a re-render.
+ */
+function renderFeedback() {
+    const b = booking;
+    const show = REVIEW_STATUSES.includes(b.status);
+    $('feedback-card').classList.toggle('hidden', !show);
+    if (!show) return;
+
+    const done = Boolean(b.feedback);
+    setText($('feedback-title'), done ? 'feedback.doneTitle' : 'feedback.title');
+    // a kinder opening line when the crop was not accepted
+    setText($('feedback-intro'), b.status === 'REJECTED' ? 'feedback.introRejected' : 'feedback.intro');
+    $('feedback-intro').classList.toggle('hidden', done);
+    $('feedback-form').classList.toggle('hidden', done);
+    $('feedback-thanks').classList.toggle('hidden', !done);
+    if (done) {
+        renderThanks(b.feedback);
+    } else {
+        PARTS.forEach(syncPart);
+    }
+}
+
+/** Five small stars, the first `rating` of them filled; read out as "4 out of 5". */
+function starRow(rating) {
+    const stars = [1, 2, 3, 4, 5].map(n =>
+        `<svg class="star-svg${n <= rating ? ' on' : ''}" aria-hidden="true" focusable="false"><use href="#star"></use></svg>`).join('');
+    return `<span class="star-row" role="img" aria-label="${esc(t(`feedback.star.${rating}`))}">${stars}</span>`;
+}
+
+function thanksPart(titleKey, rating, issues, comment) {
+    const areas = issues?.length ? `
+        <p class="feedback-improve">${esc(t('feedback.thanks.improve'))}</p>
+        <ul class="tag-list">${issues.map(code => `<li class="badge">${esc(t(`feedback.area.${code}`))}</li>`).join('')}</ul>` : '';
+    return `
+        <div class="feedback-summary-item">
+            <h3>${esc(t(titleKey))}</h3>
+            <p class="feedback-rating">${starRow(rating)}<span>${esc(t(`feedback.word.${rating}`))}</span></p>
+            ${areas}
+            ${comment ? `<blockquote class="feedback-quote">${esc(comment)}</blockquote>` : ''}
+        </div>`;
+}
+
+function renderThanks(f) {
+    $('feedback-summary').innerHTML =
+        thanksPart('feedback.thanks.centre', f.centreRating, f.centreIssues, f.centreComment)
+        + thanksPart('feedback.thanks.app', f.appRating, f.appIssues, f.appComment);
+    $('feedback-sent-on').textContent = f.createdAt
+        ? t('feedback.thanks.sentOn', { date: I18N.formatDateTime(f.createdAt) }) : '';
+}
+
+// Keep the star word and the letter counters up to date while the farmer fills in the form.
+['input', 'change'].forEach(type => $('feedback-form').addEventListener(type, () => PARTS.forEach(syncPart)));
+
+$('feedback-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (sendingFeedback) return;
+    $('feedback-error').textContent = '';
+
+    // Both star ratings are needed; the rest is optional.
+    const missing = PARTS.filter(part => !chosenRating(part));
+    PARTS.forEach(part => setText($(`${part}-rating-error`), missing.includes(part) ? 'feedback.pickStars' : null));
+    if (missing.length) {
+        $('feedback-form').querySelector(`input[name="${missing[0]}Rating"]`).focus();
+        return;
+    }
+
+    const body = {
+        centreRating: chosenRating('centre'),
+        appRating: chosenRating('app'),
+        centreIssues: chosenIssues('centre'),
+        appIssues: chosenIssues('app'),
+        centreComment: commentText('centre'),
+        appComment: commentText('app'),
+    };
+    sendingFeedback = true;
+    $('feedback-send').disabled = true;
+    setText($('feedback-send-label'), 'feedback.sending');
+    try {
+        booking = await Api.post(`/api/bookings/${bookingId}/feedback`, body);
+        render();
+        $('feedback-thanks').focus();   // screen readers hear the thank-you
+    } catch (error) {
+        if (error.code === 'FEEDBACK_ALREADY_GIVEN') {
+            // sent already (maybe from another tab or phone): show that review instead of the form
+            try {
+                booking = await Api.get(`/api/bookings/${bookingId}`);
+                render();
+                return;
+            } catch {
+                // fall through and show the message
+            }
+        }
+        $('feedback-error').textContent = Api.errorMessage(error);
+    } finally {
+        sendingFeedback = false;
+        $('feedback-send').disabled = false;
+        setText($('feedback-send-label'), 'feedback.send');
+    }
+});
+
+/** Opened from the "How was your visit?" reminder (...#feedback): bring the review card into view. */
+function scrollToFeedback() {
+    if (location.hash !== '#feedback' || $('feedback-card').classList.contains('hidden')) return;
+    $('feedback-card').scrollIntoView({ block: 'start' });
 }
 
 // ---------- Live queue (only on the day of the booking, while it is active) ----------
@@ -238,6 +388,7 @@ async function init() {
     try {
         booking = await loading;
         render();
+        scrollToFeedback();
     } catch (error) {
         showAlert(Api.errorMessage(error));
     }

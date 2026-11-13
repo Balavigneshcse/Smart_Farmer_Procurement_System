@@ -6,7 +6,8 @@ Farmers often wait all day at procurement centres without knowing the schedule o
 - **Live queue.** Counter staff check farmers in and call them to counters. Farmers see their position and waiting time live, and a TV screen at the centre shows who is being served.
 - **Email alerts.** Farmers get an email at key moments (booked, reminder, turn near, weighed, paid), in their chosen language (English, Tamil or Hindi). Every update also appears on their dashboard.
 - **Tracking.** Every booking has a timeline, from booked through weighed to paid, with payment through Razorpay (test mode).
-- **Admin dashboard.** Today's farmers, queue lengths, average wait, crop procured and payments, with charts for the last 7 days.
+- **Admin dashboard.** Today's farmers, queue lengths, average wait, crop procured and payments, with charts for the last 7 days, plus how many farmers have registered and how many brought their crop to a centre.
+- **Visit reviews.** After the crop is weighed (accepted or rejected), the farmer rates the centre and the app with 1 to 5 stars, taps what should improve (waiting time, staff, water and shade, weighing, payment; booking, live queue, emails, language, OTP login) and can add a comment. The admins see the average stars, the most chosen improvements and the newest reviews.
 - **Three staff levels.** A super admin adds centres and centre admins and sets crop rates; each centre admin sees only their own centre and adds its counter staff; staff work the operator desk.
 
 **Live site:** https://smart-farmer-procurement-cysn.onrender.com  
@@ -173,7 +174,7 @@ Use `EMAIL_PROVIDER=console` to print emails in the log instead (handy for testi
 | Booking confirmed / cancelled | Farmer books or cancels |
 | Reminder | About 2 hours before the slot (checked every 15 minutes, 7 am to 10 pm) |
 | Your turn is near | Farmer reaches position 3 or better in the queue |
-| Crop accepted / not accepted | Staff save the weighment (weight and amount, or the reason) |
+| Crop accepted / not accepted | Staff save the weighment (weight and amount, or the reason), with a request to review the visit |
 | Payment done | Admin's Razorpay payment is verified |
 | Missed slot | Not checked in by slot end + 2 hours (booking becomes *No show*) |
 
@@ -196,7 +197,7 @@ How it works (for the viva):
 
 | Page | What the admin does there (a centre admin sees only their own centre) |
 |---|---|
-| **Dashboard** (`/admin/dashboard.html`) | Today at a glance: farmers booked, waiting, served, average wait, crop procured, payments pending. A live table per centre (refreshes every 30 seconds) with a link to each TV screen. Charts of farmers and quintals per day for the last 7 days, and the crops bought this week. |
+| **Dashboard** (`/admin/dashboard.html`) | Today at a glance: farmers booked, waiting, served, average wait, crop procured, payments pending. A live table per centre (refreshes every 30 seconds) with a link to each TV screen. Charts of farmers and quintals per day for the last 7 days, and the crops bought this week. Farmers registered (site-wide, and new this week) and farmers who brought their crop (all time), and the farmers' reviews: average stars for the centre and the app, how often each improvement was chosen, the 10 newest reviews, and each centre's average stars in the centre table. |
 | **Payments** (`/admin/payments.html`) | Pays farmers through Razorpay test mode (see above). |
 | **Centres & crops** (`/admin/settings.html`) | Super admin: adds centres, changes crop rates and moisture limits, adds crops (with Tamil and Hindi names), switches crops or centres off. Any admin: changes their centre's counters, opening hours and minutes per farmer. |
 | **Admins & staff** (`/admin/staff.html`) | Super admin: adds centre admins and staff for any centre. Centre admin: adds staff for their own centre. Both can rename an account, set a new password or switch it off. |
@@ -336,7 +337,8 @@ src/main/resources/
 ├── db/migration/                 Flyway: V1 schema, V2 centres + crops, V3 staff accounts, V4 email instead of SMS,
 │                                 V5 roles and staff, V6 farmer payment details, V7 encrypted payment details, V10 encrypted Aadhaar digits,
 │                                 V8 one farmer per counter + staff login lock,
-│                                 V9 login_attempts (staff login lock per username and IP) + index for the daily OTP limit
+│                                 V9 login_attempts (staff login lock per username and IP) + index for the daily OTP limit,
+│                                 V11 visit_feedback (one review per weighed booking: stars, improvement codes, comments)
 └── static/                       HTML pages, css/, js/ (shared scripts), js/pages/ (one script per page),
                                   i18n/ (en, ta, hi), fonts/, img/ (icons.svg, photos/)
 src/test/java/                    unit tests + EndToEndFlowTest (see "Tests")
@@ -360,11 +362,11 @@ deploy/                           AWS EC2 guide (README.md), setup script (with 
 
 ## Tests
 
-Run them in IntelliJ (right-click `src/test/java` → Run 'All Tests') or with Maven (`mvn test`). There are 43 tests in 10 classes. The 7 in `EndToEndFlowTest` are skipped without a local PostgreSQL.
+Run them in IntelliJ (right-click `src/test/java` → Run 'All Tests') or with Maven (`mvn test`). There are 51 tests in 12 classes. The 10 in `EndToEndFlowTest` are skipped without a local PostgreSQL.
 
 | Test | What it checks |
 |---|---|
-| `EndToEndFlowTest` (7) | The whole app, step by step, on its own throw-away database (`farmer_procurement_e2e`, dropped afterwards; skipped without a local PostgreSQL): super admin, centre admin and staff with their access limits, a switched-off account's token refused, the lock after 5 wrong passwords (only from that IP address: the same user at another address still logs in; an unknown username is locked the same way; a new password lifts it), farmer OTP login, registration with bank details (encrypted), UPI change, booking with the QR email, check-in, call next, weighment, Razorpay order and signature check, paid status, demo day. Six smaller tests, some sending requests from several threads at the same moment: 6 farmers for the last 5 places (exactly 5 get one), two cancels of one booking (the place goes back once), 6 wrong OTP guesses (exactly 3 tries counted), a token with a made-up role (refused), the no-show and reminder jobs (one reminder however often they run), and the exact Content-Security-Policy header |
+| `EndToEndFlowTest` (10) | The whole app, step by step, on its own throw-away database (`farmer_procurement_e2e`, dropped afterwards; skipped without a local PostgreSQL): super admin, centre admin and staff with their access limits, a switched-off account's token refused, the lock after 5 wrong passwords (only from that IP address: the same user at another address still logs in; an unknown username is locked the same way; a new password lifts it), farmer OTP login, registration with bank details (encrypted), UPI change, booking with the QR email, check-in, call next, weighment, Razorpay order and signature check, paid status, demo day. Six smaller tests, some sending requests from several threads at the same moment: 6 farmers for the last 5 places (exactly 5 get one), two cancels of one booking (the place goes back once), 6 wrong OTP guesses (exactly 3 tries counted), a token with a made-up role (refused), the no-show and reminder jobs (one reminder however often they run), the exact Content-Security-Policy header, the visit review (only after the weighment, only once, only the farmer's own booking, wrong stars or codes refused; the super admin and that centre's admin see it, another centre's admin does not) and demo reviews (removed with the demo data) |
 | `JwtServiceTest` (5) | Login and registration tokens, expiry, tampering |
 | `SecretGuardTest` (4) | The built-in `local-dev-...` secrets stop the app when `APP_URL` is not localhost (also through `JwtService`), and are fine on the PC |
 | `OtpServiceTest` (4) | The daily OTP limit for the whole site (`OTP_DAILY_LIMIT`, counted from midnight, no OTP saved or emailed after it), and that the limit per address is checked first |

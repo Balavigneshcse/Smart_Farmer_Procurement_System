@@ -51,6 +51,17 @@
         <div class="stat-tile"><div class="stat-label">Payments pending</div><div class="stat-value" id="t-pending">0</div><div class="small muted" id="t-pending-sub"></div></div>
     </div>
 
+    <!-- All-time numbers. The sub lines start with &nbsp; so the tiles keep their height while loading. -->
+    <section aria-labelledby="farmers-title">
+        <h2 class="list-heading" id="farmers-title">Farmers and reviews, all time</h2>
+        <div class="stat-row stat-row-wide">
+            <div class="stat-tile"><div class="stat-label">Farmers registered</div><div class="stat-value" id="f-registered">0</div><div class="small muted" id="f-registered-sub">&nbsp;</div></div>
+            <div class="stat-tile"><div class="stat-label" id="f-brought-label">Brought their crop</div><div class="stat-value" id="f-brought">0</div><div class="small muted" id="f-brought-sub">&nbsp;</div></div>
+            <div class="stat-tile"><div class="stat-label">Centre rating</div><div class="stat-value" id="f-centre-rating">&ndash;</div><div class="small muted" id="f-centre-rating-sub">&nbsp;</div></div>
+            <div class="stat-tile"><div class="stat-label">App rating</div><div class="stat-value" id="f-app-rating">&ndash;</div><div class="small muted" id="f-app-rating-sub">&nbsp;</div></div>
+        </div>
+    </section>
+
     <section class="card table-wrap dash-section" aria-labelledby="centres-title">
         <div class="table-tools">
             <h2 id="centres-title">Centres right now</h2>
@@ -68,9 +79,10 @@
                 <th class="num">Avg wait</th>
                 <th class="num">Procured</th>
                 <th>Slots filled today</th>
+                <th class="num">Rating</th>
             </tr>
             </thead>
-            <tbody id="centre-rows"><tr class="empty-row"><td colspan="9">Loading…</td></tr></tbody>
+            <tbody id="centre-rows"><tr class="empty-row"><td colspan="10">Loading…</td></tr></tbody>
         </table>
     </section>
 
@@ -102,6 +114,36 @@
             <div class="bar-list" id="crop-bars"></div>
         </section>
     </div>
+
+    <section class="dash-section" aria-labelledby="reviews-title">
+        <div class="head-row section-head">
+            <h2 id="reviews-title">Farmer reviews</h2>
+            <span class="small muted">Farmers rate the centre and the app after their crop is weighed</span>
+        </div>
+        <div class="empty hidden" id="reviews-empty">
+            <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#megaphone"></use></svg></span>
+            <p><strong>No reviews yet.</strong> When a farmer's crop has been weighed at the counter, the app asks them
+                to rate the centre and the app and to pick what should improve. Their answers will show up here.</p>
+        </div>
+        <div class="stack" id="reviews-body">
+            <div class="grid grid-2">
+                <section class="card" aria-labelledby="centre-issues-title">
+                    <h3 id="centre-issues-title">What should improve at the centres</h3>
+                    <p class="small muted" id="centre-issues-note">&nbsp;</p>
+                    <div class="bar-list" id="centre-issue-bars"></div>
+                </section>
+                <section class="card" aria-labelledby="app-issues-title">
+                    <h3 id="app-issues-title">What should improve in the app</h3>
+                    <p class="small muted" id="app-issues-note">&nbsp;</p>
+                    <div class="bar-list" id="app-issue-bars"></div>
+                </section>
+            </div>
+            <section class="card" aria-labelledby="recent-reviews-title">
+                <h3 id="recent-reviews-title">Latest reviews</h3>
+                <ul class="review-list" id="review-list"><li class="muted">Loading…</li></ul>
+            </section>
+        </div>
+    </section>
 
     <section class="card dash-section demo-card hidden" id="demo-card" aria-labelledby="demo-title">
         <h2 id="demo-title">Demo data</h2>

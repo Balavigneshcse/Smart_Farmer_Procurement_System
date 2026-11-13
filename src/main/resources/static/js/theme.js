@@ -58,3 +58,13 @@
         }));
     });
 })();
+
+/*
+ * Every page loads this file, so it also handles the browser's Back and Forward buttons. The browser may show
+ * a page again from its back/forward cache: an old copy kept in memory, with old queue numbers or an old
+ * "rate your visit" reminder, or still showing a farmer's details after they logged out on a shared phone.
+ * Such a page is loaded afresh instead (and a logged-out visitor is sent to the login page as usual).
+ */
+window.addEventListener('pageshow', event => {
+    if (event.persisted) location.reload();
+});

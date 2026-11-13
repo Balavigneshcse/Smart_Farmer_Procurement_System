@@ -57,6 +57,8 @@
     --info-ink: #1c5a91;
     --info-bg: #e2edf8;
     --focus: #b77905;
+    --star: #f2b42a;           /* review stars: gold fill with a darker edge, so they stand out on white */
+    --star-edge: #b97f00;
 
     --shadow-1: 0 1px 2px rgb(23 35 27 / .05), 0 6px 16px -8px rgb(23 35 27 / .16);
     --shadow-2: 0 2px 4px rgb(23 35 27 / .05), 0 18px 40px -16px rgb(23 35 27 / .28);
@@ -98,6 +100,8 @@
     --info-ink: #9cc4ef;
     --info-bg: #16273a;
     --focus: #f3c46b;
+    --star: #f3c46b;
+    --star-edge: #f3c46b;
 
     --shadow-1: 0 1px 2px rgb(0 0 0 / .3), 0 6px 16px -8px rgb(0 0 0 / .5);
     --shadow-2: 0 2px 4px rgb(0 0 0 / .3), 0 18px 40px -16px rgb(0 0 0 / .6);
@@ -130,6 +134,8 @@
         --info-ink: #9cc4ef;
         --info-bg: #16273a;
         --focus: #f3c46b;
+        --star: #f3c46b;
+        --star-edge: #f3c46b;
 
         --shadow-1: 0 1px 2px rgb(0 0 0 / .3), 0 6px 16px -8px rgb(0 0 0 / .5);
         --shadow-2: 0 2px 4px rgb(0 0 0 / .3), 0 18px 40px -16px rgb(0 0 0 / .6);
@@ -1180,6 +1186,145 @@ tbody tr:hover { background: color-mix(in srgb, var(--sunken) 45%, transparent);
 .payment-block h3 { margin-bottom: 8px; }
 .payment-block p { margin: 8px 0 0; }
 
+/* Review of a visit (booking page). The stars and the "what should improve" chips are real radio buttons
+   and checkboxes, hidden and drawn with CSS, so they work with the keyboard and screen readers. */
+.svg-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.feedback-card { scroll-margin-top: 16px; }
+@media (min-width: 768px) { .feedback-card { scroll-margin-top: 88px; } }   /* below the sticky header */
+.feedback-group { border: 0; padding: 0; margin: 0; min-width: 0; }
+.feedback-group + .feedback-group { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 20px; }
+.feedback-legend { display: flex; align-items: center; gap: 10px; padding: 0; margin-bottom: 4px; font-size: 1.15rem; font-weight: 700; line-height: 1.3; }
+.feedback-legend-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+.feedback-legend-icon .icon { width: 20px; height: 20px; }
+
+/* Stars: a star is filled when it, or a star after it, is chosen. With a mouse, the hovered value is previewed. */
+.stars { display: flex; width: fit-content; margin-left: -7px; }
+.star { position: relative; display: grid; place-items: center; width: 52px; height: 52px; border-radius: var(--radius); cursor: pointer; }
+.star input { position: absolute; opacity: 0; width: 1px; height: 1px; min-height: 0; padding: 0; margin: 0; }
+.star-svg {
+    width: 38px;
+    height: 38px;
+    fill: transparent;
+    stroke: var(--field);
+    stroke-width: 1.6;
+    stroke-linejoin: round;
+    overflow: visible;
+    transition: fill .15s, stroke .15s, transform .2s var(--ease);
+}
+.star:has(input:checked) .star-svg, .star:has(~ .star input:checked) .star-svg { fill: var(--star); stroke: var(--star-edge); }
+.star:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: -3px; }
+@media (hover: hover) {
+    .stars:hover .star-svg { fill: var(--star); stroke: var(--star-edge); }
+    .stars:hover .star:hover ~ .star .star-svg { fill: transparent; stroke: var(--field); }
+}
+.star:active .star-svg { transform: scale(.9); }
+@media (prefers-reduced-motion: no-preference) {
+    .star:has(input:checked) .star-svg { animation: star-pop .35s var(--ease); }
+}
+@keyframes star-pop { 45% { transform: scale(1.2); } }
+.star-word { margin: 0 0 4px; min-height: 1.6em; font-weight: 600; color: var(--muted); }
+.star-word.chosen { color: var(--ink); }
+.feedback-group .field-error { margin-bottom: 4px; }
+
+/* "What should improve?" chips: a plus sign turns into a tick when chosen (not shown by colour alone) */
+.feedback-areas { border: 0; padding: 0; margin: 14px 0 18px; min-width: 0; }
+.feedback-areas legend { padding: 0; font-weight: 600; }
+.feedback-areas .hint { margin: 0 0 10px; font-size: .9rem; color: var(--muted); }
+.chip-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { position: relative; display: flex; max-width: 100%; }
+.chip input { position: absolute; opacity: 0; width: 1px; height: 1px; min-height: 0; padding: 0; margin: 0; }
+.chip-face {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 8px 14px 8px 12px;
+    border: 1.5px solid var(--field);
+    border-radius: var(--radius);
+    background: var(--surface);
+    font-weight: 600;
+    line-height: 1.3;
+    cursor: pointer;
+    transition: border-color .15s, background-color .15s, color .15s;
+}
+.chip-face:hover { border-color: var(--ink); }
+.chip-face .icon { width: 1.1em; height: 1.1em; color: var(--muted); }
+.chip-on { display: none; }
+.chip input:checked + .chip-face {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+.chip input:checked + .chip-face .icon { color: var(--accent); }
+.chip input:checked + .chip-face .chip-off { display: none; }
+.chip input:checked + .chip-face .chip-on { display: block; }
+.chip input:focus-visible + .chip-face { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.feedback-comment { margin-bottom: 8px; }
+.feedback-comment textarea { min-height: 88px; }
+.char-count { align-self: flex-end; font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.feedback-form > .field-error { margin: 8px 0 0; }
+.feedback-form > .btn { margin-top: 16px; }
+
+/* After the review is sent: the farmer's own answers */
+.feedback-thanks:focus { outline: none; }
+.feedback-thanks-title { display: flex; align-items: center; gap: 10px; margin: 0 0 4px; font-size: 1.2rem; font-weight: 700; color: var(--accent); }
+.feedback-thanks-title .icon { width: 28px; height: 28px; }
+.feedback-summary { display: grid; gap: 12px; margin-top: 16px; }
+.feedback-summary-item { background: var(--sunken); border-radius: var(--radius); padding: 14px 16px; min-width: 0; }
+.feedback-summary-item h3 { margin: 0 0 4px; font-size: 1rem; color: var(--muted); }
+.feedback-rating { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; font-weight: 600; }
+.star-row { display: inline-flex; gap: 2px; }
+.star-row .star-svg { width: 24px; height: 24px; stroke-width: 2; }
+.star-svg.on { fill: var(--star); stroke: var(--star-edge); }
+.feedback-improve { margin: 10px 0 6px; font-size: .9rem; color: var(--muted); }
+.tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.tag-list .badge { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.feedback-quote { margin: 10px 0 0; padding: 2px 0 2px 12px; border-left: 3px solid var(--line); white-space: pre-line; overflow-wrap: anywhere; }
+.feedback-sent { margin: 12px 0 0; }
+
+/* Review reminder on the farmer dashboard, and the small "Rate your visit" line in the bookings list */
+.feedback-reminder {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 12px 16px;
+    margin-bottom: 28px;
+    border: 1.5px solid var(--accent);
+}
+.feedback-reminder h2 { margin: 0 0 2px; font-size: 1.15rem; line-height: 1.35; }
+.feedback-reminder p { margin: 0; }
+.feedback-reminder .btn { grid-column: 1 / -1; }
+.feedback-reminder-icon {
+    display: grid;
+    place-items: center;
+    align-self: start;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius);
+    background: var(--accent-soft);
+}
+.feedback-reminder-icon .star-svg { width: 28px; height: 28px; fill: var(--star); stroke: var(--star-edge); }
+@media (min-width: 640px) {
+    .feedback-reminder { grid-template-columns: auto 1fr auto; }
+    .feedback-reminder .btn { grid-column: auto; }
+}
+@media (prefers-reduced-motion: no-preference) {
+    .feedback-reminder { animation: rise .5s var(--ease) both; }
+}
+.booking-review { display: inline-flex; align-items: center; gap: 6px; justify-self: start; margin-top: 4px; font-size: .92rem; font-weight: 600; color: var(--accent); }
+.booking-review .star-svg { width: 1.15em; height: 1.15em; fill: var(--star); stroke: var(--star-edge); stroke-width: 2; }
+
 /* Operator desk */
 .desk-grid { display: grid; gap: 20px; align-items: start; }
 @media (min-width: 1000px) { .desk-grid { grid-template-columns: minmax(380px, 5fr) 7fr; } }
@@ -1253,6 +1398,23 @@ tbody tr:hover { background: color-mix(in srgb, var(--sunken) 45%, transparent);
 .crop-form h3 { margin-bottom: 14px; }
 .crop-names { display: block; font-size: .9rem; color: var(--muted); }
 .switch-field { justify-content: center; }
+
+/* Admin: farmers' reviews (stars are text, with "out of 5" for screen readers) */
+.bar-label { min-width: 0; }
+.review-stars { color: var(--star-edge); letter-spacing: .05em; white-space: nowrap; }
+.review-stars-off { color: var(--field); }
+.review-list { list-style: none; margin: 0; padding: 0; }
+.review-item { padding: 16px 0; }
+.review-item + .review-item { border-top: 1px solid var(--line); }
+.review-item:first-child { padding-top: 0; }
+.review-item:last-child { padding-bottom: 0; }
+.review-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin-bottom: 10px; }
+.review-item .grid { gap: 10px; }
+.review-part { display: grid; gap: 6px; align-content: start; background: var(--sunken); border-radius: var(--radius); padding: 12px 14px; }
+.review-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.review-tags .badge { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.review-comment { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+.review-part .review-stars { font-size: 1.1rem; }
 
 /* 404 */
 .error-page { min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; }

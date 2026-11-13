@@ -18,4 +18,9 @@ public enum BookingStatus {
 
     /** Statuses that still hold a place: a farmer can have only one of these per day. */
     public static final Set<BookingStatus> ACTIVE = EnumSet.of(BOOKED, CHECKED_IN, CALLED);
+
+    /** The crop was weighed at the counter (accepted or rejected): the farmer can now review the visit. */
+    public boolean isWeighed() {
+        return this == COMPLETED || this == REJECTED;
+    }
 }

@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.cropcoders.procurement.dto.BookingResponse;
 import com.cropcoders.procurement.dto.CreateBookingRequest;
+import com.cropcoders.procurement.dto.FeedbackRequest;
 import com.cropcoders.procurement.security.AuthUser;
 import com.cropcoders.procurement.service.BookingService;
 
@@ -50,5 +51,12 @@ public class BookingController {
     @PostMapping("/{id}/cancel")
     public BookingResponse cancel(@AuthenticationPrincipal AuthUser farmer, @PathVariable("id") Long id) {
         return bookingService.cancel(farmer.id(), id);
+    }
+
+    /** The farmer's review of the visit, after the crop was weighed. Answers with the booking, review included. */
+    @PostMapping("/{id}/feedback")
+    public BookingResponse feedback(@AuthenticationPrincipal AuthUser farmer, @PathVariable("id") Long id,
+                                    @Valid @RequestBody FeedbackRequest request) {
+        return bookingService.giveFeedback(farmer.id(), id, request);
     }
 }

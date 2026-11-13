@@ -11,12 +11,15 @@ import com.cropcoders.procurement.entity.Booking;
 import com.cropcoders.procurement.entity.Centre;
 import com.cropcoders.procurement.entity.Payment;
 import com.cropcoders.procurement.entity.Procurement;
+import com.cropcoders.procurement.entity.VisitFeedback;
 import com.cropcoders.procurement.enums.BookingStatus;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 /**
  * A booking as the farmer sees it. "events" (the timeline) is only filled for the detail view.
  * qrText is what the QR code contains; the operator scans it at check-in (M4).
+ * feedback is the farmer's review of the visit (left out until they give one); feedbackDue = the crop was
+ * weighed in the last 7 days and there is no review yet, so the dashboard reminds the farmer to give one.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record BookingResponse(
@@ -35,7 +38,12 @@ public record BookingResponse(
         LocalDateTime createdAt,
         List<BookingEventResponse> events,
         ProcurementSummary procurement,
-        PaymentSummary payment) {
+        PaymentSummary payment,
+        boolean feedbackDue,
+        FeedbackResponse feedback) {
+
+    /** How long after the weighment the farmer's dashboard keeps asking for a review. */
+    public static final int FEEDBACK_DUE_DAYS = 7;
 
     public record CentreSummary(Long id, String code, String name, String address) {
 
@@ -45,14 +53,17 @@ public record BookingResponse(
     }
 
     public static BookingResponse from(Booking booking, LocalDateTime now, List<BookingEventResponse> events) {
-        return from(booking, now, events, null, null);
+        return from(booking, now, events, null, null, null);
     }
 
     public static BookingResponse from(Booking booking, LocalDateTime now, List<BookingEventResponse> events,
-                                       Procurement procurement, Payment payment) {
+                                       Procurement procurement, Payment payment, VisitFeedback feedback) {
         BigDecimal estAmount = booking.getEstQtyQtl()
                 .multiply(booking.getCrop().getRatePerQtl())
                 .setScale(2, RoundingMode.HALF_UP);
+        boolean feedbackDue = feedback == null && booking.getStatus().isWeighed()
+                && booking.getCompletedAt() != null
+                && booking.getCompletedAt().isAfter(now.minusDays(FEEDBACK_DUE_DAYS));
         return new BookingResponse(
                 booking.getId(),
                 booking.getToken(),
@@ -69,7 +80,9 @@ public record BookingResponse(
                 booking.getCreatedAt(),
                 events,
                 procurement == null ? null : ProcurementSummary.from(procurement),
-                payment == null ? null : PaymentSummary.from(payment));
+                payment == null ? null : PaymentSummary.from(payment),
+                feedbackDue,
+                feedback == null ? null : FeedbackResponse.from(feedback));
     }
 
     /** "SFPS:<booking id>:<token>" - the id makes a QR from another day unusable. */

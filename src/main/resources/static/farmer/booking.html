@@ -12,6 +12,9 @@
 </head>
 <body>
 
+<!-- The star shape used by the review stars (its colours come from app.css, so it follows the light/dark theme) -->
+<svg class="svg-defs" aria-hidden="true" focusable="false"><symbol id="star" viewBox="0 0 24 24"><path d="M12 2.5l2.69 6.7 7.2.49-5.54 4.62 1.76 7L12 17.48l-6.11 3.83 1.76-7-5.54-4.62 7.2-.49z"/></symbol></svg>
+
 <header class="site-header">
     <div class="container header-row">
         <a class="brand" href="/farmer/dashboard.html">
@@ -69,6 +72,88 @@
             <section class="card hidden" id="result-card" aria-labelledby="result-title">
                 <h2 id="result-title" data-i18n="result.title">Weighment result</h2>
                 <div id="result"></div>
+            </section>
+            <!-- Review of the visit, once the crop is weighed. The form is plain HTML (not drawn by the script),
+                 so live updates of the booking never clear what the farmer has chosen or typed. -->
+            <section class="card hidden feedback-card" id="feedback-card" aria-labelledby="feedback-title">
+                <h2 id="feedback-title" data-i18n="feedback.title">How was your visit?</h2>
+                <p class="muted" id="feedback-intro" data-i18n="feedback.intro">Tell us in one minute. Your answers help us make the centre and this app better.</p>
+
+                <form id="feedback-form" class="feedback-form" novalidate autocomplete="off">
+                    <fieldset class="feedback-group">
+                        <legend class="feedback-legend"><span class="feedback-legend-icon"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#map-pin"></use></svg></span><span data-i18n="feedback.centre.title">How was the centre?</span></legend>
+                        <div class="stars">
+                            <label class="star"><input type="radio" name="centreRating" value="1"><svg class="star-svg" aria-hidden="true" focusable="false"><use href="#star"></use></svg><span class="sr-only" data-i18n="feedback.star.1">1 out of 5</span></label>
+                            <label class="star"><input type="radio" name="centreRating" value="2"><svg class="star-svg" aria-hidden="true" focusable="false"><use href="#star"></use></svg><span class="sr-only" data-i18n="feedback.star.2">2 out of 5</span></label>
+                            <label class="star"><input type="radio" name="centreRating" value="3"><svg class="star-svg" aria-hidden="true" focusable="false"><use href="#star"></use></svg><span class="sr-only" data-i18n="feedback.star.3">3 out of 5</span></label>
+                            <label class="star"><input type="radio" name="centreRating" value="4"><svg class="star-svg" aria-hidden="true" focusable="false"><use href="#star"></use></svg><span class="sr-only" data-i18n="feedback.star.4">4 out of 5</span></label>
+                            <label class="star"><input type="radio" name="centreRating" value="5"><svg class="star-svg" aria-hidden="true" focusable="false"><use href="#star"></use></svg><span class="sr-only" data-i18n="feedback.star.5">5 out of 5</span></label>
+                        </div>
+                        <p class="star-word" id="centre-rating-word" data-i18n="feedback.tapStar" aria-live="polite">Tap a star</p>
+                        <p class="field-error" id="centre-rating-error" role="alert"></p>
+
+                        <fieldset class="feedback-areas">
+                            <legend data-i18n="feedback.improve">What should improve?</legend>
+                            <p class="hint" data-i18n="feedback.improveHint">Tap all that apply. You can also skip this.</p>
+                            <div class="chip-group">
+                                <label class="chip"><input type="checkbox" name="centreIssues" value="WAITING"><span class="chip-face"><svg class="icon chip-off" aria-hidden="true"><use href="/img/icons.svg#plus"></use></svg><svg class="icon chip-on" aria-hidden="true"><use href="/img/icons.svg#check"></use></svg><span data-i18n="feedback.area.WAITING">Waiting time</span></span></label>
+                                <label class="chip"><input type="checkbox" name="centreIssues" value="STAFF"><span class="chip-face"><svg class="icon chip-off" aria-hidden="true"><use href="/img/icons.svg#plus"></use></svg><svg class="icon chip-on" aria-hidden="true"><use href="/img/icons.svg#check"></use></svg><span data-i18n="feedback.area.STAFF">Staff behaviour</span></span></label>
+                                <label class="chip"><input type="checkbox" name="centreIssues" value="FACILITIES"><span class="chip-face"><svg class="icon chip-off" aria-hidden="true"><use href="/img/icons.svg#plus"></use></svg><svg class="icon chip-on" aria-hidden="true"><use href="/img/icons.svg#check"></use></svg><span data-i18n="feedback.area.FACILITIES">Drinking water, shade and toilets</span></span></label>
+                                <label class="chip"><input type="checkbox" name="centreIssues" value="WEIGHING"><span class="chip-face"><svg class="icon chip-off" aria-hidden="true"><use href="/img/icons.svg#plus"></use></svg><svg class="icon chip-on" aria-hidden="true"><use href="/img/icons.svg#check"></use></svg><span data-i18n="feedback.area.WEIGHING">Weighing and grading</span></span></label>
+                                <label class="chip"><input type="checkbox" name="centreIssues" value="PAYMENT"><span class="chip-face"><svg class="icon chip-off" aria-hidden="true"><use href="/img/icons.svg#plus"></use></svg><svg class="icon chip-on" aria-hidden="true"><use href="/img/icons.svg#check"></use></svg><span data-i18n="feedback.area.PAYMENT">Payment speed</span></span></label>
+                            </div>
+                        </fieldset>
+
+                        <div class="field feedback-comment">
+                            <label for="centre-comment" data-i18n="feedback.comment">Anything else? (optional)</label>
+                            <textarea id="centre-comment" name="centreComment" rows="3" maxlength="500" aria-describedby="centre-comment-count"
+                                      data-i18n-placeholder="feedback.centre.placeholder" placeholder="For example: what was good, what was difficult"></textarea>
+                            <span class="char-count" id="centre-comment-count">0/500</span>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="feedback-group">
+                        <legend class="feedback-legend"><span class="feedback-legend-icon"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#phone"></use></svg></span><span data-i18n="feedback.app.title">How was this app?</span></legend>
+                        <div class="stars">
+                            <label class="star"><input type="radio" name="appRating" value="1"><svg class="star-svg" aria-hidden="true" focusable="false"><use href="#star"></use></svg><span class="sr-only" data-i18n="feedback.star.1">1 out of 5</span></label>
+                            <label class="star"><input type="radio" name="appRating" value="2"><svg class="star-svg" aria-hidden="true" focusable="false"><use href="#star"></use></svg><span class="sr-only" data-i18n="feedback.star.2">2 out of 5</span></label>
+                            <label class="star"><input type="radio" name="appRating" value="3"><svg class="star-svg" aria-hidden="true" focusable="false"><use href="#star"></use></svg><span class="sr-only" data-i18n="feedback.star.3">3 out of 5</span></label>
+                            <label class="star"><input type="radio" name="appRating" value="4"><svg class="star-svg" aria-hidden="true" focusable="false"><use href="#star"></use></svg><span class="sr-only" data-i18n="feedback.star.4">4 out of 5</span></label>
+                            <label class="star"><input type="radio" name="appRating" value="5"><svg class="star-svg" aria-hidden="true" focusable="false"><use href="#star"></use></svg><span class="sr-only" data-i18n="feedback.star.5">5 out of 5</span></label>
+                        </div>
+                        <p class="star-word" id="app-rating-word" data-i18n="feedback.tapStar" aria-live="polite">Tap a star</p>
+                        <p class="field-error" id="app-rating-error" role="alert"></p>
+
+                        <fieldset class="feedback-areas">
+                            <legend data-i18n="feedback.improve">What should improve?</legend>
+                            <p class="hint" data-i18n="feedback.improveHint">Tap all that apply. You can also skip this.</p>
+                            <div class="chip-group">
+                                <label class="chip"><input type="checkbox" name="appIssues" value="BOOKING"><span class="chip-face"><svg class="icon chip-off" aria-hidden="true"><use href="/img/icons.svg#plus"></use></svg><svg class="icon chip-on" aria-hidden="true"><use href="/img/icons.svg#check"></use></svg><span data-i18n="feedback.area.BOOKING">Booking a slot</span></span></label>
+                                <label class="chip"><input type="checkbox" name="appIssues" value="LIVE_QUEUE"><span class="chip-face"><svg class="icon chip-off" aria-hidden="true"><use href="/img/icons.svg#plus"></use></svg><svg class="icon chip-on" aria-hidden="true"><use href="/img/icons.svg#check"></use></svg><span data-i18n="feedback.area.LIVE_QUEUE">Live queue and TV screen</span></span></label>
+                                <label class="chip"><input type="checkbox" name="appIssues" value="MESSAGES"><span class="chip-face"><svg class="icon chip-off" aria-hidden="true"><use href="/img/icons.svg#plus"></use></svg><svg class="icon chip-on" aria-hidden="true"><use href="/img/icons.svg#check"></use></svg><span data-i18n="feedback.area.MESSAGES">Emails and reminders</span></span></label>
+                                <label class="chip"><input type="checkbox" name="appIssues" value="LANGUAGE"><span class="chip-face"><svg class="icon chip-off" aria-hidden="true"><use href="/img/icons.svg#plus"></use></svg><svg class="icon chip-on" aria-hidden="true"><use href="/img/icons.svg#check"></use></svg><span data-i18n="feedback.area.LANGUAGE">Language and easy reading</span></span></label>
+                                <label class="chip"><input type="checkbox" name="appIssues" value="LOGIN"><span class="chip-face"><svg class="icon chip-off" aria-hidden="true"><use href="/img/icons.svg#plus"></use></svg><svg class="icon chip-on" aria-hidden="true"><use href="/img/icons.svg#check"></use></svg><span data-i18n="feedback.area.LOGIN">Login with OTP</span></span></label>
+                            </div>
+                        </fieldset>
+
+                        <div class="field feedback-comment">
+                            <label for="app-comment" data-i18n="feedback.comment">Anything else? (optional)</label>
+                            <textarea id="app-comment" name="appComment" rows="3" maxlength="500" aria-describedby="app-comment-count"
+                                      data-i18n-placeholder="feedback.app.placeholder" placeholder="For example: what was difficult to use in the app"></textarea>
+                            <span class="char-count" id="app-comment-count">0/500</span>
+                        </div>
+                    </fieldset>
+                    <p class="field-error" id="feedback-error" role="alert"></p>
+                    <button type="submit" class="btn btn-primary btn-lg btn-block" id="feedback-send"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#check"></use></svg><span id="feedback-send-label" data-i18n="feedback.send">Send review</span></button>
+                </form>
+
+                <!-- Shown instead of the form once the review is sent -->
+                <div class="feedback-thanks hidden" id="feedback-thanks" tabindex="-1">
+                    <p class="feedback-thanks-title"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#check-circle"></use></svg><span data-i18n="feedback.thanks.title">Thank you for your review!</span></p>
+                    <p class="muted" data-i18n="feedback.thanks.text">We read every review and use it to make things better.</p>
+                    <div class="feedback-summary" id="feedback-summary"></div>
+                    <p class="small muted feedback-sent" id="feedback-sent-on"></p>
+                </div>
             </section>
             <section class="card">
                 <dl class="details" id="details"></dl>

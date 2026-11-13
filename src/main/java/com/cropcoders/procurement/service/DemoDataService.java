@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -27,8 +28,11 @@ import com.cropcoders.procurement.config.AppProperties;
 import com.cropcoders.procurement.dto.DemoDataResponse;
 import com.cropcoders.procurement.entity.Centre;
 import com.cropcoders.procurement.entity.Crop;
+import com.cropcoders.procurement.entity.VisitFeedback;
+import com.cropcoders.procurement.enums.AppIssue;
 import com.cropcoders.procurement.enums.BookingEventType;
 import com.cropcoders.procurement.enums.BookingStatus;
+import com.cropcoders.procurement.enums.CentreIssue;
 import com.cropcoders.procurement.exception.ApiException;
 import com.cropcoders.procurement.realtime.QueueChangedEvent;
 import com.cropcoders.procurement.security.EncryptedText;
@@ -38,6 +42,7 @@ import com.cropcoders.procurement.repository.CropRepository;
 /**
  * Demo data for presentations: 40 demo farmers, a busy day in progress at every centre
  * (served, at the counter, waiting, still to come) and the last 6 days of history for the charts.
+ * About half of the farmers whose crop was weighed have reviewed their visit (stars, things to improve, comments).
  *
  * Demo farmers have email addresses ending in "@demo.invalid" (a domain that can never exist), so
  * they never get real emails and can be removed again without touching real farmers.
@@ -97,6 +102,34 @@ public class DemoDataService {
             {"Indian Overseas Bank", "IOBA"}, {"Tamil Nadu Grama Bank", "IDIB"},
     };
     private static final String[] UPI_HANDLES = {"okaxis", "oksbi", "ybl", "paytm"};
+
+    // Short review comments in English, Tamil and Hindi: one per improvement code (in the order of
+    // CentreIssue / AppIssue), and one for a farmer who has nothing to improve.
+    private static final String[][] CENTRE_COMMENTS = {
+            {"Waited long in the sun before my turn.", "என் முறை வரும் வரை வெயிலில் நீண்ட நேரம் காத்திருந்தேன்.",
+                    "मेरी बारी से पहले धूप में बहुत देर इंतज़ार किया।"},
+            {"Staff at the gate could talk more politely.", "வாசலில் உள்ள ஊழியர்கள் இன்னும் மரியாதையாகப் பேசலாம்.",
+                    "गेट पर कर्मचारी और विनम्रता से बात कर सकते हैं।"},
+            {"Please keep drinking water and some shade.", "குடிநீரும் நிழலும் ஏற்பாடு செய்யுங்கள்.",
+                    "कृपया पीने का पानी और छाया की व्यवस्था करें।"},
+            {"Please check the moisture a second time.", "ஈரப்பதத்தை இன்னொரு முறை சோதியுங்கள்.",
+                    "कृपया नमी दोबारा जाँचें।"},
+            {"The payment should come faster.", "பணம் இன்னும் விரைவாக வர வேண்டும்.", "भुगतान और जल्दी आना चाहिए।"},
+    };
+    private static final String[] CENTRE_PRAISE = {"Everything went smoothly, thank you.",
+            "எல்லாம் சுலபமாக நடந்தது, நன்றி.", "सब कुछ आसानी से हुआ, धन्यवाद।"};
+    private static final String[][] APP_COMMENTS = {
+            {"Choosing a slot took me some time.", "நேரத்தைத் தேர்வு செய்ய கொஞ்சம் நேரம் ஆனது.",
+                    "स्लॉट चुनने में थोड़ा समय लगा।"},
+            {"The letters on the TV screen are small.", "TV திரையில் எழுத்துகள் சிறியதாக உள்ளன.",
+                    "TV स्क्रीन के अक्षर छोटे हैं।"},
+            {"The reminder email came late.", "நினைவூட்டல் மின்னஞ்சல் தாமதமாக வந்தது.", "याद दिलाने वाला ईमेल देर से आया।"},
+            {"Some words are hard to understand.", "சில சொற்கள் புரிந்துகொள்ளக் கடினமாக உள்ளன.",
+                    "कुछ शब्द समझने में कठिन हैं।"},
+            {"The OTP took a minute to arrive.", "OTP வர ஒரு நிமிடம் ஆனது.", "OTP आने में एक मिनट लगा।"},
+    };
+    private static final String[] APP_PRAISE = {"Easy to use, I saw my turn on my phone.",
+            "பயன்படுத்த எளிது, என் முறையைக் கைப்பேசியில் பார்த்தேன்.", "इस्तेमाल करना आसान है, अपनी बारी फ़ोन पर देखी।"};
 
     public DemoDataService(JdbcTemplate jdbc, CentreRepository centreRepository, CropRepository cropRepository,
                            SlotService slotService, TokenService tokenService, ApplicationEventPublisher events,
@@ -442,10 +475,64 @@ public class DemoDataService {
         }
         if (v.status == BookingStatus.COMPLETED || v.status == BookingStatus.REJECTED) {
             saveWeighment(ctx, v, bookingId, operatorId, timeline, random);
+            // About half of the farmers review their visit, so the admin dashboard has reviews to show.
+            if (random.nextBoolean()) {
+                saveReview(ctx, v, bookingId, random);
+            }
         }
         jdbc.batchUpdate("""
                 INSERT INTO booking_events (booking_id, event, note, created_by, created_at)
                 VALUES (?, ?, ?, ?, ?)""", timeline);
+    }
+
+    /**
+     * A review like a real farmer would give: an accepted crop gets 3 to 5 stars for the centre, a rejected one
+     * 2 to 4. Fewer stars come with 1 or 2 things to improve, and some farmers write a short comment in their
+     * own language about the first of them.
+     */
+    private void saveReview(Context ctx, Visit v, long bookingId, Random random) {
+        boolean accepted = v.status == BookingStatus.COMPLETED;
+        int centreRating = (accepted ? 3 : 2) + random.nextInt(3);
+        int appRating = random.nextInt(10) == 0 ? 2 : 3 + random.nextInt(3);
+        List<CentreIssue> centreIssues = someOf(CentreIssue.values(), issuesFor(centreRating, random), random);
+        List<AppIssue> appIssues = someOf(AppIssue.values(), issuesFor(appRating, random), random);
+
+        int language = switch (v.farmer.language()) {
+            case "ta" -> 1;
+            case "hi" -> 2;
+            default -> 0;
+        };
+        String centreComment = random.nextInt(3) == 0 ? (centreIssues.isEmpty() ? CENTRE_PRAISE
+                : CENTRE_COMMENTS[centreIssues.getFirst().ordinal()])[language] : null;
+        String appComment = random.nextInt(4) == 0 ? (appIssues.isEmpty() ? APP_PRAISE
+                : APP_COMMENTS[appIssues.getFirst().ordinal()])[language] : null;
+
+        // Given a little after the weighment, but never in the future.
+        LocalDateTime at = v.completedAt.plusMinutes(10 + random.nextInt(170));
+        if (at.isAfter(ctx.now())) {
+            at = ctx.now().minusMinutes(1);
+        }
+        jdbc.update("""
+                INSERT INTO visit_feedback (booking_id, farmer_id, centre_id, centre_rating, app_rating, centre_issues,
+                                            app_issues, centre_comment, app_comment, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                bookingId, v.farmer.id(), v.centre.getId(), centreRating, appRating,
+                VisitFeedback.joinCodes(centreIssues), VisitFeedback.joinCodes(appIssues), centreComment, appComment,
+                at);
+    }
+
+    /** 5 stars: nothing to improve; 4 stars: one thing; fewer: one or two. */
+    private static int issuesFor(int rating, Random random) {
+        return rating == 5 ? 0 : rating == 4 ? 1 : 1 + random.nextInt(2);
+    }
+
+    /** howMany different codes, picked at random, in their fixed order. */
+    private static <E extends Enum<E>> List<E> someOf(E[] codes, int howMany, Random random) {
+        List<E> pool = new ArrayList<>(List.of(codes));
+        Collections.shuffle(pool, random);
+        List<E> chosen = new ArrayList<>(pool.subList(0, Math.min(howMany, pool.size())));
+        chosen.sort(Comparator.naturalOrder());
+        return chosen;
     }
 
     /** Weight, moisture and grade like a real weighment; accepted crops get a payment (paid or pending). */
@@ -614,6 +701,7 @@ public class DemoDataService {
 
         jdbc.update("DELETE FROM notifications WHERE user_id IN (" + DEMO_FARMER_IDS + ") OR booking_id IN ("
                 + bookings + ")");
+        jdbc.update("DELETE FROM visit_feedback WHERE farmer_id IN (" + DEMO_FARMER_IDS + ")");   // their reviews
         jdbc.update("DELETE FROM payments WHERE procurement_id IN (" + procurements + ")");
         jdbc.update("DELETE FROM procurements WHERE booking_id IN (" + bookings + ")");
         jdbc.update("DELETE FROM bookings WHERE farmer_id IN (" + DEMO_FARMER_IDS + ")");   // timeline goes too (cascade)

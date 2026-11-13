@@ -320,6 +320,10 @@ class EndToEndFlowTest {
         long bookingId = ((Number) JsonPath.read(booking, "$.id")).longValue();
         expect(post("/api/operator/bookings/" + bookingId + "/weighment", staffToken, Map.of(
                 "weightQtl", 24.5, "moisturePct", 12.0, "grade", "A", "accepted", true)), 200);
+        // The "crop accepted" email (in Tamil, the farmer's language) asks the farmer to rate the centre and the app.
+        assertThat(waitForEmail(email, "24.5").text()).contains("செயலியையும் மதிப்பிடுங்கள்");
+        String weighed = body(expect(get("/api/bookings/" + bookingId, farmerToken), 200));
+        assertThat((Boolean) JsonPath.read(weighed, "$.feedbackDue")).as("the farmer is asked for a review").isTrue();
 
         // ---------- Payment: the centre admin sees it with the farmer's bank details ----------
         String payments = body(expect(get("/api/admin/payments?status=PENDING", adminToken), 200));
@@ -501,6 +505,139 @@ class EndToEndFlowTest {
                 .contains("no-store");
     }
 
+    @Test
+    void farmerReviewsTheVisitAfterWeighingAndAdminsSeeTheReview() throws Exception {
+        long tnj = jdbc.queryForObject("SELECT id FROM centres WHERE code = 'TNJ'", Long.class);
+        LocalDate today = LocalDate.now();
+        // A late slot today, so the no-show job (slot end + 2 hours) never touches this booking during the test.
+        LocalTime late = LocalTime.of(23, 20, 23);
+        long farmerId = newFarmer("Review Farmer");
+        String farmer = farmerToken(farmerId);
+        long bookingId = insertBooking("TNJ-903", farmerId, insertSlot(tnj, today, late, late.plusMinutes(30)), tnj, today);
+        String bookingUrl = "/api/bookings/" + bookingId;
+        String feedbackUrl = bookingUrl + "/feedback";
+
+        Map<String, Object> review = new java.util.HashMap<>(Map.of(
+                "centreRating", 4, "appRating", 5,
+                "centreIssues", List.of("FACILITIES", "WAITING", "WAITING"), "appIssues", List.of(),
+                "centreComment", "  Need shade\nnear the counters\u0007 ", "appComment", "தமிழில் படிக்க எளிது"));
+
+        // Before the weighment: no review yet, and the dashboard does not ask for one.
+        assertThat((String) JsonPath.read(body(expect(post(feedbackUrl, farmer, review), 400)), "$.code"))
+                .isEqualTo("FEEDBACK_NOT_ALLOWED");
+        String before = body(expect(get(bookingUrl, farmer), 200));
+        assertThat((Boolean) JsonPath.read(before, "$.feedbackDue")).isFalse();
+        assertThat(before).doesNotContain("\"feedback\"");
+
+        // The crop is weighed (saved the way the counter saves it): now the farmer is asked for a review.
+        jdbc.update("UPDATE bookings SET status = 'COMPLETED', completed_at = LOCALTIMESTAMP WHERE id = ?", bookingId);
+        assertThat((Boolean) JsonPath.read(body(expect(get(bookingUrl, farmer), 200)), "$.feedbackDue")).isTrue();
+        List<Boolean> dueInList = JsonPath.read(body(expect(get("/api/bookings/my", farmer), 200)),
+                "$[?(@.id == " + bookingId + ")].feedbackDue");
+        assertThat(dueInList).containsExactly(true);
+
+        // Wrong values are refused: stars outside 1 to 5, an unknown code, a code of the other list, a long
+        // comment, a missing rating. Another farmer cannot review this booking at all.
+        Map<String, Object> wrongValues = new java.util.LinkedHashMap<>();
+        wrongValues.put("centreRating", 0);
+        wrongValues.put("appRating", 6);
+        wrongValues.put("centreIssues", List.of("NOISE"));
+        wrongValues.put("appIssues", List.of("WAITING"));
+        wrongValues.put("appComment", "x".repeat(501));
+        for (Map.Entry<String, Object> wrong : wrongValues.entrySet()) {
+            Map<String, Object> bad = new java.util.HashMap<>(review);
+            bad.put(wrong.getKey(), wrong.getValue());
+            expect(post(feedbackUrl, farmer, bad), 400);
+        }
+        Map<String, Object> noRating = new java.util.HashMap<>(review);
+        noRating.remove("appRating");
+        expect(post(feedbackUrl, farmer, noRating), 400);
+        String notTheirs = body(expect(post(feedbackUrl, farmerToken(newFarmer("Other Farmer")), review), 404));
+        assertThat((String) JsonPath.read(notTheirs, "$.code")).isEqualTo("BOOKING_NOT_FOUND");
+
+        // The review is saved tidied up: each code once in the fixed order, the comment trimmed, the line break
+        // a space, the control character gone, the Tamil text unchanged.
+        String reviewed = body(expect(post(feedbackUrl, farmer, review), 200));
+        assertThat((Integer) JsonPath.read(reviewed, "$.feedback.centreRating")).isEqualTo(4);
+        assertThat((Integer) JsonPath.read(reviewed, "$.feedback.appRating")).isEqualTo(5);
+        List<String> centreIssues = JsonPath.read(reviewed, "$.feedback.centreIssues");
+        assertThat(centreIssues).containsExactly("WAITING", "FACILITIES");
+        List<String> appIssues = JsonPath.read(reviewed, "$.feedback.appIssues");
+        assertThat(appIssues).isEmpty();
+        assertThat((String) JsonPath.read(reviewed, "$.feedback.centreComment")).isEqualTo("Need shade near the counters");
+        assertThat((String) JsonPath.read(reviewed, "$.feedback.appComment")).isEqualTo("தமிழில் படிக்க எளிது");
+        assertThat((String) JsonPath.read(reviewed, "$.feedback.createdAt")).startsWith(today.toString());
+        assertThat((Boolean) JsonPath.read(reviewed, "$.feedbackDue")).isFalse();
+
+        // Only one review per visit; the list shows it too.
+        assertThat((String) JsonPath.read(body(expect(post(feedbackUrl, farmer, review), 409)), "$.code"))
+                .isEqualTo("FEEDBACK_ALREADY_GIVEN");
+        List<Integer> inList = JsonPath.read(body(expect(get("/api/bookings/my", farmer), 200)),
+                "$[?(@.id == " + bookingId + ")].feedback.centreRating");
+        assertThat(inList).containsExactly(4);
+
+        // ---------- Super admin: farmers and reviews of every centre ----------
+        long reviewId = jdbc.queryForObject("SELECT id FROM visit_feedback WHERE booking_id = ?", Long.class, bookingId);
+        String dashboard = body(expect(get("/api/admin/dashboard", staffToken("e2e.super")), 200));
+        int registered = JsonPath.read(dashboard, "$.farmers.registered");
+        assertThat(registered).as("Review Farmer and Other Farmer at least").isGreaterThanOrEqualTo(2);
+        assertThat((Integer) JsonPath.read(dashboard, "$.farmers.newThisWeek")).isGreaterThanOrEqualTo(2);
+        assertThat((Integer) JsonPath.read(dashboard, "$.farmers.broughtCrops")).isGreaterThanOrEqualTo(1);
+        assertThat((Integer) JsonPath.read(dashboard, "$.farmers.accepted")).isGreaterThanOrEqualTo(1);
+        assertThat((Integer) JsonPath.read(dashboard, "$.farmers.visits")).isGreaterThanOrEqualTo(1);
+        assertThat((Integer) JsonPath.read(dashboard, "$.feedback.count")).isGreaterThanOrEqualTo(1);
+        assertThat(((Number) JsonPath.read(dashboard, "$.feedback.avgCentreRating")).doubleValue()).isBetween(1.0, 5.0);
+        assertThat(((Number) JsonPath.read(dashboard, "$.feedback.avgAppRating")).doubleValue()).isBetween(1.0, 5.0);
+        List<String> centreCodes = JsonPath.read(dashboard, "$.feedback.centreIssues[*].code");
+        assertThat(centreCodes).containsExactly("WAITING", "STAFF", "FACILITIES", "WEIGHING", "PAYMENT");
+        List<String> appCodes = JsonPath.read(dashboard, "$.feedback.appIssues[*].code");
+        assertThat(appCodes).containsExactly("BOOKING", "LIVE_QUEUE", "MESSAGES", "LANGUAGE", "LOGIN");
+        List<Integer> waiting = JsonPath.read(dashboard, "$.feedback.centreIssues[?(@.code == 'WAITING')].count");
+        assertThat(waiting.get(0)).isGreaterThanOrEqualTo(1);
+
+        List<Map<String, Object>> recent = JsonPath.read(dashboard, "$.feedback.recent[?(@.id == " + reviewId + ")]");
+        assertThat(recent).hasSize(1);
+        assertThat(recent.get(0)).containsEntry("farmerName", "Review Farmer").containsEntry("token", "TNJ-903")
+                .containsEntry("date", today.toString()).containsEntry("centreRating", 4).containsEntry("appRating", 5)
+                .containsEntry("centreComment", "Need shade near the counters");
+        List<Number> tnjRating = JsonPath.read(dashboard, "$.centres[?(@.code == 'TNJ')].rating");
+        assertThat(tnjRating.get(0).doubleValue()).isBetween(1.0, 5.0);
+        List<Integer> tnjReviews = JsonPath.read(dashboard, "$.centres[?(@.code == 'TNJ')].reviews");
+        assertThat(tnjReviews.get(0)).isGreaterThanOrEqualTo(1);
+
+        // ---------- Centre admins: only the reviews of their own centre ----------
+        String tnjAdmin = body(expect(get("/api/admin/dashboard", staffToken("admin.tnj")), 200));
+        assertThat((List<?>) JsonPath.read(tnjAdmin, "$.feedback.recent[?(@.id == " + reviewId + ")]")).hasSize(1);
+        assertThat((Integer) JsonPath.read(tnjAdmin, "$.farmers.registered"))
+                .as("registered farmers: the same site-wide number for every admin").isEqualTo(registered);
+        assertThat((Integer) JsonPath.read(tnjAdmin, "$.farmers.broughtCrops")).isGreaterThanOrEqualTo(1);
+
+        String tvrAdmin = body(expect(get("/api/admin/dashboard", staffToken("admin.tvr")), 200));
+        assertThat((List<?>) JsonPath.read(tvrAdmin, "$.feedback.recent[?(@.id == " + reviewId + ")]")).isEmpty();
+        assertThat((List<?>) JsonPath.read(tvrAdmin, "$.centres[?(@.code == 'TNJ')]")).isEmpty();
+    }
+
+    @Test
+    void demoDayHasReviewsAndRemovingItRemovesThem() throws Exception {
+        String superToken = staffToken("e2e.super");
+        String demoFarmers = "SELECT id FROM users WHERE role = 'FARMER' AND email LIKE '%@demo.invalid'";
+        String demoReviews = "SELECT count(*) FROM visit_feedback WHERE farmer_id IN (" + demoFarmers + ")";
+
+        expect(post("/api/admin/demo", superToken, null), 200);
+        int weighed = jdbc.queryForObject("SELECT count(*) FROM bookings WHERE status IN ('COMPLETED', 'REJECTED') "
+                + "AND farmer_id IN (" + demoFarmers + ")", Integer.class);
+        int reviews = jdbc.queryForObject(demoReviews, Integer.class);
+        assertThat(reviews).as("about half of the weighed demo visits are reviewed").isBetween(weighed / 4, weighed * 3 / 4);
+        String dashboard = body(expect(get("/api/admin/dashboard", superToken), 200));
+        assertThat((Integer) JsonPath.read(dashboard, "$.feedback.count")).isGreaterThanOrEqualTo(reviews);
+        assertThat((List<?>) JsonPath.read(dashboard, "$.feedback.recent")).hasSize(10);
+        assertThat((Integer) JsonPath.read(dashboard, "$.farmers.broughtCrops")).isGreaterThanOrEqualTo(1);
+
+        expect(delete("/api/admin/demo", superToken), 200);
+        assertThat(jdbc.queryForObject(demoReviews, Integer.class)).isZero();
+        assertThat(jdbc.queryForObject(demoFarmers.replace("SELECT id", "SELECT count(*)"), Integer.class)).isZero();
+    }
+
     // ---------- helpers ----------
 
     /**
@@ -544,6 +681,15 @@ class EndToEndFlowTest {
     /** A login token for a farmer, made the same way the server makes it after the OTP. */
     private String farmerToken(long farmerId) {
         return jwtService.createLoginToken(new AuthUser(farmerId, Role.FARMER, "Test Farmer", null));
+    }
+
+    /** A login token for a staff account (super admin, centre admin), made the same way the server makes it. */
+    private String staffToken(String username) {
+        Map<String, Object> user = jdbc.queryForMap("SELECT id, role, name, centre_id FROM users WHERE username = ?",
+                username);
+        Long centreId = user.get("centre_id") == null ? null : ((Number) user.get("centre_id")).longValue();
+        return jwtService.createLoginToken(new AuthUser(((Number) user.get("id")).longValue(),
+                Role.valueOf((String) user.get("role")), (String) user.get("name"), centreId));
     }
 
     /**

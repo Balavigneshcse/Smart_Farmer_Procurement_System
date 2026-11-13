@@ -12,6 +12,8 @@ let notifications = null;
 let showAllNotifications = false;
 let noticeTimer = null;
 const NOTIFICATIONS_SHOWN = 3;
+// a small filled star (the shape is defined once at the top of dashboard.html)
+const STAR = '<svg class="star-svg" aria-hidden="true" focusable="false"><use href="#star"></use></svg>';
 
 function showNotice(text, type = 'success') {
     $('notice').textContent = text;
@@ -50,6 +52,7 @@ function bookingItem(b, featured = false) {
                 <span>${esc(Farmer.slotTime(b.startTime, b.endTime))}</span>
                 <span class="muted">${esc(b.centre.name)}</span>
                 <span class="muted">${esc(Farmer.cropName(b.crop))}, ${esc(Farmer.quantity(b.estQtyQtl))}</span>
+                ${b.feedbackDue ? `<span class="booking-review">${STAR}${esc(I18N.t('feedback.badge'))}</span>` : ''}
             </div>
             <span class="booking-item-go">${UI.icon('caret-right')}</span>
         </a>`;
@@ -76,6 +79,24 @@ function renderBookings() {
         ${earlier.length ? `
             <h3 class="list-heading">${esc(I18N.t('dashboard.bookings.past'))}</h3>
             <div class="booking-list">${earlier.map(b => bookingItem(b)).join('')}</div>` : ''}`;
+}
+
+/**
+ * "How was your visit to Erode Centre on 13 November?" for the newest visit that waits for a review
+ * (feedbackDue: crop weighed in the last 7 days and no review yet). Hidden when there is none.
+ */
+function renderFeedbackReminder() {
+    if (!bookings) return;
+    const due = bookings.filter(b => b.feedbackDue)
+        .sort((a, b) => (b.date + b.startTime).localeCompare(a.date + a.startTime));
+    const newest = due[0];
+    $('feedback-reminder').classList.toggle('hidden', !newest);
+    if (!newest) return;
+    $('feedback-reminder-title').textContent = I18N.t('feedback.reminder.title', {
+        centre: newest.centre.name,
+        date: I18N.formatDate(newest.date, { day: 'numeric', month: 'long' }),
+    });
+    $('feedback-reminder-link').href = `/farmer/booking.html?id=${newest.id}#feedback`;
 }
 
 // Subject and message are saved in the farmer's language when the notification is created.
@@ -110,6 +131,7 @@ function renderNotifications() {
 
 function renderAll() {
     renderProfile();
+    renderFeedbackReminder();
     renderBookings();
     renderNotifications();
 }

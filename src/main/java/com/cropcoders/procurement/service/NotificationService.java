@@ -44,7 +44,9 @@ public class NotificationService {
 
     private static final Set<EmailStatus> COUNTS_TOWARDS_LIMIT = EnumSet.of(EmailStatus.PENDING, EmailStatus.SENT);
     private static final int MAX_SUBJECT = 200;
-    private static final int MAX_MESSAGE = 500;
+    // notifications.message is VARCHAR(1000) since V11: the "crop accepted / not accepted" texts end with a
+    // request to review the visit, which a long centre name and rejection reason must not cut off.
+    private static final int MAX_MESSAGE = 1000;
 
     private final NotificationRepository notificationRepository;
     private final FarmerProfileRepository profileRepository;
