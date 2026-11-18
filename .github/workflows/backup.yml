@@ -26,8 +26,10 @@ jobs:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
         run: |
+          # ::error:: shows the reason on the run's summary page, not just "exit code 1"
           if [ -z "$DATABASE_URL" ] || [ -z "$PASSPHRASE" ]; then
-            echo "Add the NEON_DATABASE_URL and BACKUP_PASSPHRASE secrets first."; exit 1
+            echo "::error::No backup made: add the repository secrets NEON_DATABASE_URL and BACKUP_PASSPHRASE (Settings > Secrets and variables > Actions)."
+            exit 1
           fi
           file="sfps-$(date -u +%F).sql.gz.gpg"
           docker run --rm -e DATABASE_URL postgres:18-alpine sh -c 'pg_dump --no-owner --no-privileges "$DATABASE_URL"' \
