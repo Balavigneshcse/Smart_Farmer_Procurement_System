@@ -14,7 +14,8 @@ Farmers often wait all day at procurement centres without knowing the schedule o
 (Render's free plan: after 15 minutes without visitors the server sleeps, so the first page then takes about a minute to open.)
 
 Staff logins: [staff-accounts.xlsx](staff-accounts.xlsx) lists every admin and staff account, its starting password and its login page (`/staff/login.html`). Change a starting password after the first login.
-
+Staff logins 
+admin.tnj	Kfkawa@7952
 Theme: Smart Automation · College mini project
 
 ## Tech stack
